@@ -65,13 +65,16 @@ def emit_apacheconf():
     apachecontext = {
         "hostname": utils.unit_get('private-address')
         }
-    with open('/etc/apache2/sites-available/rgw', 'w') as apacheconf:
+    with open('/etc/apache2/sites-available/rgw.conf', 'w') as apacheconf:
         apacheconf.write(utils.render_template('rgw', apachecontext))
 
 
 def apache_sites():
     utils.juju_log('INFO', 'Begin apache_sites.')
-    subprocess.check_call(['a2dissite', 'default'])
+    if os.path.exists('/etc/apache2/sites-available/000-default.conf'):
+        subprocess.check_call(['a2dissite', '000-default'])
+    else:
+        subprocess.check_call(['a2dissite', 'default'])
     subprocess.check_call(['a2ensite', 'rgw'])
     utils.juju_log('INFO', 'End apache_sites.')
 
