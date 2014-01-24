@@ -13,7 +13,7 @@ import time
 import os
 import apt_pkg as apt
 
-import socket.gethostname as get_unit_hostname
+from socket import gethostname as get_unit_hostname
 
 LEADER = 'leader'
 PEON = 'peon'

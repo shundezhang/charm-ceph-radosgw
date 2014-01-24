@@ -37,7 +37,7 @@ from utils import (
 )
 
 from charmhelpers.payload.execd import execd_preinstall
-import socket.gethostname as get_unit_hostname
+from socket import gethostname as get_unit_hostname
 
 hooks = Hooks()
 
