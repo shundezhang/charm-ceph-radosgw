@@ -33,7 +33,8 @@ from charmhelpers.fetch import (
 from utils import (
     render_template,
     get_host_ip,
-    enable_pocket
+    enable_pocket,
+    is_apache_24
 )
 
 from charmhelpers.payload.execd import execd_preinstall
@@ -91,12 +92,15 @@ def emit_apacheconf():
     apachecontext = {
         "hostname": unit_get('private-address')
     }
-    with open('/etc/apache2/sites-available/rgw.conf', 'w') as apacheconf:
+    site_conf = '/etc/apache2/sites-available/rgw'
+    if is_apache_24():
+        site_conf = '/etc/apache2/sites-available/rgw.conf'
+    with open(site_conf, 'w') as apacheconf:
         apacheconf.write(render_template('rgw', apachecontext))
 
 
 def apache_sites():
-    if os.path.exists('/etc/apache2/sites-available/000-default.conf'):
+    if is_apache_24():
         subprocess.check_call(['a2dissite', '000-default'])
     else:
         subprocess.check_call(['a2dissite', 'default'])

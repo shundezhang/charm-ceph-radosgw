@@ -9,6 +9,7 @@
 
 import socket
 import re
+import os
 
 from charmhelpers.core.hookenv import unit_get
 from charmhelpers.fetch import apt_install
@@ -59,3 +60,10 @@ def get_host_ip(hostname=unit_get('private-address')):
         answers = dns.resolver.query(hostname, 'A')
         if answers:
             return answers[0].address
+
+
+def is_apache_24():
+    if os.path.exists('/etc/apache2/conf-available'):
+        return True
+    else:
+        return False
