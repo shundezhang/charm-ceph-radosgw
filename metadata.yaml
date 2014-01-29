@@ -7,6 +7,8 @@ description: |
  .
  This charm provides the RADOS HTTP gateway supporting S3 and Swift protocols
  for object storage.
+categories:
+  - misc
 requires:
   mon:
     interface: ceph-radosgw

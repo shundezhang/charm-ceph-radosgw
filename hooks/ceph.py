@@ -10,9 +10,10 @@
 import json
 import subprocess
 import time
-import utils
 import os
 import apt_pkg as apt
+
+from socket import gethostname as get_unit_hostname
 
 LEADER = 'leader'
 PEON = 'peon'
@@ -20,13 +21,13 @@ QUORUM = [LEADER, PEON]
 
 
 def is_quorum():
-    asok = "/var/run/ceph/ceph-mon.{}.asok".format(utils.get_unit_hostname())
+    asok = "/var/run/ceph/ceph-mon.{}.asok".format(get_unit_hostname())
     cmd = [
         "ceph",
         "--admin-daemon",
         asok,
         "mon_status"
-        ]
+    ]
     if os.path.exists(asok):
         try:
             result = json.loads(subprocess.check_output(cmd))
@@ -44,13 +45,13 @@ def is_quorum():
 
 
 def is_leader():
-    asok = "/var/run/ceph/ceph-mon.{}.asok".format(utils.get_unit_hostname())
+    asok = "/var/run/ceph/ceph-mon.{}.asok".format(get_unit_hostname())
     cmd = [
         "ceph",
         "--admin-daemon",
         asok,
         "mon_status"
-        ]
+    ]
     if os.path.exists(asok):
         try:
             result = json.loads(subprocess.check_output(cmd))
@@ -73,14 +74,14 @@ def wait_for_quorum():
 
 
 def add_bootstrap_hint(peer):
-    asok = "/var/run/ceph/ceph-mon.{}.asok".format(utils.get_unit_hostname())
+    asok = "/var/run/ceph/ceph-mon.{}.asok".format(get_unit_hostname())
     cmd = [
         "ceph",
         "--admin-daemon",
         asok,
         "add_bootstrap_peer_hint",
         peer
-        ]
+    ]
     if os.path.exists(asok):
         # Ignore any errors for this call
         subprocess.call(cmd)
@@ -89,7 +90,7 @@ DISK_FORMATS = [
     'xfs',
     'ext4',
     'btrfs'
-    ]
+]
 
 
 def is_osd_disk(dev):
@@ -99,7 +100,7 @@ def is_osd_disk(dev):
         for line in info:
             if line.startswith(
                 'Partition GUID code: 4FBD7E29-9D25-41B8-AFD0-062C0CEFF05D'
-                ):
+            ):
                 return True
     except subprocess.CalledProcessError:
         pass
@@ -110,7 +111,7 @@ def rescan_osd_devices():
     cmd = [
         'udevadm', 'trigger',
         '--subsystem-match=block', '--action=add'
-        ]
+    ]
 
     subprocess.call(cmd)
 
@@ -140,7 +141,7 @@ def import_osd_bootstrap_key(key):
             '--create-keyring',
             '--name=client.bootstrap-osd',
             '--add-key={}'.format(key)
-            ]
+        ]
         subprocess.check_call(cmd)
 
 # OSD caps taken from ceph-create-keys
@@ -148,10 +149,10 @@ _osd_bootstrap_caps = {
     'mon': [
         'allow command osd create ...',
         'allow command osd crush set ...',
-       r'allow command auth add * osd allow\ * mon allow\ rwx',
+        r'allow command auth add * osd allow\ * mon allow\ rwx',
         'allow command mon getmap'
-        ]
-    }
+    ]
+}
 
 
 def get_osd_bootstrap_key():
@@ -169,14 +170,14 @@ def import_radosgw_key(key):
             '--create-keyring',
             '--name=client.radosgw.gateway',
             '--add-key={}'.format(key)
-            ]
+        ]
         subprocess.check_call(cmd)
 
 # OSD caps taken from ceph-create-keys
 _radosgw_caps = {
     'mon': ['allow r'],
     'osd': ['allow rwx']
-    }
+}
 
 
 def get_radosgw_key():
@@ -186,7 +187,7 @@ def get_radosgw_key():
 _default_caps = {
     'mon': ['allow r'],
     'osd': ['allow rwx']
-    }
+}
 
 
 def get_named_key(name, caps=None):
@@ -196,16 +197,16 @@ def get_named_key(name, caps=None):
         '--name', 'mon.',
         '--keyring',
         '/var/lib/ceph/mon/ceph-{}/keyring'.format(
-                                        utils.get_unit_hostname()
-                                        ),
+            get_unit_hostname()
+        ),
         'auth', 'get-or-create', 'client.{}'.format(name),
-        ]
+    ]
     # Add capabilities
     for subsystem, subcaps in caps.iteritems():
         cmd.extend([
             subsystem,
             '; '.join(subcaps),
-            ])
+        ])
     output = subprocess.check_output(cmd).strip()  # IGNORE:E1103
     # get-or-create appears to have different output depending
     # on whether its 'get' or 'create'
