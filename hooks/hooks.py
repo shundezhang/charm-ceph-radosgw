@@ -205,8 +205,7 @@ def restart():
     open_port(port=80)
 
 
-@hooks.hook('identity-service-relation-joined',
-            'identity-service-relation-changed')
+@hooks.hook('identity-service-relation-joined')
 def identity_joined(relid=None):
     if ceph.get_ceph_version('radosgw') < "0.55":
         log('Integration with keystone requires ceph >= 0.55')
@@ -223,6 +222,7 @@ def identity_joined(relid=None):
                  rid=relid)
 
 
+@hooks.hook('identity-service-relation-changed')
 def identity_changed():
     emit_cephconf()
     restart()
