@@ -73,7 +73,8 @@ def emit_cephconf():
         'auth_supported': get_auth() or 'none',
         'mon_hosts': ' '.join(get_mon_hosts()),
         'hostname': get_unit_hostname(),
-        'version': ceph.get_ceph_version('radosgw')
+        'version': ceph.get_ceph_version('radosgw'),
+        'use_syslog': str(config('use-syslog')).lower()
     }
 
     # Check to ensure that correct version of ceph is
