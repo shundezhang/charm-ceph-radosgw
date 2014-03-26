@@ -41,3 +41,8 @@ options:
     default: 600
     type: int
     description: Interval between revocation checks to keystone.
+  use-syslog:
+    type: boolean
+    default: False
+    description: |
+      If set to True, supporting services will log to syslog.
