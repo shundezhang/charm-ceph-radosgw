@@ -8,5 +8,5 @@ sync:
 	@charm-helper-sync -c charm-helpers-sync.yaml
 
 publish: lint
-	bzr push lp:charms/ceph
-	bzr push lp:charms/trusty/ceph
+	bzr push lp:charms/ceph-radosgw
+	bzr push lp:charms/trusty/ceph-radosgw
