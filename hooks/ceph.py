@@ -224,7 +224,7 @@ def get_named_key(name, caps=None):
 
 def get_ceph_version(package=None):
     apt.init()
-    cache = apt.Cache()
+    cache = apt.Cache(memonly=True)
     pkg = cache[package or 'ceph']
     if pkg.current_ver:
         return apt.upstream_version(pkg.current_ver.ver_str)
