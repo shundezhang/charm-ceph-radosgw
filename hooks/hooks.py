@@ -38,6 +38,7 @@ from utils import (
 )
 
 from charmhelpers.payload.execd import execd_preinstall
+from charmhelpers.core.host import cmp_pkgrevno
 from socket import gethostname as get_unit_hostname
 
 hooks = Hooks()
@@ -73,13 +74,13 @@ def emit_cephconf():
         'auth_supported': get_auth() or 'none',
         'mon_hosts': ' '.join(get_mon_hosts()),
         'hostname': get_unit_hostname(),
-        'version': ceph.get_ceph_version('radosgw'),
+        'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
         'use_syslog': str(config('use-syslog')).lower()
     }
 
     # Check to ensure that correct version of ceph is
     # in use
-    if ceph.get_ceph_version('radosgw') >= "0.55":
+    if cmp_pkgrevno('radosgw', '0.55') >= 0:
         # Add keystone configuration if found
         ks_conf = get_keystone_conf()
         if ks_conf:
@@ -208,7 +209,7 @@ def restart():
 
 @hooks.hook('identity-service-relation-joined')
 def identity_joined(relid=None):
-    if ceph.get_ceph_version('radosgw') < "0.55":
+    if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
 
