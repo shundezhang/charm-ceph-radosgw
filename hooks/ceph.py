@@ -11,7 +11,6 @@ import json
 import subprocess
 import time
 import os
-import apt_pkg
 
 from socket import gethostname as get_unit_hostname
 
@@ -220,21 +219,3 @@ def get_named_key(name, caps=None):
             if 'key' in element:
                 key = element.split(' = ')[1].strip()  # IGNORE:E1103
     return key
-
-
-def get_ceph_version(package=None):
-    apt_pkg.init()
-    # Force Apt to build its cache in memory. That way we avoid race
-    # conditions with other applications building the cache in the same
-    # place.
-    apt_pkg.config.set("Dir::Cache::pkgcache", "")
-    cache = apt_pkg.Cache()
-    pkg = cache[package or 'ceph']
-    if pkg.current_ver:
-        return apt_pkg.upstream_version(pkg.current_ver.ver_str)
-    else:
-        return None
-
-
-def version_compare(a, b):
-    return apt_pkg.version_compare(a, b)
