@@ -1,2 +1,2 @@
 #!/bin/sh
-exec /usr/bin/radosgw -c /etc/ceph/ceph.conf -n client.rados.gateway
+exec /usr/bin/radosgw -c /etc/ceph/ceph.conf -n client.radosgw.gateway
