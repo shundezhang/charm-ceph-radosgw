@@ -54,9 +54,9 @@ NSS_DIR = '/var/lib/ceph/nss'
 
 
 def install_ceph_optimised_packages():
-    """Inktank provides patched/optimised packages for HTTP 100-continue support
-    that does has not yet been ported to upstream. These can optionally be
-    installed from ceph.com archives.
+    """Inktank provides patched/optimised packages for HTTP 100-continue
+    support that does has not yet been ported to upstream. These can
+    optionally be installed from ceph.com archives.
     """
     prolog = "http://gitbuilder.ceph.com/"
     epilog = "-x86_64-basic/ref/master"
