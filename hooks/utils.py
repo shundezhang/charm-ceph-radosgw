@@ -14,6 +14,7 @@ import os
 from charmhelpers.core.hookenv import unit_get
 from charmhelpers.fetch import apt_install
 
+CEPHRG_HA_RES = 'grp_cephrg_vips'
 TEMPLATES_DIR = 'templates'
 
 try:

@@ -17,6 +17,7 @@ options:
       for precise.
   key:
     type: string
+    default:
     description: |
       Key ID to import to the apt keyring to support use with arbitary source
       configuration from outside of Launchpad archives or PPA's.
@@ -46,3 +47,25 @@ options:
     default: False
     description: |
       If set to True, supporting services will log to syslog.
+  vip:
+    type: string
+    default:
+    description: |
+      Virtual IP(s) to use to front API services in HA configuration.
+      .
+      If multiple networks are being used, a VIP should be provided for each
+      network, separated by spaces.
+  ha-bindiface:
+    type: string
+    default: eth0
+    description: |
+      Default network interface on which HA cluster will bind to communication
+      with the other members of the HA Cluster.
+  ha-mcastport:
+    type: int
+    default: 5414
+    description: |
+      Default multicast port number that will be used to communicate between
+      HA Cluster nodes.
+  # Network configuration options
+  # by default all access is over 'private-address'
