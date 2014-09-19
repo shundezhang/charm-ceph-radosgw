@@ -5,5 +5,9 @@ include:
     - fetch
     - contrib.storage.linux:
         - utils
+    - contrib.hahelpers:
+        - apache
+        - cluster
     - payload.execd
     - contrib.openstack.alternatives
+    - contrib.network.ip
