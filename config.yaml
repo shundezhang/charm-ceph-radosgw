@@ -47,3 +47,13 @@ options:
     default: False
     description: |
       If set to True, supporting services will log to syslog.
+  use-ceph-optimised-packages:
+    type: boolean
+    default: false
+    description: |
+        By default apache2 and libapache2-mod-fastcgi will be installed from the
+        Ubuntu archives. This option allows for an alternate ceph.com install
+        source which contains patched versions with added support for HTTP
+        100-continue. See the following page for more info:
+
+        http://ceph.com/docs/dumpling/radosgw/manual-install/#continue-support

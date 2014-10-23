@@ -30,6 +30,7 @@ from charmhelpers.fetch import (
     apt_install,
     add_source,
 )
+from charmhelpers.core.host import lsb_release
 from utils import (
     render_template,
     get_host_ip,
@@ -52,16 +53,38 @@ def install_www_scripts():
 NSS_DIR = '/var/lib/ceph/nss'
 
 
-@hooks.hook('install')
-def install():
-    execd_preinstall()
-    enable_pocket('multiverse')
+def install_ceph_optimised_packages():
+    """Inktank provides patched/optimised packages for HTTP 100-continue
+    support that does has not yet been ported to upstream. These can
+    optionally be installed from ceph.com archives.
+    """
+    prolog = "http://gitbuilder.ceph.com/"
+    epilog = "-x86_64-basic/ref/master"
+    rel = lsb_release()['DISTRIB_CODENAME']
+    fastcgi_source = "%slibapache-mod-fastcgi-deb-%s%s" % (prolog, rel, epilog)
+    apache_source = "%sapache2-deb-%s%s" % (prolog, rel, epilog)
+
+    for source in [fastcgi_source, apache_source]:
+        add_source(source, key='6EAEAE2203C3951A')
+
+
+def install_packages():
     add_source(config('source'), config('key'))
+    if config('use-ceph-optimised-packages'):
+        install_ceph_optimised_packages()
+
     apt_update(fatal=True)
     apt_install(['radosgw',
                  'libapache2-mod-fastcgi',
                  'apache2',
                  'ntp'], fatal=True)
+
+
+@hooks.hook('install')
+def install():
+    execd_preinstall()
+    enable_pocket('multiverse')
+    install_packages()
     os.makedirs(NSS_DIR)
 
 
@@ -121,6 +144,7 @@ def apache_reload():
 @hooks.hook('upgrade-charm',
             'config-changed')
 def config_changed():
+    install_packages()
     emit_cephconf()
     emit_apacheconf()
     install_www_scripts()
