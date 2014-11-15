@@ -5,6 +5,10 @@ lint:
 	@flake8 --exclude hooks/charmhelpers hooks tests
 	@charm proof
 
+unit_test:
+	@$(PYTHON) /usr/bin/nosetests unit_tests
+#	@$(PYTHON) /usr/bin/nosetests --nologcapture --with-coverage unit_tests
+
 test:
 	@echo Starting Amulet tests...
 	# coreycb note: The -v should only be temporary until Amulet sends
