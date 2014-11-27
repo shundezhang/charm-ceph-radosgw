@@ -248,7 +248,7 @@ def restart():
 def canonical_url(configs, endpoint_type=PUBLIC):
     scheme = 'http'
     address = resolve_address(endpoint_type)
-    if is_ipv6(address)
+    if is_ipv6(address):
         address = "[{}]".format(address)
     return '%s://%s' % (scheme, address)
 
