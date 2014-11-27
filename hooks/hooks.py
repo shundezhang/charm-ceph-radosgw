@@ -244,6 +244,7 @@ def restart():
 
 @hooks.hook('identity-service-relation-joined')
 def identity_joined(relid=None):
+    CONFIGS = register_configs()
     if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
