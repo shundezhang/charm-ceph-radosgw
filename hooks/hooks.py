@@ -286,7 +286,8 @@ def identity_changed():
 @hooks.hook('cluster-relation-changed',
             'cluster-relation-joined')
 def cluster_changed():
-    print "Do cluster changed actions here"
+    for r_id in relation_ids('identity-service'):
+        identity_joined(relid=r_id)
 
 
 @hooks.hook('ha-relation-joined')
