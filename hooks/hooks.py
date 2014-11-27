@@ -47,6 +47,11 @@ from charmhelpers.contrib.network.ip import (
     get_iface_for_address,
     get_netmask_for_address
 )
+from charmhelpers.contrib.openstack.ip import (
+    canonical_url,
+    PUBLIC, INTERNAL, ADMIN
+)
+
 hooks = Hooks()
 
 
@@ -244,13 +249,13 @@ def identity_joined(relid=None):
         sys.exit(1)
     if not cluster.eligible_leader(CEPHRG_HA_RES):
         return
-    if cluster.is_clustered():
-        hostname = config('vip')
-    else:
-        hostname = unit_get('private-address')
 
-    admin_url = 'http://{}:80/swift'.format(hostname)
-    internal_url = public_url = '{}/v1'.format(admin_url)
+    port = 80
+    admin_url = '%s:%i' % (canonical_url(CONFIGS, ADMIN), port)
+    internal_url = '%s:%s/v1' % \
+        (canonical_url(CONFIGS, INTERNAL), port)
+    public_url = '%s:%s/v1' % \
+        (canonical_url(CONFIGS, PUBLIC), port)
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
