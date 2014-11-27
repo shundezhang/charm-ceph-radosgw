@@ -13,7 +13,7 @@ import sys
 import glob
 import os
 import ceph
-
+import charmhelpers.contrib.hahelpers.cluster as cluster
 from charmhelpers.core.hookenv import (
     relation_get,
     relation_ids,
@@ -22,7 +22,7 @@ from charmhelpers.core.hookenv import (
     unit_get,
     open_port,
     relation_set,
-    log,
+    log, ERROR,
     Hooks, UnregisteredHookError,
 )
 from charmhelpers.fetch import (
@@ -35,13 +35,18 @@ from utils import (
     render_template,
     get_host_ip,
     enable_pocket,
-    is_apache_24
+    is_apache_24,
+    CEPHRG_HA_RES,
 )
 
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import cmp_pkgrevno
 from socket import gethostname as get_unit_hostname
 
+from charmhelpers.contrib.network.ip import (
+    get_iface_for_address,
+    get_netmask_for_address
+)
 hooks = Hooks()
 
 
@@ -237,8 +242,13 @@ def identity_joined(relid=None):
     if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
+    if not cluster.eligible_leader(CEPHRG_HA_RES):
+        return
+    if cluster.is_clustered():
+        hostname = config('vip')
+    else:
+        hostname = unit_get('private-address')
 
-    hostname = unit_get('private-address')
     admin_url = 'http://{}:80/swift'.format(hostname)
     internal_url = public_url = '{}/v1'.format(admin_url)
     relation_set(service='swift',
@@ -253,6 +263,76 @@ def identity_joined(relid=None):
 def identity_changed():
     emit_cephconf()
     restart()
+
+
+@hooks.hook('cluster-relation-changed',
+            'cluster-relation-joined')
+def cluster_changed():
+    print "Do cluster changed actions here"
+
+
+@hooks.hook('ha-relation-joined')
+def ha_relation_joined():
+    # Obtain the config values necessary for the cluster config. These
+    # include multicast port and interface to bind to.
+    corosync_bindiface = config('ha-bindiface')
+    corosync_mcastport = config('ha-mcastport')
+    vip = config('vip')
+    if not vip:
+        log('Unable to configure hacluster as vip not provided',
+            level=ERROR)
+        sys.exit(1)
+    # Obtain resources
+    # SWIFT_HA_RES = 'grp_swift_vips'
+    resources = {
+        'res_cephrg_haproxy': 'lsb:haproxy'
+    }
+    resource_params = {
+        'res_cephrg_haproxy': 'op monitor interval="5s"'
+    }
+
+    vip_group = []
+    for vip in vip.split():
+        iface = get_iface_for_address(vip)
+        if iface is not None:
+            vip_key = 'res_cephrg_{}_vip'.format(iface)
+            resources[vip_key] = 'ocf:heartbeat:IPaddr2'
+            resource_params[vip_key] = (
+                'params ip="{vip}" cidr_netmask="{netmask}"'
+                ' nic="{iface}"'.format(vip=vip,
+                                        iface=iface,
+                                        netmask=get_netmask_for_address(vip))
+            )
+            vip_group.append(vip_key)
+
+    if len(vip_group) >= 1:
+        relation_set(groups={CEPHRG_HA_RES: ' '.join(vip_group)})
+
+    init_services = {
+        'res_cephrg_haproxy': 'haproxy'
+    }
+    clones = {
+        'cl_cephrg_haproxy': 'res_cephrg_haproxy'
+    }
+
+    relation_set(init_services=init_services,
+                 corosync_bindiface=corosync_bindiface,
+                 corosync_mcastport=corosync_mcastport,
+                 resources=resources,
+                 resource_params=resource_params,
+                 clones=clones)
+
+
+@hooks.hook('ha-relation-changed')
+def ha_relation_changed():
+    clustered = relation_get('clustered')
+    if clustered and cluster.is_leader(CEPHRG_HA_RES):
+        log('Cluster configured, notifying other services and'
+            'updating keystone endpoint configuration')
+        # Tell all related services to start using
+        # the VIP instead
+        for r_id in relation_ids('identity-service'):
+            identity_joined(relid=r_id)
 
 
 if __name__ == '__main__':
