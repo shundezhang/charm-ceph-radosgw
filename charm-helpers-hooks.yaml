@@ -11,3 +11,4 @@ include:
     - payload.execd
     - contrib.openstack.alternatives
     - contrib.network.ip
+    - charmhelpers.contrib.openstack.ip
