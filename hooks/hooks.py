@@ -262,10 +262,10 @@ def identity_joined(relid=None):
         return
 
     port = 80
-    admin_url = '%s:%i' % (canonical_url(ADMIN), port)
-    internal_url = '%s:%s/v1' % \
+    admin_url = '%s:%i/swift' % (canonical_url(ADMIN), port)
+    internal_url = '%s:%s/swift/v1' % \
         (canonical_url(INTERNAL), port)
-    public_url = '%s:%s/v1' % \
+    public_url = '%s:%s/swift/v1' % \
         (canonical_url(PUBLIC), port)
     relation_set(service='swift',
                  region=config('region'),
