@@ -45,11 +45,12 @@ from socket import gethostname as get_unit_hostname
 
 from charmhelpers.contrib.network.ip import (
     get_iface_for_address,
-    get_netmask_for_address
+    get_netmask_for_address,
+    is_ipv6,
 )
 from charmhelpers.contrib.openstack.ip import (
-    canonical_url,
-    PUBLIC, INTERNAL, ADMIN
+    resolve_address,
+    PUBLIC, INTERNAL, ADMIN,
 )
 
 hooks = Hooks()
@@ -242,9 +243,18 @@ def restart():
     open_port(port=80)
 
 
+# XXX Define local canonical_url until charm has been updated to use the
+#     standard context architecture.
+def canonical_url(configs, endpoint_type=PUBLIC):
+    scheme = 'http'
+    address = resolve_address(endpoint_type)
+    if is_ipv6(address)
+        address = "[{}]".format(address)
+    return '%s://%s' % (scheme, address)
+
+
 @hooks.hook('identity-service-relation-joined')
 def identity_joined(relid=None):
-    CONFIGS = register_configs()
     if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
@@ -252,11 +262,11 @@ def identity_joined(relid=None):
         return
 
     port = 80
-    admin_url = '%s:%i' % (canonical_url(CONFIGS, ADMIN), port)
+    admin_url = '%s:%i' % (canonical_url(ADMIN), port)
     internal_url = '%s:%s/v1' % \
-        (canonical_url(CONFIGS, INTERNAL), port)
+        (canonical_url(INTERNAL), port)
     public_url = '%s:%s/v1' % \
-        (canonical_url(CONFIGS, PUBLIC), port)
+        (canonical_url(PUBLIC), port)
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
