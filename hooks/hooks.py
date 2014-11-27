@@ -162,6 +162,8 @@ def config_changed():
     apache_sites()
     apache_modules()
     apache_reload()
+    for r_id in relation_ids('identity-service'):
+        identity_joined(relid=r_id)
 
 
 def get_mon_hosts():
