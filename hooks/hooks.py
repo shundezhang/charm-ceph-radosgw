@@ -266,6 +266,7 @@ def identity_joined(relid=None):
         return
 
     log('LY identity_joined I am eligible_leader', level=ERROR)
+    log('LY identity_joined cluster state: ' + str(cluster.is_clustered()), level=ERROR)
     port = 80
     admin_url = '%s:%i/swift' % (canonical_url(ADMIN), port)
     internal_url = '%s:%s/swift/v1' % \
