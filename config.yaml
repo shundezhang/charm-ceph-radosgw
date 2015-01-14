@@ -57,3 +57,13 @@ options:
         100-continue. See the following page for more info:
 
         http://ceph.com/docs/dumpling/radosgw/manual-install/#continue-support
+  use-embedded-webserver:
+    type: boolean
+    default: false
+    description: |
+      Newer versions of the Ceph RADOS Gateway support use of an embedded web
+      container instead of Apache + mod-fastcgi, avoiding some of the nuances
+      of using the stock mod-fastcgi packages from Ubuntu.
+      .
+      Enable this option to disable use of Apache and enable the embedded
+      web container feature.
