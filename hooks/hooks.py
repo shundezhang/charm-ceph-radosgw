@@ -161,7 +161,7 @@ def apache_reload():
 
 @hooks.hook('upgrade-charm',
             'config-changed')
-@restart_on_change({'/etc/ceph/ceph.con', ['radosgw']})
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def config_changed():
     install_packages()
     emit_cephconf()
