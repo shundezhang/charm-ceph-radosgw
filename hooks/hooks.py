@@ -269,6 +269,7 @@ def identity_joined(relid=None):
         (canonical_url(INTERNAL), port)
     public_url = '%s:%s/swift/v1' % \
         (canonical_url(PUBLIC), port)
+    log('LY identity_joined relation_set public_url=%s relation_id=%s' % (public_url, str(relid)), level=ERROR)
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
@@ -286,7 +287,9 @@ def identity_changed():
 @hooks.hook('cluster-relation-changed',
             'cluster-relation-joined')
 def cluster_changed():
+    log('LY In cluster_changed triggering identity_joined', level=ERROR)
     for r_id in relation_ids('identity-service'):
+        log('LY In cluster_changed triggering identity_joined for relid: ' + r_id, level=ERROR)
         identity_joined(relid=r_id)
 
 
