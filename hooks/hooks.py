@@ -257,23 +257,18 @@ def canonical_url(configs, endpoint_type=PUBLIC):
 
 @hooks.hook('identity-service-relation-joined')
 def identity_joined(relid=None):
-    log('LY identity_joined called relid: ' + str(relid), level=ERROR)
     if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
     if not cluster.eligible_leader(CEPHRG_HA_RES):
-        log('LY identity_joined exiting not eligible_leader', level=ERROR)
         return
 
-    log('LY identity_joined I am eligible_leader', level=ERROR)
-    log('LY identity_joined cluster state: ' + str(cluster.is_clustered()), level=ERROR)
     port = 80
     admin_url = '%s:%i/swift' % (canonical_url(ADMIN), port)
     internal_url = '%s:%s/swift/v1' % \
         (canonical_url(INTERNAL), port)
     public_url = '%s:%s/swift/v1' % \
         (canonical_url(PUBLIC), port)
-    log('LY identity_joined setting endpoint for public_url: ' + public_url, level=ERROR)
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
@@ -291,9 +286,7 @@ def identity_changed():
 @hooks.hook('cluster-relation-changed',
             'cluster-relation-joined')
 def cluster_changed():
-    log('LY cluster_changed Cluster has changed calling identity_joined', level=ERROR)
     for r_id in relation_ids('identity-service'):
-        log('LY cluster_changed Cluster has changed calling identity_joined: ' + r_id, level=ERROR)
         identity_joined(relid=r_id)
 
 
