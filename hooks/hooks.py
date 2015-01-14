@@ -41,6 +41,7 @@ from utils import (
     enable_pocket,
     is_apache_24,
     CEPHRG_HA_RES,
+    register_configs,
 )
 
 from charmhelpers.payload.execd import execd_preinstall
@@ -58,6 +59,7 @@ from charmhelpers.contrib.openstack.ip import (
 )
 
 hooks = Hooks()
+CONFIGS = register_configs()
 
 
 def install_www_scripts():
@@ -86,6 +88,7 @@ def install_ceph_optimised_packages():
 PACKAGES = [
     'radosgw',
     'ntp',
+    'haproxy',
 ]
 
 APACHE_PACKAGES = [
@@ -172,10 +175,12 @@ def apache_reload():
 
 @hooks.hook('upgrade-charm',
             'config-changed')
-@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw'],
+                    '/etc/haproxy/haproxy.cfg': ['haproxy']})
 def config_changed():
     install_packages()
     emit_cephconf()
+    CONFIGS.write_all()
     if not config('use-embedded-webserver'):
         emit_apacheconf()
         install_www_scripts()
@@ -236,6 +241,7 @@ def get_keystone_conf():
 
 @hooks.hook('mon-relation-departed',
             'mon-relation-changed')
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def mon_relation():
     emit_cephconf()
     key = relation_get('radosgw_key')
@@ -289,7 +295,6 @@ def identity_joined(relid=None):
         (canonical_url(INTERNAL), port)
     public_url = '%s:%s/swift/v1' % \
         (canonical_url(PUBLIC), port)
-    log('LY identity_joined relation_set public_url=%s relation_id=%s' % (public_url, str(relid)), level=ERROR)
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
@@ -299,6 +304,7 @@ def identity_joined(relid=None):
 
 
 @hooks.hook('identity-service-relation-changed')
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def identity_changed():
     emit_cephconf()
     restart()
@@ -306,10 +312,10 @@ def identity_changed():
 
 @hooks.hook('cluster-relation-changed',
             'cluster-relation-joined')
+@restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
 def cluster_changed():
-    log('LY In cluster_changed triggering identity_joined', level=ERROR)
+    CONFIGS.write_all()
     for r_id in relation_ids('identity-service'):
-        log('LY In cluster_changed triggering identity_joined for relid: ' + r_id, level=ERROR)
         identity_joined(relid=r_id)
 
 
