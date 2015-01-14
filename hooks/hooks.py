@@ -279,7 +279,7 @@ def identity_joined(relid=None):
                  public_url=public_url, internal_url=internal_url,
                  admin_url=admin_url,
                  requested_roles=config('operator-roles'),
-                 rid=relid)
+                 relation_id=relid)
 
 
 @hooks.hook('identity-service-relation-changed')
