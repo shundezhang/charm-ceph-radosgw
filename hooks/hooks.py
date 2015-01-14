@@ -28,9 +28,13 @@ from charmhelpers.core.hookenv import (
 from charmhelpers.fetch import (
     apt_update,
     apt_install,
+    apt_purge,
     add_source,
 )
-from charmhelpers.core.host import lsb_release
+from charmhelpers.core.host import (
+    lsb_release,
+    restart_on_change
+)
 from utils import (
     render_template,
     get_host_ip,
@@ -68,16 +72,29 @@ def install_ceph_optimised_packages():
         add_source(source, key='6EAEAE2203C3951A')
 
 
+PACKAGES = [
+    'radosgw',
+    'ntp',
+]
+
+APACHE_PACKAGES = [
+    'libapache2-mod-fastcgi',
+    'apache2',
+]
+
+
 def install_packages():
     add_source(config('source'), config('key'))
-    if config('use-ceph-optimised-packages'):
+    if (config('use-ceph-optimised-packages') and
+            not config('use-embedded-webserver')):
         install_ceph_optimised_packages()
 
     apt_update(fatal=True)
-    apt_install(['radosgw',
-                 'libapache2-mod-fastcgi',
-                 'apache2',
-                 'ntp'], fatal=True)
+    apt_install(PACKAGES, fatal=True)
+    if config('use-embedded-webserver'):
+        apt_purge(APACHE_PACKAGES)
+    else:
+        apt_install(APACHE_PACKAGES, fatal=True)
 
 
 @hooks.hook('install')
@@ -98,7 +115,8 @@ def emit_cephconf():
         'mon_hosts': ' '.join(get_mon_hosts()),
         'hostname': get_unit_hostname(),
         'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
-        'use_syslog': str(config('use-syslog')).lower()
+        'use_syslog': str(config('use-syslog')).lower(),
+        'embedded_webserver': config('use-embedded-webserver'),
     }
 
     # Check to ensure that correct version of ceph is
@@ -143,14 +161,16 @@ def apache_reload():
 
 @hooks.hook('upgrade-charm',
             'config-changed')
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def config_changed():
     install_packages()
     emit_cephconf()
-    emit_apacheconf()
-    install_www_scripts()
-    apache_sites()
-    apache_modules()
-    apache_reload()
+    if not config('use-embedded-webserver'):
+        emit_apacheconf()
+        install_www_scripts()
+        apache_sites()
+        apache_modules()
+        apache_reload()
 
 
 def get_mon_hosts():
