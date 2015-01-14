@@ -9,6 +9,8 @@ include:
         - apache
         - cluster
     - payload.execd
-    - contrib.openstack.alternatives
+    - contrib.openstack|inc=* 
     - contrib.network.ip
     - contrib.openstack.ip
+    - contrib.storage.linux
+    - contrib.python.packages

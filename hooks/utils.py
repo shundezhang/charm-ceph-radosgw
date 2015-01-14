@@ -10,12 +10,27 @@
 import socket
 import re
 import os
-
+from copy import deepcopy
+from collections import OrderedDict
 from charmhelpers.core.hookenv import unit_get
 from charmhelpers.fetch import apt_install
+from charmhelpers.contrib.openstack import context, templating
+from charmhelpers.contrib.openstack.utils import os_release
+
+import ceph_radosgw_context
 
 CEPHRG_HA_RES = 'grp_cephrg_vips'
 TEMPLATES_DIR = 'templates'
+TEMPLATES = 'templates/'
+HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
+
+BASE_RESOURCE_MAP = OrderedDict([
+    (HAPROXY_CONF, {
+        'contexts': [context.HAProxyContext(singlenode_mode=True),
+                     ceph_radosgw_context.HAProxyContext()],
+        'services': ['haproxy'],
+    }),
+])
 
 try:
     import jinja2
@@ -28,6 +43,23 @@ try:
 except ImportError:
     apt_install('python-dnspython', fatal=True)
     import dns.resolver
+
+
+def resource_map():
+    '''
+    Dynamically generate a map of resources that will be managed for a single
+    hook execution.
+    '''
+    resource_map = deepcopy(BASE_RESOURCE_MAP)
+    return resource_map
+
+
+def register_configs(release='icehouse'):
+    configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
+                                          openstack_release=release)
+    for cfg, rscs in resource_map().iteritems():
+        configs.register(cfg, rscs['contexts'])
+    return configs
 
 
 def render_template(template_name, context, template_dir=TEMPLATES_DIR):
