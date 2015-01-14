@@ -348,7 +348,7 @@ def ha_relation_joined():
 @hooks.hook('ha-relation-changed')
 def ha_relation_changed():
     clustered = relation_get('clustered')
-    if clustered and cluster.is_leader(CEPHRG_HA_RES):
+    if clustered:
         log('Cluster configured, notifying other services and'
             'updating keystone endpoint configuration')
         # Tell all related services to start using
