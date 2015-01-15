@@ -173,6 +173,10 @@ def apache_reload():
     subprocess.call(['service', 'apache2', 'reload'])
 
 
+def apache_ports():
+    shutil.copy('files/ports.conf', '/etc/apache2/ports.conf')
+    
+
 @hooks.hook('upgrade-charm',
             'config-changed')
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw'],
@@ -186,6 +190,7 @@ def config_changed():
         install_www_scripts()
         apache_sites()
         apache_modules()
+        apache_ports()
         apache_reload()
     for r_id in relation_ids('identity-service'):
         identity_joined(relid=r_id)
