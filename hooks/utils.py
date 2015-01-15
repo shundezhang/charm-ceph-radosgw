@@ -53,6 +53,8 @@ def resource_map():
     return resource_map
 
 
+# Hardcoded to icehouse to enable use of charmhelper templating/context tools
+# Ideally these function would support non-OpenStack services
 def register_configs(release='icehouse'):
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
