@@ -13,7 +13,6 @@ import sys
 import glob
 import os
 import ceph
-import charmhelpers.contrib.hahelpers.cluster as cluster
 from charmhelpers.core.hookenv import (
     relation_get,
     relation_ids,
@@ -175,7 +174,7 @@ def apache_reload():
 
 def apache_ports():
     shutil.copy('files/ports.conf', '/etc/apache2/ports.conf')
-    
+
 
 @hooks.hook('upgrade-charm',
             'config-changed')
