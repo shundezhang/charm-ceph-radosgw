@@ -291,8 +291,6 @@ def identity_joined(relid=None):
     if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
-    if not cluster.eligible_leader(CEPHRG_HA_RES):
-        return
 
     port = 80
     admin_url = '%s:%i/swift' % (canonical_url(ADMIN), port)
