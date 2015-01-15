@@ -15,7 +15,6 @@ from collections import OrderedDict
 from charmhelpers.core.hookenv import unit_get
 from charmhelpers.fetch import apt_install
 from charmhelpers.contrib.openstack import context, templating
-from charmhelpers.contrib.openstack.utils import os_release
 
 import ceph_radosgw_context
 
