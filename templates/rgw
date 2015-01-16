@@ -2,7 +2,7 @@
 	FastCgiExternalServer /var/www/s3gw.fcgi -socket /tmp/radosgw.sock
 </IfModule>
 
-<VirtualHost *:80>
+<VirtualHost *:70>
 	ServerName {{ hostname }}
 	ServerAdmin ceph@ubuntu.com
 	DocumentRoot /var/www
