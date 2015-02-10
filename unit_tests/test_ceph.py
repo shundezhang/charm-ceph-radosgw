@@ -121,4 +121,9 @@ class CephRadosGWCephTests(CharmTestCase):
         ]
         ceph.import_osd_bootstrap_key('mykey')
         self.subprocess.check_call.assert_called_with(cmd)
-        
+       
+    def test_is_bootstrapped(self):
+        self.os.path.exists.return_value = True
+        self.assertEqual(ceph.is_bootstrapped(), True) 
+        self.os.path.exists.return_value = False
+        self.assertEqual(ceph.is_bootstrapped(), False) 

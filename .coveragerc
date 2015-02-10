@@ -4,3 +4,5 @@ exclude_lines =
     if __name__ == .__main__.:
 include=
     hooks/ceph.py
+    hooks/hooks.py
+    hooks/utils.py
