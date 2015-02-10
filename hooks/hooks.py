@@ -13,7 +13,6 @@ import sys
 import glob
 import os
 import ceph
-
 from charmhelpers.core.hookenv import (
     relation_get,
     relation_ids,
@@ -22,27 +21,44 @@ from charmhelpers.core.hookenv import (
     unit_get,
     open_port,
     relation_set,
-    log,
+    log, ERROR,
     Hooks, UnregisteredHookError,
 )
 from charmhelpers.fetch import (
     apt_update,
     apt_install,
+    apt_purge,
     add_source,
 )
-from charmhelpers.core.host import lsb_release
+from charmhelpers.core.host import (
+    lsb_release,
+    restart_on_change
+)
 from utils import (
     render_template,
     get_host_ip,
     enable_pocket,
-    is_apache_24
+    is_apache_24,
+    CEPHRG_HA_RES,
+    register_configs,
 )
 
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import cmp_pkgrevno
 from socket import gethostname as get_unit_hostname
 
+from charmhelpers.contrib.network.ip import (
+    get_iface_for_address,
+    get_netmask_for_address,
+    is_ipv6,
+)
+from charmhelpers.contrib.openstack.ip import (
+    resolve_address,
+    PUBLIC, INTERNAL, ADMIN,
+)
+
 hooks = Hooks()
+CONFIGS = register_configs()
 
 
 def install_www_scripts():
@@ -68,16 +84,30 @@ def install_ceph_optimised_packages():
         add_source(source, key='6EAEAE2203C3951A')
 
 
+PACKAGES = [
+    'radosgw',
+    'ntp',
+    'haproxy',
+]
+
+APACHE_PACKAGES = [
+    'libapache2-mod-fastcgi',
+    'apache2',
+]
+
+
 def install_packages():
     add_source(config('source'), config('key'))
-    if config('use-ceph-optimised-packages'):
+    if (config('use-ceph-optimised-packages') and
+            not config('use-embedded-webserver')):
         install_ceph_optimised_packages()
 
     apt_update(fatal=True)
-    apt_install(['radosgw',
-                 'libapache2-mod-fastcgi',
-                 'apache2',
-                 'ntp'], fatal=True)
+    apt_install(PACKAGES, fatal=True)
+    if config('use-embedded-webserver'):
+        apt_purge(APACHE_PACKAGES)
+    else:
+        apt_install(APACHE_PACKAGES, fatal=True)
 
 
 @hooks.hook('install')
@@ -98,7 +128,8 @@ def emit_cephconf():
         'mon_hosts': ' '.join(get_mon_hosts()),
         'hostname': get_unit_hostname(),
         'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
-        'use_syslog': str(config('use-syslog')).lower()
+        'use_syslog': str(config('use-syslog')).lower(),
+        'embedded_webserver': config('use-embedded-webserver'),
     }
 
     # Check to ensure that correct version of ceph is
@@ -141,16 +172,27 @@ def apache_reload():
     subprocess.call(['service', 'apache2', 'reload'])
 
 
+def apache_ports():
+    shutil.copy('files/ports.conf', '/etc/apache2/ports.conf')
+
+
 @hooks.hook('upgrade-charm',
             'config-changed')
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw'],
+                    '/etc/haproxy/haproxy.cfg': ['haproxy']})
 def config_changed():
     install_packages()
     emit_cephconf()
-    emit_apacheconf()
-    install_www_scripts()
-    apache_sites()
-    apache_modules()
-    apache_reload()
+    CONFIGS.write_all()
+    if not config('use-embedded-webserver'):
+        emit_apacheconf()
+        install_www_scripts()
+        apache_sites()
+        apache_modules()
+        apache_ports()
+        apache_reload()
+    for r_id in relation_ids('identity-service'):
+        identity_joined(relid=r_id)
 
 
 def get_mon_hosts():
@@ -203,6 +245,7 @@ def get_keystone_conf():
 
 @hooks.hook('mon-relation-departed',
             'mon-relation-changed')
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def mon_relation():
     emit_cephconf()
     key = relation_get('radosgw_key')
@@ -232,27 +275,114 @@ def restart():
     open_port(port=80)
 
 
+# XXX Define local canonical_url until charm has been updated to use the
+#     standard context architecture.
+def canonical_url(configs, endpoint_type=PUBLIC):
+    scheme = 'http'
+    address = resolve_address(endpoint_type)
+    if is_ipv6(address):
+        address = "[{}]".format(address)
+    return '%s://%s' % (scheme, address)
+
+
 @hooks.hook('identity-service-relation-joined')
 def identity_joined(relid=None):
     if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
 
-    hostname = unit_get('private-address')
-    admin_url = 'http://{}:80/swift'.format(hostname)
-    internal_url = public_url = '{}/v1'.format(admin_url)
+    port = 80
+    admin_url = '%s:%i/swift' % (canonical_url(ADMIN), port)
+    internal_url = '%s:%s/swift/v1' % \
+        (canonical_url(INTERNAL), port)
+    public_url = '%s:%s/swift/v1' % \
+        (canonical_url(PUBLIC), port)
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
                  admin_url=admin_url,
                  requested_roles=config('operator-roles'),
-                 rid=relid)
+                 relation_id=relid)
 
 
 @hooks.hook('identity-service-relation-changed')
+@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def identity_changed():
     emit_cephconf()
     restart()
+
+
+@hooks.hook('cluster-relation-changed',
+            'cluster-relation-joined')
+@restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
+def cluster_changed():
+    CONFIGS.write_all()
+    for r_id in relation_ids('identity-service'):
+        identity_joined(relid=r_id)
+
+
+@hooks.hook('ha-relation-joined')
+def ha_relation_joined():
+    # Obtain the config values necessary for the cluster config. These
+    # include multicast port and interface to bind to.
+    corosync_bindiface = config('ha-bindiface')
+    corosync_mcastport = config('ha-mcastport')
+    vip = config('vip')
+    if not vip:
+        log('Unable to configure hacluster as vip not provided',
+            level=ERROR)
+        sys.exit(1)
+    # Obtain resources
+    # SWIFT_HA_RES = 'grp_swift_vips'
+    resources = {
+        'res_cephrg_haproxy': 'lsb:haproxy'
+    }
+    resource_params = {
+        'res_cephrg_haproxy': 'op monitor interval="5s"'
+    }
+
+    vip_group = []
+    for vip in vip.split():
+        iface = get_iface_for_address(vip)
+        if iface is not None:
+            vip_key = 'res_cephrg_{}_vip'.format(iface)
+            resources[vip_key] = 'ocf:heartbeat:IPaddr2'
+            resource_params[vip_key] = (
+                'params ip="{vip}" cidr_netmask="{netmask}"'
+                ' nic="{iface}"'.format(vip=vip,
+                                        iface=iface,
+                                        netmask=get_netmask_for_address(vip))
+            )
+            vip_group.append(vip_key)
+
+    if len(vip_group) >= 1:
+        relation_set(groups={CEPHRG_HA_RES: ' '.join(vip_group)})
+
+    init_services = {
+        'res_cephrg_haproxy': 'haproxy'
+    }
+    clones = {
+        'cl_cephrg_haproxy': 'res_cephrg_haproxy'
+    }
+
+    relation_set(init_services=init_services,
+                 corosync_bindiface=corosync_bindiface,
+                 corosync_mcastport=corosync_mcastport,
+                 resources=resources,
+                 resource_params=resource_params,
+                 clones=clones)
+
+
+@hooks.hook('ha-relation-changed')
+def ha_relation_changed():
+    clustered = relation_get('clustered')
+    if clustered:
+        log('Cluster configured, notifying other services and'
+            'updating keystone endpoint configuration')
+        # Tell all related services to start using
+        # the VIP instead
+        for r_id in relation_ids('identity-service'):
+            identity_joined(relid=r_id)
 
 
 if __name__ == '__main__':
