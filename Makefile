@@ -6,8 +6,7 @@ lint:
 	@charm proof
 
 unit_test:
-	@$(PYTHON) /usr/bin/nosetests unit_tests
-#	@$(PYTHON) /usr/bin/nosetests --nologcapture --with-coverage unit_tests
+	@$(PYTHON) /usr/bin/nosetests --nologcapture --with-coverage unit_tests
 
 test:
 	@echo Starting Amulet tests...
