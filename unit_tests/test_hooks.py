@@ -2,7 +2,16 @@
 from mock import call, patch, MagicMock
 from test_utils import CharmTestCase, patch_open
 
-import utils
+dnsmock = MagicMock()
+modules = {
+    'dns': dnsmock,
+    'dns.resolver': dnsmock,
+}
+module_patcher = patch.dict('sys.modules', modules)
+module_patcher.start()
+with patch('charmhelpers.fetch.apt_install'):
+    import utils
+
 _reg = utils.register_configs
 
 utils.register_configs = MagicMock()
