@@ -83,8 +83,10 @@ def enable_pocket(pocket):
                 sources.write(line)
 
 
-def get_host_ip(hostname=unit_get('private-address')):
+def get_host_ip(hostname=None):
     try:
+        if not hostname:
+            hostname = unit_get('private-address')
         # Test to see if already an IPv4 address
         socket.inet_aton(hostname)
         return hostname
