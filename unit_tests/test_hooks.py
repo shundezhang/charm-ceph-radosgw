@@ -213,8 +213,13 @@ class CephRadosGWTests(CharmTestCase):
     def test_get_mon_hosts(self):
         self.relation_ids.return_value = ['monrelid']
         self.related_units.return_value = ['monunit']
-        self.relation_get.return_value = '10.0.0.1'
-        self.get_host_ip.return_value = '10.0.0.1'
+
+        def rel_get(k, *args):
+            return {'private-address': '127.0.0.1',
+                    'ceph-public-address': '10.0.0.1'}[k]
+
+        self.relation_get.side_effect = rel_get
+        self.get_host_ip.side_effect = lambda x: x
         self.assertEquals(ceph_hooks.get_mon_hosts(), ['10.0.0.1:6789'])
 
     def test_get_conf(self):
