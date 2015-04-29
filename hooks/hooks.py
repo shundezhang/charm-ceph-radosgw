@@ -199,11 +199,9 @@ def get_mon_hosts():
     hosts = []
     for relid in relation_ids('mon'):
         for unit in related_units(relid):
-            hosts.append(
-                '{}:6789'.format(get_host_ip(
-                    relation_get('private-address',
-                                 unit, relid)))
-            )
+            host_ip = get_host_ip(relation_get('ceph-public-address',
+                                               unit, relid))
+            hosts.append('{}:6789'.format(host_ip))
 
     hosts.sort()
     return hosts
