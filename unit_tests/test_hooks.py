@@ -348,12 +348,14 @@ class CephRadosGWTests(CharmTestCase):
             relation_id='rid',
             admin_url='http://myserv:80/swift')
 
-    @patch('charmhelpers.contrib.openstack.ip.resolve_address')
+    @patch('charmhelpers.contrib.openstack.ip.is_clustered')
+    @patch('charmhelpers.contrib.openstack.ip.unit_get')
     @patch('charmhelpers.contrib.openstack.ip.config')
-    def test_identity_joined_public_name(self, _config, _resolve_address):
+    def test_identity_joined_public_name(self, _config, _unit_get, _is_clustered):
         _config.side_effect = self.test_config.get
         self.test_config.set('endpoint-public-name', 'files.example.com')
-        _resolve_address.return_value = 'myserv'
+        _unit_get.return_value = 'myserv'
+        _is_clustered.return_value = False
         ceph_hooks.identity_joined(relid='rid')
         self.relation_set.assert_called_with(
             service='swift',
@@ -371,11 +373,14 @@ class CephRadosGWTests(CharmTestCase):
         _emit_cephconf.assert_called()
         _restart.assert_called()
 
-    @patch('charmhelpers.contrib.openstack.ip.resolve_address')
+    @patch('charmhelpers.contrib.openstack.ip.is_clustered')
+    @patch('charmhelpers.contrib.openstack.ip.unit_get')
     @patch('charmhelpers.contrib.openstack.ip.config')
-    def test_canonical_url_ipv6(self, _resolve_address, _config):
+    def test_canonical_url_ipv6(self, _config, _unit_get, _is_clustered):
         ipv6_addr = '2001:db8:85a3:8d3:1319:8a2e:370:7348'
-        _resolve_address.return_value = ipv6_addr
+        _config.side_effect = self.test_config.get
+        _unit_get.return_value = ipv6_addr
+        _is_clustered.return_value = False
         self.assertEquals(ceph_hooks.canonical_url({}, PUBLIC),
                           'http://[%s]' % ipv6_addr)
 
