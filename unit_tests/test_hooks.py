@@ -351,9 +351,10 @@ class CephRadosGWTests(CharmTestCase):
     @patch('charmhelpers.contrib.openstack.ip.is_clustered')
     @patch('charmhelpers.contrib.openstack.ip.unit_get')
     @patch('charmhelpers.contrib.openstack.ip.config')
-    def test_identity_joined_public_name(self, _config, _unit_get, _is_clustered):
+    def test_identity_joined_public_name(self, _config, _unit_get,
+                                         _is_clustered):
         _config.side_effect = self.test_config.get
-        self.test_config.set('endpoint-public-name', 'files.example.com')
+        self.test_config.set('os-public-hostname', 'files.example.com')
         _unit_get.return_value = 'myserv'
         _is_clustered.return_value = False
         ceph_hooks.identity_joined(relid='rid')
