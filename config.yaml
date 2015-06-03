@@ -87,7 +87,7 @@ options:
     description: |
       Default multicast port number that will be used to communicate between
       HA Cluster nodes.
-  endpoint-public-name:
+  os-public-hostname:
     type: string
     default:
     description: |
@@ -95,7 +95,7 @@ options:
       in the keystone identity provider.
       .
       This value will be used for public endpoints. For example, an
-      endpoint-public-name set to 'files.example.com' with will create
+      os-public-hostname set to 'files.example.com' with will create
       the following public endpoint for the ceph-radosgw.
       .
       https://files.example.com:80/swift/v1
