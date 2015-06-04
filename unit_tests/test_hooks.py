@@ -323,12 +323,16 @@ class CephRadosGWTests(CharmTestCase):
         cmd = ['service', 'radosgw', 'restart']
         self.subprocess.call.assert_called_with(cmd)
 
+    @patch('charmhelpers.contrib.openstack.ip.service_name',
+           lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined_early_version(self, _config):
         self.cmp_pkgrevno.return_value = -1
         ceph_hooks.identity_joined()
         self.sys.exit.assert_called_with(1)
 
+    @patch('charmhelpers.contrib.openstack.ip.service_name',
+           lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.resolve_address')
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined(self, _config, _resolve_address):
@@ -348,6 +352,8 @@ class CephRadosGWTests(CharmTestCase):
             relation_id='rid',
             admin_url='http://myserv:80/swift')
 
+    @patch('charmhelpers.contrib.openstack.ip.service_name',
+           lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.is_clustered')
     @patch('charmhelpers.contrib.openstack.ip.unit_get')
     @patch('charmhelpers.contrib.openstack.ip.config')
