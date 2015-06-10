@@ -87,3 +87,15 @@ options:
     description: |
       Default multicast port number that will be used to communicate between
       HA Cluster nodes.
+  os-public-hostname:
+    type: string
+    default:
+    description: |
+      The hostname or address of the public endpoints created for ceph-radosgw
+      in the keystone identity provider.
+      .
+      This value will be used for public endpoints. For example, an
+      os-public-hostname set to 'files.example.com' with will create
+      the following public endpoint for the ceph-radosgw:
+      .
+      https://files.example.com:80/swift/v1
