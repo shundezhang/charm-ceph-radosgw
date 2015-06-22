@@ -1,13 +1,14 @@
 #!/usr/bin/python
 
 import amulet
+import time
 from charmhelpers.contrib.openstack.amulet.deployment import (
     OpenStackAmuletDeployment
 )
-from charmhelpers.contrib.openstack.amulet.utils import (  # noqa
+from charmhelpers.contrib.openstack.amulet.utils import (
     OpenStackAmuletUtils,
     DEBUG,
-    ERROR
+    #ERROR
 )
 
 # Use DEBUG to turn on debug logging
@@ -35,9 +36,12 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
            compatible with the local charm (e.g. stable or next).
            """
         this_service = {'name': 'ceph-radosgw'}
-        other_services = [{'name': 'ceph', 'units': 3}, {'name': 'mysql'},
-                          {'name': 'keystone'}, {'name': 'rabbitmq-server'},
-                          {'name': 'nova-compute'}, {'name': 'glance'},
+        other_services = [{'name': 'ceph', 'units': 3},
+                          {'name': 'mysql'},
+                          {'name': 'keystone'},
+                          {'name': 'rabbitmq-server'},
+                          {'name': 'nova-compute'},
+                          {'name': 'glance'},
                           {'name': 'cinder'}]
         super(CephRadosGwBasicDeployment, self)._add_services(this_service,
                                                               other_services)
@@ -92,13 +96,20 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         self.mysql_sentry = self.d.sentry.unit['mysql/0']
         self.keystone_sentry = self.d.sentry.unit['keystone/0']
         self.rabbitmq_sentry = self.d.sentry.unit['rabbitmq-server/0']
-        self.nova_compute_sentry = self.d.sentry.unit['nova-compute/0']
+        self.nova_sentry = self.d.sentry.unit['nova-compute/0']
         self.glance_sentry = self.d.sentry.unit['glance/0']
         self.cinder_sentry = self.d.sentry.unit['cinder/0']
         self.ceph0_sentry = self.d.sentry.unit['ceph/0']
         self.ceph1_sentry = self.d.sentry.unit['ceph/1']
         self.ceph2_sentry = self.d.sentry.unit['ceph/2']
         self.ceph_radosgw_sentry = self.d.sentry.unit['ceph-radosgw/0']
+        u.log.debug('openstack release val: {}'.format(
+            self._get_openstack_release()))
+        u.log.debug('openstack release str: {}'.format(
+            self._get_openstack_release_string()))
+
+        # Let things settle a bit original moving forward
+        time.sleep(30)
 
         # Authenticate admin with keystone
         self.keystone = u.authenticate_keystone_admin(self.keystone_sentry,
@@ -135,39 +146,76 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                                                   'password',
                                                   self.demo_tenant)
 
-    def _ceph_osd_id(self, index):
-        """Produce a shell command that will return a ceph-osd id."""
-        return "`initctl list | grep 'ceph-osd ' | awk 'NR=={} {{ print $2 }}' | grep -o '[0-9]*'`".format(index + 1)  # noqa
+        # Authenticate radosgw user using swift api
+        ks_obj_rel = self.keystone_sentry.relation('identity-service',
+                                                   'ceph-radosgw:identity-service')
+        self.swift = u.authenticate_swift_user(self.keystone,
+                                               user=ks_obj_rel['service_username'],
+                                               password=ks_obj_rel['service_password'],
+                                               tenant=ks_obj_rel['service_tenant'])
 
-    def test_services(self):
-        """Verify the expected services are running on the service units."""
-        ceph_services = ['status ceph-mon-all',
-                         'status ceph-mon id=`hostname`']
-        commands = {
-            self.mysql_sentry: ['status mysql'],
-            self.rabbitmq_sentry: ['sudo service rabbitmq-server status'],
-            self.nova_compute_sentry: ['status nova-compute'],
-            self.keystone_sentry: ['status keystone'],
-            self.glance_sentry: ['status glance-registry',
-                                 'status glance-api'],
-            self.cinder_sentry: ['status cinder-api',
-                                 'status cinder-scheduler',
-                                 'status cinder-volume'],
-            self.ceph_radosgw_sentry: ['status radosgw-all']
+    def test_100_ceph_processes(self):
+        """Verify that the expected service processes are running
+        on each ceph unit."""
+
+        # Process name and quantity of processes to expect on each unit
+        ceph_processes = {
+            'ceph-mon': 1,
+            'ceph-mon': 1,
+            'ceph-osd': 2
         }
-        ceph_osd0 = 'status ceph-osd id={}'.format(self._ceph_osd_id(0))
-        ceph_osd1 = 'status ceph-osd id={}'.format(self._ceph_osd_id(1))
-        ceph_services.extend([ceph_osd0, ceph_osd1, 'status ceph-osd-all'])
-        commands[self.ceph0_sentry] = ceph_services
-        commands[self.ceph1_sentry] = ceph_services
-        commands[self.ceph2_sentry] = ceph_services
 
-        ret = u.validate_services(commands)
+        # Units with process names and PID quantities expected
+        expected_processes = {
+            self.ceph_radosgw_sentry: {'radosgw': 1},
+            self.ceph0_sentry: ceph_processes,
+            self.ceph1_sentry: ceph_processes,
+            self.ceph2_sentry: ceph_processes
+        }
+
+        actual_pids = u.get_unit_process_ids(expected_processes)
+        ret = u.validate_unit_process_ids(expected_processes, actual_pids)
         if ret:
             amulet.raise_status(amulet.FAIL, msg=ret)
 
-    def test_ceph_radosgw_ceph_relation(self):
+    def test_102_services(self):
+        """Verify the expected services are running on the service units."""
+
+        services = {
+            self.mysql_sentry: ['mysql'],
+            self.rabbitmq_sentry: ['rabbitmq-server'],
+            self.nova_sentry: ['nova-compute'],
+            self.keystone_sentry: ['keystone'],
+            self.glance_sentry: ['glance-registry',
+                                 'glance-api'],
+            self.cinder_sentry: ['cinder-api',
+                                 'cinder-scheduler',
+                                 'cinder-volume'],
+        }
+
+        if self._get_openstack_release() < self.vivid_kilo:
+            # For upstart systems only.  Ceph services under systemd
+            # are checked by process name instead.
+            ceph_services = [
+                'ceph-mon-all',
+                'ceph-mon id=`hostname`',
+                'ceph-osd-all',
+                'ceph-osd id={}'.format(u.get_ceph_osd_id_cmd(0)),
+                'ceph-osd id={}'.format(u.get_ceph_osd_id_cmd(1))
+            ]
+            services[self.ceph0_sentry] = ceph_services
+            services[self.ceph1_sentry] = ceph_services
+            services[self.ceph2_sentry] = ceph_services
+            services[self.ceph_radosgw_sentry] = ['radosgw-all']
+
+        ret = u.validate_services_by_name(services)
+        if ret:
+            amulet.raise_status(amulet.FAIL, msg=ret)
+
+    def test_200_ceph_radosgw_ceph_relation(self):
         """Verify the ceph-radosgw to ceph relation data."""
+        u.log.debug('Checking ceph-radosgw:mon to ceph:radosgw '
+                    'relation data...')
         unit = self.ceph_radosgw_sentry
         relation = ['mon', 'ceph:radosgw']
         expected = {
@@ -179,8 +227,9 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph-radosgw to ceph', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_ceph0_ceph_radosgw_relation(self):
+    def test_201_ceph0_ceph_radosgw_relation(self):
         """Verify the ceph0 to ceph-radosgw relation data."""
+        u.log.debug('Checking ceph0:radosgw radosgw:mon relation data...')
         unit = self.ceph0_sentry
         relation = ['radosgw', 'ceph-radosgw:mon']
         expected = {
@@ -196,8 +245,9 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph0 to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_ceph1_ceph_radosgw_relation(self):
+    def test_202_ceph1_ceph_radosgw_relation(self):
         """Verify the ceph1 to ceph-radosgw relation data."""
+        u.log.debug('Checking ceph1:radosgw ceph-radosgw:mon relation data...')
         unit = self.ceph1_sentry
         relation = ['radosgw', 'ceph-radosgw:mon']
         expected = {
@@ -213,8 +263,9 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph1 to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_ceph2_ceph_radosgw_relation(self):
+    def test_203_ceph2_ceph_radosgw_relation(self):
         """Verify the ceph2 to ceph-radosgw relation data."""
+        u.log.debug('Checking ceph2:radosgw ceph-radosgw:mon relation data...')
         unit = self.ceph2_sentry
         relation = ['radosgw', 'ceph-radosgw:mon']
         expected = {
@@ -230,8 +281,10 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph2 to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_ceph_radosgw_keystone_relation(self):
+    def test_204_ceph_radosgw_keystone_relation(self):
         """Verify the ceph-radosgw to keystone relation data."""
+        u.log.debug('Checking ceph-radosgw to keystone id service '
+                    'relation data...')
         unit = self.ceph_radosgw_sentry
         relation = ['identity-service', 'keystone:identity-service']
         expected = {
@@ -249,8 +302,10 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph-radosgw to keystone', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_keystone_ceph_radosgw_relation(self):
+    def test_205_keystone_ceph_radosgw_relation(self):
         """Verify the keystone to ceph-radosgw relation data."""
+        u.log.debug('Checking keystone to ceph-radosgw id service '
+                    'relation data...')
         unit = self.keystone_sentry
         relation = ['identity-service', 'ceph-radosgw:identity-service']
         expected = {
@@ -273,8 +328,9 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('keystone to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_ceph_config(self):
+    def test_300_ceph_radosgw_config(self):
         """Verify the data in the ceph config file."""
+        u.log.debug('Checking ceph config file data...')
         unit = self.ceph_radosgw_sentry
         conf = '/etc/ceph/ceph.conf'
         keystone_sentry = self.keystone_sentry
@@ -309,11 +365,153 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                 message = "ceph config error: {}".format(ret)
                 amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_restart_on_config_change(self):
-        """Verify the specified services are restarted on config change."""
-        # NOTE(coreycb): Test not implemented but should it be? ceph-radosgw
-        #                svcs aren't restarted by charm after config change
-        #                Should they be restarted?
-        if self._get_openstack_release() >= self.precise_essex:
-            u.log.error("Test not implemented")
-            return
+    def test_302_cinder_rbd_config(self):
+        """Verify the cinder config file data regarding ceph."""
+        u.log.debug('Checking cinder (rbd) config file data...')
+        unit = self.cinder_sentry
+        conf = '/etc/cinder/cinder.conf'
+        expected = {
+            'DEFAULT': {
+                'volume_driver': 'cinder.volume.drivers.rbd.RBDDriver'
+            }
+        }
+        for section, pairs in expected.iteritems():
+            ret = u.validate_config_data(unit, conf, section, pairs)
+            if ret:
+                message = "cinder (rbd) config error: {}".format(ret)
+                amulet.raise_status(amulet.FAIL, msg=message)
+
+    def test_304_glance_rbd_config(self):
+        """Verify the glance config file data regarding ceph."""
+        u.log.debug('Checking glance (rbd) config file data...')
+        unit = self.glance_sentry
+        conf = '/etc/glance/glance-api.conf'
+        config = {
+            'default_store': 'rbd',
+            'rbd_store_ceph_conf': '/etc/ceph/ceph.conf',
+            'rbd_store_user': 'glance',
+            'rbd_store_pool': 'glance',
+            'rbd_store_chunk_size': '8'
+        }
+
+        if self._get_openstack_release() >= self.trusty_kilo:
+            # Kilo or later
+            config['stores'] = ('glance.store.filesystem.Store,'
+                                'glance.store.http.Store,'
+                                'glance.store.rbd.Store')
+            section = 'glance_store'
+        else:
+            # Juno or earlier
+            section = 'DEFAULT'
+
+        expected = {section: config}
+        for section, pairs in expected.iteritems():
+            ret = u.validate_config_data(unit, conf, section, pairs)
+            if ret:
+                message = "glance (rbd) config error: {}".format(ret)
+                amulet.raise_status(amulet.FAIL, msg=message)
+
+    def test_306_nova_rbd_config(self):
+        """Verify the nova config file data regarding ceph."""
+        u.log.debug('Checking nova (rbd) config file data...')
+        unit = self.nova_sentry
+        conf = '/etc/nova/nova.conf'
+        expected = {
+            'libvirt': {
+                'rbd_pool': 'nova',
+                'rbd_user': 'nova-compute',
+                'rbd_secret_uuid': u.not_null
+            }
+        }
+        for section, pairs in expected.iteritems():
+            ret = u.validate_config_data(unit, conf, section, pairs)
+            if ret:
+                message = "nova (rbd) config error: {}".format(ret)
+                amulet.raise_status(amulet.FAIL, msg=message)
+
+    def test_400_ceph_check_osd_pools(self):
+        """Check osd pools on all ceph units, expect them to be
+        identical, and expect specific pools to be present."""
+        u.log.debug('Checking pools on ceph units...')
+
+        expected_pools = self.get_ceph_expected_pools(radosgw=True)
+        results = []
+        sentries = [
+            self.ceph_radosgw_sentry,
+            self.ceph0_sentry,
+            self.ceph1_sentry,
+            self.ceph2_sentry
+        ]
+
+        # Check for presence of expected pools on each unit
+        u.log.debug('Expected pools: {}'.format(expected_pools))
+        for sentry_unit in sentries:
+            pools = u.get_ceph_pools(sentry_unit)
+            results.append(pools)
+
+            for expected_pool in expected_pools:
+                if expected_pool not in pools:
+                    msg = ('{} does not have pool: '
+                           '{}'.format(sentry_unit.info['unit_name'],
+                                       expected_pool))
+                    amulet.raise_status(amulet.FAIL, msg=msg)
+            u.log.debug('{} has (at least) the expected '
+                        'pools.'.format(sentry_unit.info['unit_name']))
+
+        # Check that all units returned the same pool name:id data
+        ret = u.validate_list_of_identical_dicts(results)
+        if ret:
+            u.log.debug('Pool list results: {}'.format(results))
+            msg = ('{}; Pool list results are not identical on all '
+                   'ceph units.'.format(ret))
+            amulet.raise_status(amulet.FAIL, msg=msg)
+        else:
+            u.log.debug('Pool list on all ceph units produced the '
+                        'same results (OK).')
+
+    def test_402_swift_api_connection(self):
+        """Simple api call to confirm basic service functionality"""
+        u.log.debug('Checking basic radosgw functionality via swift api...')
+        headers, containers = self.swift.get_account()
+        assert('content-type' in headers.keys())
+        assert(containers == [])
+
+    def test_498_radosgw_cmds_exit_zero(self):
+        """Check basic functionality of radosgw cli commands against
+        the ceph_radosgw unit."""
+        sentry_units = [self.ceph_radosgw_sentry]
+        commands = [
+            'sudo radosgw-admin regions list',
+            'sudo radosgw-admin bucket list',
+            'sudo radosgw-admin zone list',
+            'sudo radosgw-admin metadata list',
+            'sudo radosgw-admin gc list'
+        ]
+        ret = u.check_commands_on_units(commands, sentry_units)
+        if ret:
+            amulet.raise_status(amulet.FAIL, msg=ret)
+
+    def test_499_ceph_cmds_exit_zero(self):
+        """Check basic functionality of ceph cli commands against
+        all ceph units."""
+        sentry_units = [
+            self.ceph_radosgw_sentry,
+            self.ceph0_sentry,
+            self.ceph1_sentry,
+            self.ceph2_sentry
+        ]
+        commands = [
+            'sudo ceph health',
+            'sudo ceph mds stat',
+            'sudo ceph pg stat',
+            'sudo ceph osd stat',
+            'sudo ceph mon stat',
+        ]
+        ret = u.check_commands_on_units(commands, sentry_units)
+        if ret:
+            amulet.raise_status(amulet.FAIL, msg=ret)
+
+    # Note(beisner): need to add basic object store functional checks.
+
+    # FYI: No restart check as ceph services do not restart
+    # when charm config changes, unless monitor count increases.
