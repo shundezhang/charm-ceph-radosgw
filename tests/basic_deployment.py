@@ -147,12 +147,14 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                                                   self.demo_tenant)
 
         # Authenticate radosgw user using swift api
-        ks_obj_rel = self.keystone_sentry.relation('identity-service',
-                                                   'ceph-radosgw:identity-service')
-        self.swift = u.authenticate_swift_user(self.keystone,
-                                               user=ks_obj_rel['service_username'],
-                                               password=ks_obj_rel['service_password'],
-                                               tenant=ks_obj_rel['service_tenant'])
+        ks_obj_rel = self.keystone_sentry.relation(
+            'identity-service',
+            'ceph-radosgw:identity-service')
+        self.swift = u.authenticate_swift_user(
+            self.keystone,
+            user=ks_obj_rel['service_username'],
+            password=ks_obj_rel['service_password'],
+            tenant=ks_obj_rel['service_tenant'])
 
     def test_100_ceph_processes(self):
         """Verify that the expected service processes are running
