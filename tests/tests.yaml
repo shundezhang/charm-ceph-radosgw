@@ -11,7 +11,8 @@ packages:
     - python-amulet
     - python-cinderclient
     - python-distro-info
-    - python-keystoneclient
     - python-glanceclient
+    - python-heatclient
+    - python-keystoneclient
     - python-novaclient
     - python-swiftclient
