@@ -7,7 +7,10 @@ description: |
  .
  This charm provides the RADOS HTTP gateway supporting S3 and Swift protocols
  for object storage.
-categories:
+tags:
+  - openstack
+  - storage
+  - file-servers
   - misc
 requires:
   mon:
