@@ -1,20 +1,20 @@
 options:
   source:
     type: string
-    default: cloud:precise-updates/folsom
+    default:
     description: |
       Optional configuration to support use of additional sources such as:
-      .
+
         - ppa:myteam/ppa
-        - cloud:precise-proposed/folsom
+        - cloud:trusty-proposed/kilo
         - http://my.archive.com/ubuntu main
-      .
+
       The last option should be used in conjunction with the key configuration
       option.
-      .
+
       Note that a minimum ceph version of 0.48.2 is required for use with this
       charm which is NOT provided by the packages in the main Ubuntu archive
-      for precise.
+      for precise but is provided in the Ubuntu cloud archive.
   key:
     type: string
     default:
@@ -32,8 +32,8 @@ options:
     default: RegionOne
     type: string
     description: |
-      OpenStack region that the RADOS gateway supports; used when integrating with
-      OpenStack Keystone.
+      OpenStack region that the RADOS gateway supports; used when integrating
+      with OpenStack Keystone.
   cache-size:
     default: 500
     type: int
@@ -51,12 +51,12 @@ options:
     type: boolean
     default: false
     description: |
-        By default apache2 and libapache2-mod-fastcgi will be installed from the
-        Ubuntu archives. This option allows for an alternate ceph.com install
-        source which contains patched versions with added support for HTTP
-        100-continue. See the following page for more info:
+      By default apache2 and libapache2-mod-fastcgi will be installed from the
+      Ubuntu archives. This option allows for an alternate ceph.com install
+      source which contains patched versions with added support for HTTP
+      100-continue. See the following page for more info:
 
-        http://ceph.com/docs/dumpling/radosgw/manual-install/#continue-support
+      http://ceph.com/docs/dumpling/radosgw/manual-install/#continue-support
   use-embedded-webserver:
     type: boolean
     default: false
@@ -64,7 +64,7 @@ options:
       Newer versions of the Ceph RADOS Gateway support use of an embedded web
       container instead of Apache + mod-fastcgi, avoiding some of the nuances
       of using the stock mod-fastcgi packages from Ubuntu.
-      .
+
       Enable this option to disable use of Apache and enable the embedded
       web container feature.
   vip:
@@ -72,7 +72,7 @@ options:
     default:
     description: |
       Virtual IP(s) to use to front API services in HA configuration.
-      .
+
       If multiple networks are being used, a VIP should be provided for each
       network, separated by spaces.
   ha-bindiface:
@@ -93,9 +93,9 @@ options:
     description: |
       The hostname or address of the public endpoints created for ceph-radosgw
       in the keystone identity provider.
-      .
+
       This value will be used for public endpoints. For example, an
       os-public-hostname set to 'files.example.com' with will create
       the following public endpoint for the ceph-radosgw:
-      .
+
       https://files.example.com:80/swift/v1
