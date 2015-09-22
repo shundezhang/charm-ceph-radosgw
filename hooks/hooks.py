@@ -109,7 +109,7 @@ def install_packages():
         apt_install(APACHE_PACKAGES, fatal=True)
 
 
-@hooks.hook('install')
+@hooks.hook('install.real')
 def install():
     execd_preinstall()
     enable_pocket('multiverse')
