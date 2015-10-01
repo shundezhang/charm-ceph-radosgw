@@ -34,23 +34,6 @@ import errno
 import tempfile
 from subprocess import CalledProcessError
 
-try:
-    from charmhelpers.cli import cmdline
-except ImportError as e:
-    # due to the anti-pattern of partially synching charmhelpers directly
-    # into charms, it's possible that charmhelpers.cli is not available;
-    # if that's the case, they don't really care about using the cli anyway,
-    # so mock it out
-    if str(e) == 'No module named cli':
-        class cmdline(object):
-            @classmethod
-            def subcommand(cls, *args, **kwargs):
-                def _wrap(func):
-                    return func
-                return _wrap
-    else:
-        raise
-
 import six
 if not six.PY3:
     from UserDict import UserDict
@@ -91,6 +74,7 @@ def cached(func):
         res = func(*args, **kwargs)
         cache[key] = res
         return res
+    wrapper._wrapped = func
     return wrapper
 
 
@@ -190,7 +174,6 @@ def relation_type():
     return os.environ.get('JUJU_RELATION', None)
 
 
-@cmdline.subcommand()
 @cached
 def relation_id(relation_name=None, service_or_unit=None):
     """The relation ID for the current or a specified relation"""
@@ -216,13 +199,11 @@ def remote_unit():
     return os.environ.get('JUJU_REMOTE_UNIT', None)
 
 
-@cmdline.subcommand()
 def service_name():
     """The name service group this unit belongs to"""
     return local_unit().split('/')[0]
 
 
-@cmdline.subcommand()
 @cached
 def remote_service_name(relid=None):
     """The remote service name for a given relation-id (or the current relation)"""
@@ -642,6 +623,38 @@ def unit_private_ip():
     return unit_get('private-address')
 
 
+@cached
+def storage_get(attribute="", storage_id=""):
+    """Get storage attributes"""
+    _args = ['storage-get', '--format=json']
+    if storage_id:
+        _args.extend(('-s', storage_id))
+    if attribute:
+        _args.append(attribute)
+    try:
+        return json.loads(subprocess.check_output(_args).decode('UTF-8'))
+    except ValueError:
+        return None
+
+
+@cached
+def storage_list(storage_name=""):
+    """List the storage IDs for the unit"""
+    _args = ['storage-list', '--format=json']
+    if storage_name:
+        _args.append(storage_name)
+    try:
+        return json.loads(subprocess.check_output(_args).decode('UTF-8'))
+    except ValueError:
+        return None
+    except OSError as e:
+        import errno
+        if e.errno == errno.ENOENT:
+            # storage-list does not exist
+            return []
+        raise
+
+
 class UnregisteredHookError(Exception):
     """Raised when an undefined hook is called"""
     pass
@@ -786,21 +799,23 @@ def status_set(workload_state, message):
 
 
 def status_get():
-    """Retrieve the previously set juju workload state
+    """Retrieve the previously set juju workload state and message
 
-    If the status-set command is not found then assume this is juju < 1.23 and
-    return 'unknown'
+    If the status-get command is not found then assume this is juju < 1.23 and
+    return 'unknown', ""
+
     """
-    cmd = ['status-get']
+    cmd = ['status-get', "--format=json", "--include-data"]
     try:
-        raw_status = subprocess.check_output(cmd, universal_newlines=True)
-        status = raw_status.rstrip()
-        return status
+        raw_status = subprocess.check_output(cmd)
     except OSError as e:
         if e.errno == errno.ENOENT:
-            return 'unknown'
+            return ('unknown', "")
         else:
             raise
+    else:
+        status = json.loads(raw_status.decode("UTF-8"))
+        return (status["status"], status["message"])
 
 
 def translate_exc(from_exc, to_exc):
