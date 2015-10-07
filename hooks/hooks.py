@@ -23,6 +23,7 @@ from charmhelpers.core.hookenv import (
     relation_set,
     log, ERROR,
     Hooks, UnregisteredHookError,
+    status_set,
 )
 from charmhelpers.fetch import (
     apt_update,
@@ -32,7 +33,7 @@ from charmhelpers.fetch import (
 )
 from charmhelpers.core.host import (
     lsb_release,
-    restart_on_change
+    restart_on_change,
 )
 from utils import (
     render_template,
@@ -41,6 +42,8 @@ from utils import (
     is_apache_24,
     CEPHRG_HA_RES,
     register_configs,
+    REQUIRED_INTERFACES,
+    check_optional_relations,
 )
 
 from charmhelpers.payload.execd import execd_preinstall
@@ -55,7 +58,9 @@ from charmhelpers.contrib.openstack.ip import (
     canonical_url,
     PUBLIC, INTERNAL, ADMIN,
 )
-
+from charmhelpers.contrib.openstack.utils import (
+    os_workload_status,
+)
 hooks = Hooks()
 CONFIGS = register_configs()
 
@@ -96,6 +101,7 @@ APACHE_PACKAGES = [
 
 
 def install_packages():
+    status_set('maintenance', 'Installing apt packages')
     add_source(config('source'), config('key'))
     if (config('use-ceph-optimised-packages') and
             not config('use-embedded-webserver')):
@@ -110,7 +116,10 @@ def install_packages():
 
 
 @hooks.hook('install.real')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 def install():
+    status_set('maintenance', 'Executing pre-install')
     execd_preinstall()
     enable_pocket('multiverse')
     install_packages()
@@ -139,6 +148,7 @@ def emit_cephconf():
         if ks_conf:
             cephcontext.update(ks_conf)
 
+    print cephcontext
     with open('/etc/ceph/ceph.conf', 'w') as cephconf:
         cephconf.write(render_template('ceph.conf', cephcontext))
 
@@ -177,6 +187,8 @@ def apache_ports():
 
 @hooks.hook('upgrade-charm',
             'config-changed')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw'],
                     '/etc/haproxy/haproxy.cfg': ['haproxy']})
 def config_changed():
@@ -184,6 +196,7 @@ def config_changed():
     emit_cephconf()
     CONFIGS.write_all()
     if not config('use-embedded-webserver'):
+        status_set('maintenance', 'configuring apache')
         emit_apacheconf()
         install_www_scripts()
         apache_sites()
@@ -236,12 +249,15 @@ def get_keystone_conf():
                 config('revocation-check-interval')
             }
             if None not in ks_auth.itervalues():
+                print ks_auth
                 return ks_auth
     return None
 
 
 @hooks.hook('mon-relation-departed',
             'mon-relation-changed')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def mon_relation():
     emit_cephconf()
@@ -273,6 +289,8 @@ def restart():
 
 
 @hooks.hook('identity-service-relation-joined')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 def identity_joined(relid=None):
     if cmp_pkgrevno('radosgw', '0.55') < 0:
         log('Integration with keystone requires ceph >= 0.55')
@@ -293,6 +311,8 @@ def identity_joined(relid=None):
 
 
 @hooks.hook('identity-service-relation-changed')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def identity_changed():
     emit_cephconf()
@@ -301,6 +321,8 @@ def identity_changed():
 
 @hooks.hook('cluster-relation-changed',
             'cluster-relation-joined')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 @restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
 def cluster_changed():
     CONFIGS.write_all()
@@ -309,6 +331,8 @@ def cluster_changed():
 
 
 @hooks.hook('ha-relation-joined')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 def ha_relation_joined():
     # Obtain the config values necessary for the cluster config. These
     # include multicast port and interface to bind to.
@@ -361,6 +385,8 @@ def ha_relation_joined():
 
 
 @hooks.hook('ha-relation-changed')
+@os_workload_status(CONFIGS, REQUIRED_INTERFACES,
+                    charm_func=check_optional_relations)
 def ha_relation_changed():
     clustered = relation_get('clustered')
     if clustered:
