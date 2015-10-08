@@ -122,31 +122,6 @@ class CephRadosGWTests(CharmTestCase):
         self.enable_pocket.assert_called_with('multiverse')
         self.os.makedirs.called_with('/var/lib/ceph/nss')
 
-#    def test_emit_cephconf(self):
-#        _get_keystone_conf = self.patch('get_keystone_conf')
-#        _get_auth = self.patch('get_auth')
-#        _get_mon_hosts = self.patch('get_mon_hosts')
-#        _get_auth.return_value = 'cephx'
-#        _get_keystone_conf.return_value = {'keystone_key': 'keystone_value'}
-#        _get_mon_hosts.return_value = ['10.0.0.1:6789', '10.0.0.2:6789']
-#        self.get_unit_hostname.return_value = 'bob'
-#        self.os.path.exists.return_value = False
-#        cephcontext = {
-#            'auth_supported': 'cephx',
-#            'mon_hosts': '10.0.0.1:6789 10.0.0.2:6789',
-#            'hostname': 'bob',
-#            'old_auth': False,
-#            'use_syslog': 'false',
-#            'keystone_key': 'keystone_value',
-#            'embedded_webserver': False,
-#        }
-#        self.cmp_pkgrevno.return_value = 1
-#        with patch_open() as (_open, _file):
-#            ceph_hooks.emit_cephconf()
-#            self.os.makedirs.assert_called_with('/etc/ceph')
-#            _open.assert_called_with('/etc/ceph/ceph.conf', 'w')
-#            self.render_template.assert_called_with('ceph.conf', cephcontext)
-
     def test_emit_apacheconf(self):
         self.is_apache_24.return_value = True
         self.unit_get.return_value = '10.0.0.1'
