@@ -18,6 +18,7 @@ from charmhelpers.contrib.openstack import context, templating
 from charmhelpers.contrib.openstack.utils import set_os_workload_status
 from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
 from charmhelpers.core.host import cmp_pkgrevno
+from charmhelpers.fetch import filter_installed_packages
 
 import ceph_radosgw_context
 
@@ -61,7 +62,8 @@ def register_configs(release='icehouse'):
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
     CONFIGS = resource_map()
-    if cmp_pkgrevno('radosgw', '0.55') >= 0:
+    pkg = 'radosgw'
+    if not filter_installed_packages([pkg]) and cmp_pkgrevno(pkg, '0.55') >= 0:
         # Add keystone configuration if found
         CONFIGS[CEPH_CONF]['contexts'].append(
             ceph_radosgw_context.IdentityServiceContext()
