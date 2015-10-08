@@ -9,8 +9,11 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     related_units,
     relation_get,
+    unit_get,
 )
 import socket
+import dns.resolver
+
 
 class HAProxyContext(context.HAProxyContext):
 
@@ -36,20 +39,21 @@ class HAProxyContext(context.HAProxyContext):
         return ctxt
 
 
-class IdentityServiceContext(context.IdentityServiceContext):                                          
-    interfaces = ['identity-service']                                                                  
+class IdentityServiceContext(context.IdentityServiceContext):
+    interfaces = ['identity-service']
 
-    def __call__(self):                                                                                
-        ctxt = super(IdentityServiceContext, self).__call__()                                          
-        if not ctxt:                                                                                   
+    def __call__(self):
+        ctxt = super(IdentityServiceContext, self).__call__()
+        if not ctxt:
             return
 
+        ctxt['admin_token'] = None
         for relid in relation_ids('identity-service'):
             for unit in related_units(relid):
                 if not ctxt.get('admin_token'):
                     ctxt['admin_token'] = \
                         relation_get('admin_token', unit, relid)
-    
+
         ctxt['auth_type'] = 'keystone'
         ctxt['user_roles'] = config('operator-roles')
         ctxt['cache_size'] = config('cache-size')
@@ -57,11 +61,11 @@ class IdentityServiceContext(context.IdentityServiceContext):
         if self.context_complete(ctxt):
             return ctxt
 
-        return {}  
+        return {}
 
 
-class MonContext(context.OSContextGenerator):                                          
-    interfaces = ['mon']                                                                  
+class MonContext(context.OSContextGenerator):
+    interfaces = ['ceph-radosgw']
 
     def __call__(self):
         if not relation_ids('mon'):
@@ -70,12 +74,14 @@ class MonContext(context.OSContextGenerator):
         auth = 'none'
         for relid in relation_ids('mon'):
             for unit in related_units(relid):
-                host_ip = self.get_host_ip(relation_get('ceph-public-address',
-                                                        unit, relid))
-                hosts.append('{}:6789'.format(host_ip))
-                _auth = relation_get('auth', unit, relid)
-                if _auth:
-                    auth = _auth
+                ceph_public_addr = relation_get('ceph-public-address', unit,
+                                                relid)
+                if ceph_public_addr:
+                    host_ip = self.get_host_ip(ceph_public_addr)
+                    hosts.append('{}:6789'.format(host_ip))
+                    _auth = relation_get('auth', unit, relid)
+                    if _auth:
+                        auth = _auth
         hosts.sort()
         ctxt = {
             'auth_supported': auth,
@@ -84,13 +90,12 @@ class MonContext(context.OSContextGenerator):
             'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
             'use_syslog': str(config('use-syslog')).lower(),
             'embedded_webserver': config('use-embedded-webserver'),
-        }         
+        }
 
         if self.context_complete(ctxt):
-            print ctxt
             return ctxt
 
-        return {}  
+        return {}
 
     def get_host_ip(self, hostname=None):
         try:
