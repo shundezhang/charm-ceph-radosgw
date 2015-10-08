@@ -574,7 +574,6 @@ class HAProxyContext(OSContextGenerator):
         if not relation_ids('cluster') and not self.singlenode_mode:
             return {}
 
-        print "config('prefer-ipv6'): {}".format(config('prefer-ipv6'))
         if config('prefer-ipv6'):
             addr = get_ipv6_addr(exc_list=[config('vip')])[0]
         else:
