@@ -23,6 +23,7 @@ with patch('charmhelpers.fetch.apt_install'):
         import hooks as ceph_hooks
 
 TO_PATCH = [
+    'CONFIGS',
     'add_source',
     'apt_update',
     'apt_install',
@@ -31,22 +32,20 @@ TO_PATCH = [
     'cmp_pkgrevno',
     'execd_preinstall',
     'enable_pocket',
-    'get_host_ip',
     'get_iface_for_address',
     'get_netmask_for_address',
-    'get_unit_hostname',
     'glob',
     'is_apache_24',
     'log',
     'lsb_release',
     'open_port',
     'os',
-    'related_units',
     'relation_ids',
     'relation_set',
     'relation_get',
     'render_template',
     'shutil',
+    'status_set',
     'subprocess',
     'sys',
     'unit_get',
@@ -123,30 +122,30 @@ class CephRadosGWTests(CharmTestCase):
         self.enable_pocket.assert_called_with('multiverse')
         self.os.makedirs.called_with('/var/lib/ceph/nss')
 
-    def test_emit_cephconf(self):
-        _get_keystone_conf = self.patch('get_keystone_conf')
-        _get_auth = self.patch('get_auth')
-        _get_mon_hosts = self.patch('get_mon_hosts')
-        _get_auth.return_value = 'cephx'
-        _get_keystone_conf.return_value = {'keystone_key': 'keystone_value'}
-        _get_mon_hosts.return_value = ['10.0.0.1:6789', '10.0.0.2:6789']
-        self.get_unit_hostname.return_value = 'bob'
-        self.os.path.exists.return_value = False
-        cephcontext = {
-            'auth_supported': 'cephx',
-            'mon_hosts': '10.0.0.1:6789 10.0.0.2:6789',
-            'hostname': 'bob',
-            'old_auth': False,
-            'use_syslog': 'false',
-            'keystone_key': 'keystone_value',
-            'embedded_webserver': False,
-        }
-        self.cmp_pkgrevno.return_value = 1
-        with patch_open() as (_open, _file):
-            ceph_hooks.emit_cephconf()
-            self.os.makedirs.assert_called_with('/etc/ceph')
-            _open.assert_called_with('/etc/ceph/ceph.conf', 'w')
-            self.render_template.assert_called_with('ceph.conf', cephcontext)
+#    def test_emit_cephconf(self):
+#        _get_keystone_conf = self.patch('get_keystone_conf')
+#        _get_auth = self.patch('get_auth')
+#        _get_mon_hosts = self.patch('get_mon_hosts')
+#        _get_auth.return_value = 'cephx'
+#        _get_keystone_conf.return_value = {'keystone_key': 'keystone_value'}
+#        _get_mon_hosts.return_value = ['10.0.0.1:6789', '10.0.0.2:6789']
+#        self.get_unit_hostname.return_value = 'bob'
+#        self.os.path.exists.return_value = False
+#        cephcontext = {
+#            'auth_supported': 'cephx',
+#            'mon_hosts': '10.0.0.1:6789 10.0.0.2:6789',
+#            'hostname': 'bob',
+#            'old_auth': False,
+#            'use_syslog': 'false',
+#            'keystone_key': 'keystone_value',
+#            'embedded_webserver': False,
+#        }
+#        self.cmp_pkgrevno.return_value = 1
+#        with patch_open() as (_open, _file):
+#            ceph_hooks.emit_cephconf()
+#            self.os.makedirs.assert_called_with('/etc/ceph')
+#            _open.assert_called_with('/etc/ceph/ceph.conf', 'w')
+#            self.render_template.assert_called_with('ceph.conf', cephcontext)
 
     def test_emit_apacheconf(self):
         self.is_apache_24.return_value = True
@@ -195,7 +194,6 @@ class CephRadosGWTests(CharmTestCase):
 
     def test_config_changed(self):
         _install_packages = self.patch('install_packages')
-        _emit_cephconf = self.patch('emit_cephconf')
         _emit_apacheconf = self.patch('emit_apacheconf')
         _install_www_scripts = self.patch('install_www_scripts')
         _apache_sites = self.patch('apache_sites')
@@ -203,105 +201,30 @@ class CephRadosGWTests(CharmTestCase):
         _apache_reload = self.patch('apache_reload')
         ceph_hooks.config_changed()
         _install_packages.assert_called()
-        _emit_cephconf.assert_called()
+        self.CONFIGS.write_all.assert_called_with()
         _emit_apacheconf.assert_called()
         _install_www_scripts.assert_called()
         _apache_sites.assert_called()
         _apache_modules.assert_called()
         _apache_reload.assert_called()
 
-    def test_get_mon_hosts(self):
-        self.relation_ids.return_value = ['monrelid']
-        self.related_units.return_value = ['monunit']
-
-        def rel_get(k, *args):
-            return {'private-address': '127.0.0.1',
-                    'ceph-public-address': '10.0.0.1'}[k]
-
-        self.relation_get.side_effect = rel_get
-        self.get_host_ip.side_effect = lambda x: x
-        self.assertEquals(ceph_hooks.get_mon_hosts(), ['10.0.0.1:6789'])
-
-    def test_get_conf(self):
-        self.relation_ids.return_value = ['monrelid']
-        self.related_units.return_value = ['monunit']
-        self.relation_get.return_value = 'bob'
-        self.assertEquals(ceph_hooks.get_conf('key'), 'bob')
-
-    def test_get_conf_nomatch(self):
-        self.relation_ids.return_value = ['monrelid']
-        self.related_units.return_value = ['monunit']
-        self.relation_get.return_value = ''
-        self.assertEquals(ceph_hooks.get_conf('key'), None)
-
-    def test_get_auth(self):
-        self.relation_ids.return_value = ['monrelid']
-        self.related_units.return_value = ['monunit']
-        self.relation_get.return_value = 'bob'
-        self.assertEquals(ceph_hooks.get_auth(), 'bob')
-
-    def test_get_keystone_conf(self):
-        self.test_config.set('operator-roles', 'admin')
-        self.test_config.set('cache-size', '42')
-        self.test_config.set('revocation-check-interval', '21')
-        self.relation_ids.return_value = ['idrelid']
-        self.related_units.return_value = ['idunit']
-
-        def _relation_get(key, unit, relid):
-            ks_dict = {
-                'auth_protocol': 'https',
-                'auth_host': '10.0.0.2',
-                'auth_port': '8090',
-                'admin_token': 'sectocken',
-            }
-            return ks_dict[key]
-        self.relation_get.side_effect = _relation_get
-        self.assertEquals(ceph_hooks.get_keystone_conf(), {
-            'auth_type': 'keystone',
-            'auth_protocol': 'https',
-            'admin_token': 'sectocken',
-            'user_roles': 'admin',
-            'auth_host': '10.0.0.2',
-            'cache_size': '42',
-            'auth_port': '8090',
-            'revocation_check_interval': '21'})
-
-    def test_get_keystone_conf_missinginfo(self):
-        self.test_config.set('operator-roles', 'admin')
-        self.test_config.set('cache-size', '42')
-        self.test_config.set('revocation-check-interval', '21')
-        self.relation_ids.return_value = ['idrelid']
-        self.related_units.return_value = ['idunit']
-
-        def _relation_get(key, unit, relid):
-            ks_dict = {
-                'auth_protocol': 'https',
-                'auth_host': '10.0.0.2',
-                'auth_port': '8090',
-            }
-            return ks_dict[key] if key in ks_dict else None
-        self.relation_get.side_effect = _relation_get
-        self.assertEquals(ceph_hooks.get_keystone_conf(), None)
-
     def test_mon_relation(self):
-        _emit_cephconf = self.patch('emit_cephconf')
         _ceph = self.patch('ceph')
         _restart = self.patch('restart')
         self.relation_get.return_value = 'seckey'
         ceph_hooks.mon_relation()
         _restart.assert_called()
         _ceph.import_radosgw_key.assert_called_with('seckey')
-        _emit_cephconf.assert_called()
+        self.CONFIGS.write_all.assert_called_with()
 
     def test_mon_relation_nokey(self):
-        _emit_cephconf = self.patch('emit_cephconf')
         _ceph = self.patch('ceph')
         _restart = self.patch('restart')
         self.relation_get.return_value = None
         ceph_hooks.mon_relation()
         self.assertFalse(_ceph.import_radosgw_key.called)
         self.assertFalse(_restart.called)
-        _emit_cephconf.assert_called()
+        self.CONFIGS.write_all.assert_called_with()
 
     def test_gateway_relation(self):
         self.unit_get.return_value = 'myserver'
@@ -374,10 +297,9 @@ class CephRadosGWTests(CharmTestCase):
             admin_url='http://myserv:80/swift')
 
     def test_identity_changed(self):
-        _emit_cephconf = self.patch('emit_cephconf')
         _restart = self.patch('restart')
         ceph_hooks.identity_changed()
-        _emit_cephconf.assert_called()
+        self.CONFIGS.write_all.assert_called_with()
         _restart.assert_called()
 
     @patch('charmhelpers.contrib.openstack.ip.is_clustered')
@@ -391,12 +313,11 @@ class CephRadosGWTests(CharmTestCase):
         self.assertEquals(ceph_hooks.canonical_url({}, PUBLIC),
                           'http://[%s]' % ipv6_addr)
 
-    @patch.object(ceph_hooks, 'CONFIGS')
-    def test_cluster_changed(self, configs):
+    def test_cluster_changed(self):
         _id_joined = self.patch('identity_joined')
         self.relation_ids.return_value = ['rid']
         ceph_hooks.cluster_changed()
-        configs.write_all.assert_called()
+        self.CONFIGS.write_all.assert_called_with()
         _id_joined.assert_called_with(relid='rid')
 
     def test_ha_relation_joined_no_vip(self):

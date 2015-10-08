@@ -9,10 +9,11 @@
 import socket
 import re
 import os
+import dns.resolver
+import jinja2
 from copy import deepcopy
 from collections import OrderedDict
 from charmhelpers.core.hookenv import unit_get, relation_ids, status_get
-from charmhelpers.fetch import apt_install
 from charmhelpers.contrib.openstack import context, templating
 from charmhelpers.contrib.openstack.utils import set_os_workload_status
 from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
@@ -43,18 +44,6 @@ BASE_RESOURCE_MAP = OrderedDict([
         'services': ['radosgw'],
     }),
 ])
-
-try:
-    import jinja2
-except ImportError:
-    apt_install('python-jinja2', fatal=True)
-    import jinja2
-
-try:
-    import dns.resolver
-except ImportError:
-    apt_install('python-dnspython', fatal=True)
-    import dns.resolver
 
 
 def resource_map():
