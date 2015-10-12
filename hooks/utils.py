@@ -25,7 +25,6 @@ import ceph_radosgw_context
 # The interface is said to be satisfied if anyone of the interfaces in the
 # list has a complete context.
 REQUIRED_INTERFACES = {
-    'identity': ['identity-service'],
     'mon': ['ceph-radosgw'],
 }
 CEPHRG_HA_RES = 'grp_cephrg_vips'
@@ -125,6 +124,8 @@ def check_optional_relations(configs):
             return ('blocked',
                     'hacluster missing configuration: '
                     'vip, vip_iface, vip_cidr')
+    if cmp_pkgrevno(pkg, '0.55') >= 0 and relation_ids('identity-service'):
+        required_interfaces['identity'] = ['identity-service']
     if required_interfaces:
         set_os_workload_status(configs, required_interfaces)
         return status_get()
