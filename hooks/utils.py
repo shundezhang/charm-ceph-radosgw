@@ -124,7 +124,8 @@ def check_optional_relations(configs):
             return ('blocked',
                     'hacluster missing configuration: '
                     'vip, vip_iface, vip_cidr')
-    if cmp_pkgrevno(pkg, '0.55') >= 0 and relation_ids('identity-service'):
+    if cmp_pkgrevno('radosgw', '0.55') >= 0 and \
+            relation_ids('identity-service'):
         required_interfaces['identity'] = ['identity-service']
     if required_interfaces:
         set_os_workload_status(configs, required_interfaces)
