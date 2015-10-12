@@ -1,4 +1,3 @@
-
 #
 # Copyright 2012 Canonical Ltd.
 #
@@ -10,18 +9,29 @@
 import socket
 import re
 import os
+import dns.resolver
+import jinja2
 from copy import deepcopy
 from collections import OrderedDict
-from charmhelpers.core.hookenv import unit_get
-from charmhelpers.fetch import apt_install
+from charmhelpers.core.hookenv import unit_get, relation_ids, status_get
 from charmhelpers.contrib.openstack import context, templating
+from charmhelpers.contrib.openstack.utils import set_os_workload_status
+from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
+from charmhelpers.core.host import cmp_pkgrevno
+from charmhelpers.fetch import filter_installed_packages
 
 import ceph_radosgw_context
 
+# The interface is said to be satisfied if anyone of the interfaces in the
+# list has a complete context.
+REQUIRED_INTERFACES = {
+    'mon': ['ceph-radosgw'],
+}
 CEPHRG_HA_RES = 'grp_cephrg_vips'
 TEMPLATES_DIR = 'templates'
 TEMPLATES = 'templates/'
 HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
+CEPH_CONF = '/etc/ceph/ceph.conf'
 
 BASE_RESOURCE_MAP = OrderedDict([
     (HAPROXY_CONF, {
@@ -29,19 +39,11 @@ BASE_RESOURCE_MAP = OrderedDict([
                      ceph_radosgw_context.HAProxyContext()],
         'services': ['haproxy'],
     }),
+    (CEPH_CONF, {
+        'contexts': [ceph_radosgw_context.MonContext()],
+        'services': ['radosgw'],
+    }),
 ])
-
-try:
-    import jinja2
-except ImportError:
-    apt_install('python-jinja2', fatal=True)
-    import jinja2
-
-try:
-    import dns.resolver
-except ImportError:
-    apt_install('python-dnspython', fatal=True)
-    import dns.resolver
 
 
 def resource_map():
@@ -58,7 +60,14 @@ def resource_map():
 def register_configs(release='icehouse'):
     configs = templating.OSConfigRenderer(templates_dir=TEMPLATES,
                                           openstack_release=release)
-    for cfg, rscs in resource_map().iteritems():
+    CONFIGS = resource_map()
+    pkg = 'radosgw'
+    if not filter_installed_packages([pkg]) and cmp_pkgrevno(pkg, '0.55') >= 0:
+        # Add keystone configuration if found
+        CONFIGS[CEPH_CONF]['contexts'].append(
+            ceph_radosgw_context.IdentityServiceContext()
+        )
+    for cfg, rscs in CONFIGS.iteritems():
         configs.register(cfg, rscs['contexts'])
     return configs
 
@@ -103,3 +112,23 @@ def is_apache_24():
         return True
     else:
         return False
+
+
+def check_optional_relations(configs):
+    required_interfaces = {}
+    if relation_ids('ha'):
+        required_interfaces['ha'] = ['cluster']
+        try:
+            get_hacluster_config()
+        except:
+            return ('blocked',
+                    'hacluster missing configuration: '
+                    'vip, vip_iface, vip_cidr')
+    if cmp_pkgrevno('radosgw', '0.55') >= 0 and \
+            relation_ids('identity-service'):
+        required_interfaces['identity'] = ['identity-service']
+    if required_interfaces:
+        set_os_workload_status(configs, required_interfaces)
+        return status_get()
+    else:
+        return 'unknown', 'No optional relations'
