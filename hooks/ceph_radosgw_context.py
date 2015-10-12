@@ -5,7 +5,9 @@ from charmhelpers.contrib.hahelpers.cluster import (
 )
 from charmhelpers.core.host import cmp_pkgrevno
 from charmhelpers.core.hookenv import (
+    WARNING,
     config,
+    log,
     relation_ids,
     related_units,
     relation_get,
@@ -71,7 +73,7 @@ class MonContext(context.OSContextGenerator):
         if not relation_ids('mon'):
             return {}
         hosts = []
-        auth = 'none'
+        auths = []
         for relid in relation_ids('mon'):
             for unit in related_units(relid):
                 ceph_public_addr = relation_get('ceph-public-address', unit,
@@ -81,7 +83,14 @@ class MonContext(context.OSContextGenerator):
                     hosts.append('{}:6789'.format(host_ip))
                     _auth = relation_get('auth', unit, relid)
                     if _auth:
-                        auth = _auth
+                        auths.append(_auth)
+        if len(set(auths)) != 1:
+            e=("Inconsistent or absent auth returned by mon units. Setting "
+               "auth_supported to 'none'")
+            log(e, level=WARNING)
+            auth = 'none'
+        else:
+            auth = auths[0]
         hosts.sort()
         ctxt = {
             'auth_supported': auth,
