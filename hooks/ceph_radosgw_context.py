@@ -85,8 +85,8 @@ class MonContext(context.OSContextGenerator):
                     if _auth:
                         auths.append(_auth)
         if len(set(auths)) != 1:
-            e=("Inconsistent or absent auth returned by mon units. Setting "
-               "auth_supported to 'none'")
+            e = ("Inconsistent or absent auth returned by mon units. Setting "
+                 "auth_supported to 'none'")
             log(e, level=WARNING)
             auth = 'none'
         else:

@@ -7,6 +7,7 @@ import charmhelpers
 
 TO_PATCH = [
     'config',
+    'log',
     'relation_get',
     'relation_ids',
     'related_units',
@@ -175,3 +176,27 @@ class MonContextTest(CharmTestCase):
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
         self.assertEqual({}, mon_ctxt())
+
+    def test_ctxt_inconsistent_auths(self):
+        self.socket.gethostname.return_value = '10.0.0.10'
+        mon_ctxt = context.MonContext()
+        addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
+        auths = ['cephx', 'cephy', 'cephz']
+
+        def _relation_get(attr, unit, rid):
+            if attr == 'ceph-public-address':
+                return addresses.pop()
+            elif attr == 'auth':
+                return auths.pop()
+        self.relation_get.side_effect = _relation_get
+        self.relation_ids.return_value = ['mon:6']
+        self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        expect = {
+            'auth_supported': 'none',
+            'embedded_webserver': False,
+            'hostname': '10.0.0.10',
+            'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
+            'old_auth': False,
+            'use_syslog': 'false'
+        }
+        self.assertEqual(expect, mon_ctxt())
