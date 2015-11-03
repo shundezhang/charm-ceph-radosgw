@@ -85,7 +85,7 @@ class CephRadosGWTests(CharmTestCase):
         self.test_config.set('use-ceph-optimised-packages', '')
         ceph_hooks.install_packages()
         self.add_source.assert_called_with('distro', 'secretkey')
-        self.apt_update.assert_called()
+        self.assertTrue(self.apt_update.called)
         self.apt_install.assert_called_with(['libapache2-mod-fastcgi',
                                              'apache2'], fatal=True)
 
@@ -95,8 +95,8 @@ class CephRadosGWTests(CharmTestCase):
         _install_packages = self.patch('install_ceph_optimised_packages')
         ceph_hooks.install_packages()
         self.add_source.assert_called_with('distro', 'secretkey')
-        self.apt_update.assert_called()
-        _install_packages.assert_called()
+        self.assertTrue(self.apt_update.called)
+        self.assertTrue(_install_packages.called)
         self.apt_install.assert_called_with(['libapache2-mod-fastcgi',
                                              'apache2'], fatal=True)
 
@@ -106,8 +106,8 @@ class CephRadosGWTests(CharmTestCase):
         _install_packages = self.patch('install_ceph_optimised_packages')
         ceph_hooks.install_packages()
         self.add_source.assert_called_with('distro', 'secretkey')
-        self.apt_update.assert_called()
-        _install_packages.assert_called()
+        self.assertTrue(self.apt_update.called)
+        self.assertFalse(_install_packages.called)
         self.apt_install.assert_called_with(['radosgw',
                                              'ntp',
                                              'haproxy'], fatal=True)
@@ -117,8 +117,8 @@ class CephRadosGWTests(CharmTestCase):
     def test_install(self):
         _install_packages = self.patch('install_packages')
         ceph_hooks.install()
-        self.execd_preinstall.assert_called()
-        _install_packages.assert_called()
+        self.assertTrue(self.execd_preinstall.called)
+        self.assertTrue(_install_packages.called)
         self.enable_pocket.assert_called_with('multiverse')
         self.os.makedirs.called_with('/var/lib/ceph/nss')
 
@@ -175,20 +175,20 @@ class CephRadosGWTests(CharmTestCase):
         _apache_modules = self.patch('apache_modules')
         _apache_reload = self.patch('apache_reload')
         ceph_hooks.config_changed()
-        _install_packages.assert_called()
+        self.assertTrue(_install_packages.called)
         self.CONFIGS.write_all.assert_called_with()
-        _emit_apacheconf.assert_called()
-        _install_www_scripts.assert_called()
-        _apache_sites.assert_called()
-        _apache_modules.assert_called()
-        _apache_reload.assert_called()
+        self.assertTrue(_emit_apacheconf.called)
+        self.assertTrue(_install_www_scripts.called)
+        self.assertTrue(_apache_sites.called)
+        self.assertTrue(_apache_modules.called)
+        self.assertTrue(_apache_reload.called)
 
     def test_mon_relation(self):
         _ceph = self.patch('ceph')
         _restart = self.patch('restart')
         self.relation_get.return_value = 'seckey'
         ceph_hooks.mon_relation()
-        _restart.assert_called()
+        self.assertTrue(_restart.called)
         _ceph.import_radosgw_key.assert_called_with('seckey')
         self.CONFIGS.write_all.assert_called_with()
 
@@ -275,7 +275,7 @@ class CephRadosGWTests(CharmTestCase):
         _restart = self.patch('restart')
         ceph_hooks.identity_changed()
         self.CONFIGS.write_all.assert_called_with()
-        _restart.assert_called()
+        self.assertTrue(_restart.called)
 
     @patch('charmhelpers.contrib.openstack.ip.is_clustered')
     @patch('charmhelpers.contrib.openstack.ip.unit_get')
