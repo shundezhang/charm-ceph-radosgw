@@ -1,5 +1,5 @@
-.project
-.pydevproject
 bin
-.coveragerc
 .coverage
+.testrepository
+.tox
+tags
