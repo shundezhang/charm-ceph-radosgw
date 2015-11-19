@@ -265,7 +265,8 @@ def get_create_rgw_pools_rq():
              '.users.email'
              '.users.swift'
              '.users.uid']
+    pg_num = config('rgw-lightweight-pool-pg-num')
     for pool in light:
-        rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=100)
+        rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=pg_num)
 
     return rq
