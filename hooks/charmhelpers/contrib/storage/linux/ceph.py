@@ -26,6 +26,7 @@
 
 import os
 import shutil
+import six
 import json
 import time
 import uuid
@@ -125,29 +126,37 @@ def get_osds(service):
     return None
 
 
-def create_pool(service, name, replicas=3):
+def update_pool(client, pool, settings):
+    cmd = ['ceph', '--id', client, 'osd', 'pool', 'set', pool]
+    for k, v in six.iteritems(settings):
+        cmd.append(k)
+        cmd.append(v)
+
+    check_call(cmd)
+
+
+def create_pool(service, name, replicas=3, pg_num=None):
     """Create a new RADOS pool."""
     if pool_exists(service, name):
         log("Ceph pool {} already exists, skipping creation".format(name),
             level=WARNING)
         return
 
-    # Calculate the number of placement groups based
-    # on upstream recommended best practices.
-    osds = get_osds(service)
-    if osds:
-        pgnum = (len(osds) * 100 // replicas)
-    else:
-        # NOTE(james-page): Default to 200 for older ceph versions
-        # which don't support OSD query from cli
-        pgnum = 200
+    if not pg_num:
+        # Calculate the number of placement groups based
+        # on upstream recommended best practices.
+        osds = get_osds(service)
+        if osds:
+            pg_num = (len(osds) * 100 // replicas)
+        else:
+            # NOTE(james-page): Default to 200 for older ceph versions
+            # which don't support OSD query from cli
+            pg_num = 200
 
-    cmd = ['ceph', '--id', service, 'osd', 'pool', 'create', name, str(pgnum)]
+    cmd = ['ceph', '--id', service, 'osd', 'pool', 'create', name, str(pg_num)]
     check_call(cmd)
 
-    cmd = ['ceph', '--id', service, 'osd', 'pool', 'set', name, 'size',
-           str(replicas)]
-    check_call(cmd)
+    update_pool(service, name, settings={'size': str(replicas)})
 
 
 def delete_pool(service, name):
@@ -413,9 +422,16 @@ class CephBrokerRq(object):
             self.request_id = str(uuid.uuid1())
         self.ops = []
 
-    def add_op_create_pool(self, name, replica_count=3):
+    def add_op_create_pool(self, name, replica_count=3, pg_num=None):
+        """Adds an operation to create a pool.
+
+        @param pg_num setting:  optional setting. If not provided, this value
+        will be calculated by the broker based on how many OSDs are in the
+        cluster at the time of creation. Note that, if provided, this value
+        will be capped at the current available maximum.
+        """
         self.ops.append({'op': 'create-pool', 'name': name,
-                         'replicas': replica_count})
+                         'replicas': replica_count, 'pg_num': pg_num})
 
     def set_ops(self, ops):
         """Set request ops to provided value.
@@ -433,8 +449,8 @@ class CephBrokerRq(object):
     def _ops_equal(self, other):
         if len(self.ops) == len(other.ops):
             for req_no in range(0, len(self.ops)):
-                for key in ['replicas', 'name', 'op']:
-                    if self.ops[req_no][key] != other.ops[req_no][key]:
+                for key in ['replicas', 'name', 'op', 'pg_num']:
+                    if self.ops[req_no].get(key) != other.ops[req_no].get(key):
                         return False
         else:
             return False
