@@ -20,7 +20,9 @@ from charmhelpers.core.hookenv import (
     unit_get,
     open_port,
     relation_set,
-    log, ERROR,
+    log,
+    DEBUG,
+    ERROR,
     Hooks, UnregisteredHookError,
     status_set,
 )
@@ -58,6 +60,11 @@ from charmhelpers.contrib.openstack.ip import (
 from charmhelpers.contrib.openstack.utils import (
     set_os_workload_status,
 )
+from charmhelpers.contrib.storage.linux.ceph import (
+    send_request_if_needed,
+    is_request_complete,
+)
+
 hooks = Hooks()
 CONFIGS = register_configs()
 
@@ -178,11 +185,16 @@ def config_changed():
             'mon-relation-changed')
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def mon_relation():
-    CONFIGS.write_all()
-    key = relation_get('radosgw_key')
-    if key:
-        ceph.import_radosgw_key(key)
-        restart()  # TODO figure out a better way todo this
+    rq = ceph.get_create_rgw_pools_rq()
+    if is_request_complete(rq):
+        log('Broker request complete', level=DEBUG)
+        CONFIGS.write_all()
+        key = relation_get('radosgw_key')
+        if key:
+            ceph.import_radosgw_key(key)
+            restart()  # TODO figure out a better way todo this
+    else:
+        send_request_if_needed(rq)
 
 
 @hooks.hook('gateway-relation-joined')

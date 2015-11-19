@@ -99,3 +99,11 @@ options:
       the following public endpoint for the ceph-radosgw:
 
       https://files.example.com:80/swift/v1
+  ceph-osd-replication-count:
+    type: int
+    default: 3
+    description: |
+      This value dictates the number of replicas ceph must make of any object
+      it stores within RGW pools. Note that once the RGW pools have been
+      created, changing this value will not have any effect (although it can be
+      changed in ceph by manually configuring your ceph cluster).
