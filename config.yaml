@@ -107,3 +107,17 @@ options:
       it stores within RGW pools. Note that once the RGW pools have been
       created, changing this value will not have any effect (although it can be
       changed in ceph by manually configuring your ceph cluster).
+  rgw-lightweight-pool-pg-num:
+    type: int
+    default: 64
+    description: |
+      When the Rados Gatway is installed it, by default, creates pools with
+      pg_num 8 which, in the majority of cases is suboptimal. A few rgw pools
+      tend to carry more data than others e.g. .rgw.buckets tends to be larger
+      than most. So, for pools with greater requirements than others the charm
+      will apply the optimal value i.e. corresponding to the number of OSDs
+      up+in the cluster at the time the pool is created. For others it will use
+      this value which can be altered depending on how big you cluster is. Note
+      that once a pool has been created, changes to this setting will be
+      ignored.
+
