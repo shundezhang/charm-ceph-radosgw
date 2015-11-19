@@ -26,6 +26,7 @@ import re
 
 import six
 import traceback
+import uuid
 import yaml
 
 from charmhelpers.contrib.network import ip
@@ -41,6 +42,7 @@ from charmhelpers.core.hookenv import (
     log as juju_log,
     charm_dir,
     INFO,
+    related_units,
     relation_ids,
     relation_set,
     status_set,
@@ -121,6 +123,7 @@ SWIFT_CODENAMES = OrderedDict([
     ('2.2.2', 'kilo'),
     ('2.3.0', 'liberty'),
     ('2.4.0', 'liberty'),
+    ('2.5.0', 'liberty'),
 ])
 
 # >= Liberty version->codename mapping
@@ -858,7 +861,9 @@ def set_os_workload_status(configs, required_interfaces, charm_func=None):
         if charm_state != 'active' and charm_state != 'unknown':
             state = workload_state_compare(state, charm_state)
             if message:
-                message = "{} {}".format(message, charm_message)
+                charm_message = charm_message.replace("Incomplete relations: ",
+                                                      "")
+                message = "{}, {}".format(message, charm_message)
             else:
                 message = charm_message
 
@@ -975,3 +980,19 @@ def do_action_openstack_upgrade(package, upgrade_callback, configs):
             action_set({'outcome': 'no upgrade available.'})
 
     return ret
+
+
+def remote_restart(rel_name, remote_service=None):
+    trigger = {
+        'restart-trigger': str(uuid.uuid4()),
+    }
+    if remote_service:
+        trigger['remote-service'] = remote_service
+    for rid in relation_ids(rel_name):
+        # This subordinate can be related to two seperate services using
+        # different subordinate relations so only issue the restart if
+        # the principle is conencted down the relation we think it is
+        if related_units(relid=rid):
+            relation_set(relation_id=rid,
+                         relation_settings=trigger,
+                         )
