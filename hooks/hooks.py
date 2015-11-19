@@ -194,7 +194,7 @@ def mon_relation():
             ceph.import_radosgw_key(key)
             restart()  # TODO figure out a better way todo this
     else:
-        send_request_if_needed(rq)
+        send_request_if_needed(rq, relation='mon')
 
 
 @hooks.hook('gateway-relation-joined')
