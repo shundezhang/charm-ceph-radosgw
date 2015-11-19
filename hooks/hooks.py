@@ -186,7 +186,7 @@ def config_changed():
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def mon_relation():
     rq = ceph.get_create_rgw_pools_rq()
-    if is_request_complete(rq):
+    if is_request_complete(rq, relation='mon'):
         log('Broker request complete', level=DEBUG)
         CONFIGS.write_all()
         key = relation_get('radosgw_key')
