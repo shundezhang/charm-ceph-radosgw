@@ -14,6 +14,14 @@ import os
 
 from socket import gethostname as get_unit_hostname
 
+from charmhelpers.core.hookenv import (
+    config,
+)
+
+from charmhelpers.contrib.storage.linux.ceph import (
+    CephBrokerRq,
+)
+
 LEADER = 'leader'
 PEON = 'peon'
 QUORUM = [LEADER, PEON]
@@ -219,3 +227,33 @@ def get_named_key(name, caps=None):
             if 'key' in element:
                 key = element.split(' = ')[1].strip()  # IGNORE:E1103
     return key
+
+
+def get_create_rgw_pools_rq():
+    """Pre-create RGW pools so that they have the correct settings.
+
+    When RGW creates its own pools it will create them with non-optimal
+    settings (LP: #1476749).
+    """
+    rq = CephBrokerRq()
+    replicas = config('ceph-osd-replication-count')
+
+    # Buckets likely to contain the most data and therefore requiring the most
+    # PGs
+    heavy = ['.rgw.buckets']
+
+    for pool in heavy:
+        rq.add_op_create_pool(name=pool, replica_count=replicas)
+
+    # TODO: we want these pools to have a smaller pg_num/pgp_num than the
+    # others but do not currently have the ability to override this with the
+    # broker api (LP: #1517846). Right now omit this so that the remaining
+    # pools are created when the RGW is installed.
+    #
+    # Buckets not expected to contain too much data
+    #light = ['.rgw', '.rgw.buckets.index', '.rgw.control', '.rgw.gc',
+    #         '.rgw.root']
+    #for pool in light:
+    #    rq.add_op_create_pool(name=pool, replica_count=replicas)
+
+    return rq
