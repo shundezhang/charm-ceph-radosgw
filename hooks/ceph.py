@@ -245,15 +245,11 @@ def get_create_rgw_pools_rq():
     for pool in heavy:
         rq.add_op_create_pool(name=pool, replica_count=replicas)
 
-    # TODO: we want these pools to have a smaller pg_num/pgp_num than the
-    # others but do not currently have the ability to override this with the
-    # broker api (LP: #1517846). Right now omit this so that the remaining
-    # pools are created when the RGW is installed.
-    #
-    # Buckets not expected to contain too much data
-    #light = ['.rgw', '.rgw.buckets.index', '.rgw.control', '.rgw.gc',
-    #         '.rgw.root']
-    #for pool in light:
-    #    rq.add_op_create_pool(name=pool, replica_count=replicas)
+    # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
+    # others since they are not expected to contain as much data
+    light = ['.rgw', '.rgw.buckets.index', '.rgw.control', '.rgw.gc',
+             '.rgw.root']
+    for pool in light:
+        rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=100)
 
     return rq
