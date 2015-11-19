@@ -183,7 +183,8 @@ class CephRadosGWTests(CharmTestCase):
         self.assertTrue(_apache_modules.called)
         self.assertTrue(_apache_reload.called)
 
-    @patch.object(ceph_hooks, 'is_request_complete', lambda *args: True)
+    @patch.object(ceph_hooks, 'is_request_complete',
+                  lambda *args, **kwargs: True)
     def test_mon_relation(self):
         _ceph = self.patch('ceph')
         _restart = self.patch('restart')
@@ -193,7 +194,8 @@ class CephRadosGWTests(CharmTestCase):
         _ceph.import_radosgw_key.assert_called_with('seckey')
         self.CONFIGS.write_all.assert_called_with()
 
-    @patch.object(ceph_hooks, 'is_request_complete', lambda *args: True)
+    @patch.object(ceph_hooks, 'is_request_complete',
+                  lambda *args, **kwargs: True)
     def test_mon_relation_nokey(self):
         _ceph = self.patch('ceph')
         _restart = self.patch('restart')
@@ -204,7 +206,8 @@ class CephRadosGWTests(CharmTestCase):
         self.CONFIGS.write_all.assert_called_with()
 
     @patch.object(ceph_hooks, 'send_request_if_needed')
-    @patch.object(ceph_hooks, 'is_request_complete', lambda *args: False)
+    @patch.object(ceph_hooks, 'is_request_complete',
+                  lambda *args, **kwargs: False)
     def test_mon_relation_send_broker_request(self,
                                               mock_send_request_if_needed):
         _ceph = self.patch('ceph')
