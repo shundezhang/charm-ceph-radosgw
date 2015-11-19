@@ -234,6 +234,10 @@ def get_create_rgw_pools_rq():
 
     When RGW creates its own pools it will create them with non-optimal
     settings (LP: #1476749).
+
+    NOTE: see http://docs.ceph.com/docs/master/radosgw/config-ref/#pools and
+          http://docs.ceph.com/docs/master/radosgw/config/#create-pools for
+          list of supported/required pools.
     """
     rq = CephBrokerRq()
     replicas = config('ceph-osd-replication-count')
@@ -247,8 +251,20 @@ def get_create_rgw_pools_rq():
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
     # others since they are not expected to contain as much data
-    light = ['.rgw', '.rgw.buckets.index', '.rgw.control', '.rgw.gc',
-             '.rgw.root']
+    light = ['.rgw',
+             '.rgw.root',
+             '.rgw.control',
+             '.rgw.gc',
+             '.rgw.buckets',
+             '.rgw.buckets.index',
+             '.rgw.buckets.extra',
+             '.log',
+             '.intent-log'
+             '.usage',
+             '.users'
+             '.users.email'
+             '.users.swift'
+             '.users.uid']
     for pool in light:
         rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=100)
 
