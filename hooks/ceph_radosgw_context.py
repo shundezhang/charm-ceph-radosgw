@@ -21,18 +21,17 @@ class HAProxyContext(context.HAProxyContext):
 
     def __call__(self):
         ctxt = super(HAProxyContext, self).__call__()
+        port = config('port')
 
         # Apache ports
-        a_cephradosgw_api = determine_apache_port(80,
-                                                  singlenode_mode=True)
+        a_cephradosgw_api = determine_apache_port(port, singlenode_mode=True)
 
         port_mapping = {
-            'cephradosgw-server': [
-                80, a_cephradosgw_api]
+            'cephradosgw-server': [port, a_cephradosgw_api]
         }
 
         ctxt['cephradosgw_bind_port'] = determine_api_port(
-            80,
+            port,
             singlenode_mode=True,
         )
 
@@ -99,6 +98,8 @@ class MonContext(context.OSContextGenerator):
             'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
             'use_syslog': str(config('use-syslog')).lower(),
             'embedded_webserver': config('use-embedded-webserver'),
+            'port': determine_apache_port(config('port'),
+                                          singlenode_mode=True)
         }
 
         if self.context_complete(ctxt):

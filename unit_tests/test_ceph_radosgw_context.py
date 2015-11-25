@@ -165,7 +165,8 @@ class MonContextTest(CharmTestCase):
             'hostname': '10.0.0.10',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
-            'use_syslog': 'false'
+            'use_syslog': 'false',
+            'port': 70
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -197,7 +198,8 @@ class MonContextTest(CharmTestCase):
             'hostname': '10.0.0.10',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
-            'use_syslog': 'false'
+            'use_syslog': 'false',
+            'port': 70
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -221,6 +223,7 @@ class MonContextTest(CharmTestCase):
             'hostname': '10.0.0.10',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
-            'use_syslog': 'false'
+            'use_syslog': 'false',
+            'port': 70
         }
         self.assertEqual(expect, mon_ctxt())
