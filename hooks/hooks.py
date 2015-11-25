@@ -34,6 +34,9 @@ from charmhelpers.core.host import (
     lsb_release,
     restart_on_change,
 )
+from charmhelpers.contrib.hahelpers.cluster import (
+    determine_apache_port,
+)
 from utils import (
     render_template,
     enable_pocket,
@@ -58,6 +61,9 @@ from charmhelpers.contrib.openstack.ip import (
 from charmhelpers.contrib.openstack.utils import (
     set_os_workload_status,
 )
+
+APACHE_PORTS_CONF = '/etc/apache2/ports.conf'
+
 hooks = Hooks()
 CONFIGS = register_configs()
 
@@ -125,7 +131,8 @@ def install():
 
 def emit_apacheconf():
     apachecontext = {
-        "hostname": unit_get('private-address')
+        "hostname": unit_get('private-address'),
+        "port": determine_apache_port(config('port'), singlenode_mode=True)
     }
     site_conf = '/etc/apache2/sites-available/rgw'
     if is_apache_24():
@@ -152,7 +159,11 @@ def apache_reload():
 
 
 def apache_ports():
-    shutil.copy('files/ports.conf', '/etc/apache2/ports.conf')
+    portscontext = {
+        "port": determine_apache_port(config('port'), singlenode_mode=True)
+    }
+    with open(APACHE_PORTS_CONF, 'w') as portsconf:
+        portsconf.write(render_template('ports.conf', portscontext))
 
 
 @hooks.hook('upgrade-charm',
@@ -188,22 +199,22 @@ def mon_relation():
 @hooks.hook('gateway-relation-joined')
 def gateway_relation():
     relation_set(hostname=unit_get('private-address'),
-                 port=80)
+                 port=config('port'))
 
 
 def start():
     subprocess.call(['service', 'radosgw', 'start'])
-    open_port(port=80)
+    open_port(port=config('port'))
 
 
 def stop():
     subprocess.call(['service', 'radosgw', 'stop'])
-    open_port(port=80)
+    open_port(port=config('port'))
 
 
 def restart():
     subprocess.call(['service', 'radosgw', 'restart'])
-    open_port(port=80)
+    open_port(port=config('port'))
 
 
 @hooks.hook('identity-service-relation-joined')
@@ -212,7 +223,7 @@ def identity_joined(relid=None):
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
 
-    port = 80
+    port = config('port')
     admin_url = '%s:%i/swift' % (canonical_url(None, ADMIN), port)
     internal_url = '%s:%s/swift/v1' % \
         (canonical_url(None, INTERNAL), port)
