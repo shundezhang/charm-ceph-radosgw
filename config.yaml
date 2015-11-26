@@ -1,4 +1,8 @@
 options:
+  loglevel:
+    default: 1
+    type: int
+    description: RadosGW debug level. Max is 20.
   source:
     type: string
     default:

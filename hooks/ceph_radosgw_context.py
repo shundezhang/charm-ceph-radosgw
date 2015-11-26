@@ -99,6 +99,7 @@ class MonContext(context.OSContextGenerator):
             'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
             'use_syslog': str(config('use-syslog')).lower(),
             'embedded_webserver': config('use-embedded-webserver'),
+            'loglevel': config('loglevel'),
         }
 
         if self.context_complete(ctxt):
