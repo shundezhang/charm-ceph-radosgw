@@ -102,6 +102,13 @@ class MonContext(context.OSContextGenerator):
             'loglevel': config('loglevel'),
         }
 
+        if (config('use-ceph-optimised-packages') and
+                not config('use-embedded-webserver')):
+            ctxt['disable_100_continue'] = False
+        else:
+            # NOTE: currently only applied if NOT using embedded webserver
+            ctxt['disable_100_continue'] = True
+
         if self.context_complete(ctxt):
             return ctxt
 
