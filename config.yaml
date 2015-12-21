@@ -1,4 +1,8 @@
 options:
+  loglevel:
+    default: 1
+    type: int
+    description: RadosGW debug level. Max is 20.
   source:
     type: string
     default:
@@ -104,3 +108,27 @@ options:
       the following public endpoint for the ceph-radosgw:
 
       https://files.example.com:80/swift/v1
+  haproxy-server-timeout:
+    type: int
+    default:
+    description: |
+       Server timeout configuration in ms for haproxy, used in HA
+       configurations. If not provided, default value of 30000ms is used.
+  haproxy-client-timeout:
+    type: int
+    default:
+    description: |
+       Client timeout configuration in ms for haproxy, used in HA
+       configurations. If not provided, default value of 30000ms is used.
+  haproxy-queue-timeout:
+    type: int
+    default:
+    description: |
+       Queue timeout configuration in ms for haproxy, used in HA
+       configurations. If not provided, default value of 5000ms is used.
+  haproxy-connect-timeout:
+    type: int
+    default:
+    description: |
+       Connect timeout configuration in ms for haproxy, used in HA
+       configurations. If not provided, default value of 5000ms is used.
