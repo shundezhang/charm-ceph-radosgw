@@ -13,6 +13,7 @@ from charmhelpers.core.hookenv import (
     relation_get,
     unit_get,
 )
+import os
 import socket
 import dns.resolver
 
@@ -100,6 +101,12 @@ class MonContext(context.OSContextGenerator):
             'use_syslog': str(config('use-syslog')).lower(),
             'embedded_webserver': config('use-embedded-webserver'),
         }
+
+        certs_path = '/var/lib/ceph/nss'
+        paths = [os.path.join(certs_path, 'ca.pem'),
+                 os.path.join(certs_path, 'signing_certificate.pem')]
+        if all([os.path.isfile(p) for p in paths]):
+            ctxt['cms'] = True
 
         if self.context_complete(ctxt):
             return ctxt
