@@ -13,15 +13,18 @@ import sys
 import glob
 import os
 import ceph
+
 from charmhelpers.core.hookenv import (
     relation_get,
     relation_ids,
+    related_units,
     config,
     unit_get,
     open_port,
     relation_set,
     log,
     DEBUG,
+    WARNING,
     ERROR,
     Hooks, UnregisteredHookError,
     status_set,
@@ -45,9 +48,11 @@ from utils import (
     REQUIRED_INTERFACES,
     check_optional_relations,
 )
-
 from charmhelpers.payload.execd import execd_preinstall
-from charmhelpers.core.host import cmp_pkgrevno
+from charmhelpers.core.host import (
+    cmp_pkgrevno,
+    mkdir,
+)
 
 from charmhelpers.contrib.network.ip import (
     get_iface_for_address,
@@ -96,6 +101,11 @@ PACKAGES = [
     'radosgw',
     'ntp',
     'haproxy',
+    'libnss3-tools',
+    'python-keystoneclient',
+    'python-six',  # Ensures correct version is installed for precise
+                   # since python-keystoneclient does not pull in icehouse
+                   # version
 ]
 
 APACHE_PACKAGES = [
@@ -162,6 +172,99 @@ def apache_ports():
     shutil.copy('files/ports.conf', '/etc/apache2/ports.conf')
 
 
+def setup_keystone_certs(unit=None, rid=None):
+    """
+    Get CA and signing certs from Keystone used to decrypt revoked token list.
+    """
+    import requests
+    try:
+        # Kilo and newer
+        from keystoneclient.exceptions import ConnectionRefused
+    except ImportError:
+        # Juno and older
+        from keystoneclient.exceptions import ConnectionError as \
+            ConnectionRefused
+
+    from keystoneclient.v2_0 import client
+
+    certs_path = '/var/lib/ceph/nss'
+    mkdir(certs_path)
+
+    rdata = relation_get(unit=unit, rid=rid)
+    auth_protocol = rdata.get('auth_protocol', 'http')
+
+    required_keys = ['admin_token', 'auth_host', 'auth_port']
+    settings = {}
+    for key in required_keys:
+        settings[key] = rdata.get(key)
+
+    if not all(settings.values()):
+        log("Missing relation settings (%s) - skipping cert setup" %
+            (', '.join([k for k in settings.keys() if not settings[k]])),
+            level=DEBUG)
+        return
+
+    auth_endpoint = "%s://%s:%s/v2.0" % (auth_protocol, settings['auth_host'],
+                                         settings['auth_port'])
+    keystone = client.Client(token=settings['admin_token'],
+                             endpoint=auth_endpoint)
+
+    # CA
+    try:
+        # Kilo and newer
+        ca_cert = keystone.certificates.get_ca_certificate()
+    except AttributeError:
+        # Juno and older
+        ca_cert = requests.request('GET', auth_endpoint +
+                                   '/certificates/ca').text
+    except ConnectionRefused:
+        log("Error connecting to keystone - skipping ca/signing cert setup",
+            level=WARNING)
+        return
+
+    if ca_cert:
+        log("Updating ca cert from keystone", level=DEBUG)
+        ca = os.path.join(certs_path, 'ca.pem')
+        with open(ca, 'w') as fd:
+            fd.write(ca_cert)
+
+        out = subprocess.check_output(['openssl', 'x509', '-in', ca,
+                                       '-pubkey'])
+        p = subprocess.Popen(['certutil', '-d', certs_path, '-A', '-n', 'ca',
+                              '-t', 'TCu,Cu,Tuw'], stdin=subprocess.PIPE)
+        p.communicate(out)
+    else:
+        log("No ca cert available from keystone", level=DEBUG)
+
+    # Signing cert
+    try:
+        # Kilo and newer
+        signing_cert = keystone.certificates.get_signing_certificate()
+    except AttributeError:
+        # Juno and older
+        signing_cert = requests.request('GET', auth_endpoint +
+                                        '/certificates/signing').text
+    except ConnectionRefused:
+        log("Error connecting to keystone - skipping ca/signing cert setup",
+            level=WARNING)
+        return
+
+    if signing_cert:
+        log("Updating signing cert from keystone", level=DEBUG)
+        signing_cert_path = os.path.join(certs_path, 'signing_certificate.pem')
+        with open(signing_cert_path, 'w') as fd:
+            fd.write(signing_cert)
+
+        out = subprocess.check_output(['openssl', 'x509', '-in',
+                                       signing_cert_path, '-pubkey'])
+        p = subprocess.Popen(['certutil', '-A', '-d', certs_path, '-n',
+                              'signing_cert', '-t', 'P,P,P'],
+                             stdin=subprocess.PIPE)
+        p.communicate(out)
+    else:
+        log("No signing cert available from keystone", level=DEBUG)
+
+
 @hooks.hook('upgrade-charm',
             'config-changed')
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw'],
@@ -177,8 +280,9 @@ def config_changed():
         apache_modules()
         apache_ports()
         apache_reload()
+
     for r_id in relation_ids('identity-service'):
-        identity_joined(relid=r_id)
+        identity_changed(relid=r_id)
 
 
 @hooks.hook('mon-relation-departed',
@@ -237,10 +341,17 @@ def identity_joined(relid=None):
                  requested_roles=config('operator-roles'),
                  relation_id=relid)
 
+    if relid:
+        for unit in related_units(relid):
+            setup_keystone_certs(unit=unit, rid=relid)
+    else:
+        setup_keystone_certs()
+
 
 @hooks.hook('identity-service-relation-changed')
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
-def identity_changed():
+def identity_changed(relid=None):
+    identity_joined(relid)
     CONFIGS.write_all()
     restart()
 
