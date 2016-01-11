@@ -43,6 +43,7 @@ TO_PATCH = [
     'relation_ids',
     'relation_set',
     'relation_get',
+    'related_units',
     'render_template',
     'shutil',
     'status_set',
@@ -108,9 +109,8 @@ class CephRadosGWTests(CharmTestCase):
         self.add_source.assert_called_with('distro', 'secretkey')
         self.assertTrue(self.apt_update.called)
         self.assertFalse(_install_packages.called)
-        self.apt_install.assert_called_with(['radosgw',
-                                             'ntp',
-                                             'haproxy'], fatal=True)
+        self.apt_install.assert_called_with(ceph_hooks.PACKAGES,
+                                            fatal=True)
         self.apt_purge.assert_called_with(['libapache2-mod-fastcgi',
                                            'apache2'])
 
@@ -167,6 +167,7 @@ class CephRadosGWTests(CharmTestCase):
         ]
         self.subprocess.call.assert_has_calls(calls)
 
+    @patch.object(ceph_hooks, 'mkdir', lambda *args: None)
     def test_config_changed(self):
         _install_packages = self.patch('install_packages')
         _emit_apacheconf = self.patch('emit_apacheconf')
@@ -239,12 +240,15 @@ class CephRadosGWTests(CharmTestCase):
         cmd = ['service', 'radosgw', 'restart']
         self.subprocess.call.assert_called_with(cmd)
 
+    @patch.object(ceph_hooks, 'setup_keystone_certs')
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.config')
-    def test_identity_joined_early_version(self, _config):
+    def test_identity_joined_early_version(self, _config,
+                                           mock_setup_keystone_certs):
         self.cmp_pkgrevno.return_value = -1
         ceph_hooks.identity_joined()
+        self.assertTrue(mock_setup_keystone_certs.called)
         self.sys.exit.assert_called_with(1)
 
     @patch('charmhelpers.contrib.openstack.ip.service_name',
@@ -252,6 +256,7 @@ class CephRadosGWTests(CharmTestCase):
     @patch('charmhelpers.contrib.openstack.ip.resolve_address')
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined(self, _config, _resolve_address):
+        self.related_units = ['unit/0']
         self.cmp_pkgrevno.return_value = 1
         _resolve_address.return_value = 'myserv'
         _config.side_effect = self.test_config.get
@@ -275,6 +280,7 @@ class CephRadosGWTests(CharmTestCase):
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined_public_name(self, _config, _unit_get,
                                          _is_clustered):
+        self.related_units = ['unit/0']
         _config.side_effect = self.test_config.get
         self.test_config.set('os-public-hostname', 'files.example.com')
         _unit_get.return_value = 'myserv'
@@ -289,11 +295,13 @@ class CephRadosGWTests(CharmTestCase):
             relation_id='rid',
             admin_url='http://myserv:80/swift')
 
-    def test_identity_changed(self):
+    @patch.object(ceph_hooks, 'identity_joined')
+    def test_identity_changed(self, mock_identity_joined):
         _restart = self.patch('restart')
         ceph_hooks.identity_changed()
         self.CONFIGS.write_all.assert_called_with()
         self.assertTrue(_restart.called)
+        self.assertTrue(mock_identity_joined.called)
 
     @patch('charmhelpers.contrib.openstack.ip.is_clustered')
     @patch('charmhelpers.contrib.openstack.ip.unit_get')
