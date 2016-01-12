@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
-"""Amulet tests on a basic ceph-radosgw deployment on vivid-kilo."""
+"""Amulet tests on a basic ceph-radosgw deployment on wily-liberty."""
 
 from basic_deployment import CephRadosGwBasicDeployment
 
 if __name__ == '__main__':
-    deployment = CephRadosGwBasicDeployment(series='vivid')
+    deployment = CephRadosGwBasicDeployment(series='wily')
     deployment.run_tests()
