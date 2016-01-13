@@ -206,12 +206,13 @@ def setup_keystone_certs(unit=None, rid=None):
 
     # CA
     try:
-        # Kilo and newer
-        ca_cert = keystone.certificates.get_ca_certificate()
-    except AttributeError:
-        # Juno and older
-        ca_cert = requests.request('GET', auth_endpoint +
-                                   '/certificates/ca').text
+        try:
+            # Kilo and newer
+            ca_cert = keystone.certificates.get_ca_certificate()
+        except AttributeError:
+            # Juno and older
+            ca_cert = requests.request('GET', auth_endpoint +
+                                       '/certificates/ca').text
     except ConnectionRefused:
         log("Error connecting to keystone - skipping ca/signing cert setup",
             level=WARNING)
@@ -233,12 +234,13 @@ def setup_keystone_certs(unit=None, rid=None):
 
     # Signing cert
     try:
-        # Kilo and newer
-        signing_cert = keystone.certificates.get_signing_certificate()
-    except AttributeError:
-        # Juno and older
-        signing_cert = requests.request('GET', auth_endpoint +
-                                        '/certificates/signing').text
+        try:
+            # Kilo and newer
+            signing_cert = keystone.certificates.get_signing_certificate()
+        except AttributeError:
+            # Juno and older
+            signing_cert = requests.request('GET', auth_endpoint +
+                                            '/certificates/signing').text
     except ConnectionRefused:
         log("Error connecting to keystone - skipping ca/signing cert setup",
             level=WARNING)
