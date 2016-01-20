@@ -224,7 +224,7 @@ def setup_keystone_certs(unit=None, rid=None):
             # Juno and older
             ca_cert = requests.request('GET', auth_endpoint +
                                        '/certificates/ca').text
-    except ConnectionRefused:
+    except (ConnectionRefused, requests.exceptions.ConnectionError):
         log("Error connecting to keystone - skipping ca/signing cert setup",
             level=WARNING)
         return
@@ -252,7 +252,7 @@ def setup_keystone_certs(unit=None, rid=None):
             # Juno and older
             signing_cert = requests.request('GET', auth_endpoint +
                                             '/certificates/signing').text
-    except ConnectionRefused:
+    except (ConnectionRefused, requests.exceptions.ConnectionError):
         log("Error connecting to keystone - skipping ca/signing cert setup",
             level=WARNING)
         return
