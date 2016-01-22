@@ -168,6 +168,7 @@ class MonContextTest(CharmTestCase):
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
+            'port': 70
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -202,6 +203,7 @@ class MonContextTest(CharmTestCase):
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
+            'port': 70
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -228,5 +230,6 @@ class MonContextTest(CharmTestCase):
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
+            'port': 70
         }
         self.assertEqual(expect, mon_ctxt())

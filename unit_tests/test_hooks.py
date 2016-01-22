@@ -127,6 +127,7 @@ class CephRadosGWTests(CharmTestCase):
         self.unit_get.return_value = '10.0.0.1'
         apachecontext = {
             "hostname": '10.0.0.1',
+            "port": 70,
         }
         vhost_file = '/etc/apache2/sites-available/rgw.conf'
         with patch_open() as (_open, _file):
@@ -167,6 +168,7 @@ class CephRadosGWTests(CharmTestCase):
         ]
         self.subprocess.call.assert_has_calls(calls)
 
+    @patch.object(ceph_hooks, 'apache_ports', lambda *args: True)
     @patch.object(ceph_hooks, 'mkdir', lambda *args: None)
     def test_config_changed(self):
         _install_packages = self.patch('install_packages')
