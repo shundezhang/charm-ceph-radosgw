@@ -39,6 +39,9 @@ from charmhelpers.core.host import (
     lsb_release,
     restart_on_change,
 )
+from charmhelpers.contrib.hahelpers.cluster import (
+    determine_apache_port,
+)
 from utils import (
     render_template,
     enable_pocket,
@@ -69,6 +72,8 @@ from charmhelpers.contrib.storage.linux.ceph import (
     send_request_if_needed,
     is_request_complete,
 )
+
+APACHE_PORTS_CONF = '/etc/apache2/ports.conf'
 
 hooks = Hooks()
 CONFIGS = register_configs()
@@ -142,7 +147,8 @@ def install():
 
 def emit_apacheconf():
     apachecontext = {
-        "hostname": unit_get('private-address')
+        "hostname": unit_get('private-address'),
+        "port": determine_apache_port(config('port'), singlenode_mode=True)
     }
     site_conf = '/etc/apache2/sites-available/rgw'
     if is_apache_24():
@@ -169,7 +175,11 @@ def apache_reload():
 
 
 def apache_ports():
-    shutil.copy('files/ports.conf', '/etc/apache2/ports.conf')
+    portscontext = {
+        "port": determine_apache_port(config('port'), singlenode_mode=True)
+    }
+    with open(APACHE_PORTS_CONF, 'w') as portsconf:
+        portsconf.write(render_template('ports.conf', portscontext))
 
 
 def setup_keystone_certs(unit=None, rid=None):
@@ -211,13 +221,14 @@ def setup_keystone_certs(unit=None, rid=None):
 
     # CA
     try:
-        # Kilo and newer
-        ca_cert = keystone.certificates.get_ca_certificate()
-    except AttributeError:
-        # Juno and older
-        ca_cert = requests.request('GET', auth_endpoint +
-                                   '/certificates/ca').text
-    except ConnectionRefused:
+        try:
+            # Kilo and newer
+            ca_cert = keystone.certificates.get_ca_certificate()
+        except AttributeError:
+            # Juno and older
+            ca_cert = requests.request('GET', auth_endpoint +
+                                       '/certificates/ca').text
+    except (ConnectionRefused, requests.exceptions.ConnectionError):
         log("Error connecting to keystone - skipping ca/signing cert setup",
             level=WARNING)
         return
@@ -238,13 +249,14 @@ def setup_keystone_certs(unit=None, rid=None):
 
     # Signing cert
     try:
-        # Kilo and newer
-        signing_cert = keystone.certificates.get_signing_certificate()
-    except AttributeError:
-        # Juno and older
-        signing_cert = requests.request('GET', auth_endpoint +
-                                        '/certificates/signing').text
-    except ConnectionRefused:
+        try:
+            # Kilo and newer
+            signing_cert = keystone.certificates.get_signing_certificate()
+        except AttributeError:
+            # Juno and older
+            signing_cert = requests.request('GET', auth_endpoint +
+                                            '/certificates/signing').text
+    except (ConnectionRefused, requests.exceptions.ConnectionError):
         log("Error connecting to keystone - skipping ca/signing cert setup",
             level=WARNING)
         return
@@ -304,22 +316,22 @@ def mon_relation():
 @hooks.hook('gateway-relation-joined')
 def gateway_relation():
     relation_set(hostname=unit_get('private-address'),
-                 port=80)
+                 port=config('port'))
 
 
 def start():
     subprocess.call(['service', 'radosgw', 'start'])
-    open_port(port=80)
+    open_port(port=config('port'))
 
 
 def stop():
     subprocess.call(['service', 'radosgw', 'stop'])
-    open_port(port=80)
+    open_port(port=config('port'))
 
 
 def restart():
     subprocess.call(['service', 'radosgw', 'restart'])
-    open_port(port=80)
+    open_port(port=config('port'))
 
 
 @hooks.hook('identity-service-relation-joined')
@@ -328,7 +340,7 @@ def identity_joined(relid=None):
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
 
-    port = 80
+    port = config('port')
     admin_url = '%s:%i/swift' % (canonical_url(None, ADMIN), port)
     internal_url = '%s:%s/swift/v1' % \
         (canonical_url(None, INTERNAL), port)
