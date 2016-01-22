@@ -14,6 +14,14 @@ import os
 
 from socket import gethostname as get_unit_hostname
 
+from charmhelpers.core.hookenv import (
+    config,
+)
+
+from charmhelpers.contrib.storage.linux.ceph import (
+    CephBrokerRq,
+)
+
 LEADER = 'leader'
 PEON = 'peon'
 QUORUM = [LEADER, PEON]
@@ -219,3 +227,46 @@ def get_named_key(name, caps=None):
             if 'key' in element:
                 key = element.split(' = ')[1].strip()  # IGNORE:E1103
     return key
+
+
+def get_create_rgw_pools_rq():
+    """Pre-create RGW pools so that they have the correct settings.
+
+    When RGW creates its own pools it will create them with non-optimal
+    settings (LP: #1476749).
+
+    NOTE: see http://docs.ceph.com/docs/master/radosgw/config-ref/#pools and
+          http://docs.ceph.com/docs/master/radosgw/config/#create-pools for
+          list of supported/required pools.
+    """
+    rq = CephBrokerRq()
+    replicas = config('ceph-osd-replication-count')
+
+    # Buckets likely to contain the most data and therefore requiring the most
+    # PGs
+    heavy = ['.rgw.buckets']
+
+    for pool in heavy:
+        rq.add_op_create_pool(name=pool, replica_count=replicas)
+
+    # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
+    # others since they are not expected to contain as much data
+    light = ['.rgw',
+             '.rgw.root',
+             '.rgw.control',
+             '.rgw.gc',
+             '.rgw.buckets',
+             '.rgw.buckets.index',
+             '.rgw.buckets.extra',
+             '.log',
+             '.intent-log'
+             '.usage',
+             '.users'
+             '.users.email'
+             '.users.swift'
+             '.users.uid']
+    pg_num = config('rgw-lightweight-pool-pg-num')
+    for pool in light:
+        rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=pg_num)
+
+    return rq
