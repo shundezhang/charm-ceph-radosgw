@@ -260,42 +260,6 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_202_ceph1_ceph_radosgw_relation(self):
-        """Verify the ceph1 to ceph-radosgw relation data."""
-        u.log.debug('Checking ceph1:radosgw ceph-radosgw:mon relation data...')
-        unit = self.ceph1_sentry
-        relation = ['radosgw', 'ceph-radosgw:mon']
-        expected = {
-            'private-address': u.valid_ip,
-            'radosgw_key': u.not_null,
-            'auth': 'none',
-            'ceph-public-address': u.valid_ip,
-            'fsid': u'6547bd3e-1397-11e2-82e5-53567c8d32dc'
-        }
-
-        ret = u.validate_relation_data(unit, relation, expected)
-        if ret:
-            message = u.relation_error('ceph1 to ceph-radosgw', ret)
-            amulet.raise_status(amulet.FAIL, msg=message)
-
-    def test_203_ceph2_ceph_radosgw_relation(self):
-        """Verify the ceph2 to ceph-radosgw relation data."""
-        u.log.debug('Checking ceph2:radosgw ceph-radosgw:mon relation data...')
-        unit = self.ceph2_sentry
-        relation = ['radosgw', 'ceph-radosgw:mon']
-        expected = {
-            'private-address': u.valid_ip,
-            'radosgw_key': u.not_null,
-            'auth': 'none',
-            'ceph-public-address': u.valid_ip,
-            'fsid': u'6547bd3e-1397-11e2-82e5-53567c8d32dc'
-        }
-
-        ret = u.validate_relation_data(unit, relation, expected)
-        if ret:
-            message = u.relation_error('ceph2 to ceph-radosgw', ret)
-            amulet.raise_status(amulet.FAIL, msg=message)
-
     def test_204_ceph_radosgw_keystone_relation(self):
         """Verify the ceph-radosgw to keystone relation data."""
         u.log.debug('Checking ceph-radosgw to keystone id service '
