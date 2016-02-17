@@ -189,7 +189,7 @@ def setup_keystone_certs(unit=None, rid=None):
     import requests
     try:
         # Kilo and newer
-        from keystoneclient.exceptions import ConnectionRefused
+        from keystoneclient.exceptions import ConnectionRefused, Forbidden
     except ImportError:
         # Juno and older
         from keystoneclient.exceptions import ConnectionError as \
@@ -228,7 +228,7 @@ def setup_keystone_certs(unit=None, rid=None):
             # Juno and older
             ca_cert = requests.request('GET', auth_endpoint +
                                        '/certificates/ca').text
-    except (ConnectionRefused, requests.exceptions.ConnectionError):
+    except (ConnectionRefused, requests.exceptions.ConnectionError, Forbidden):
         log("Error connecting to keystone - skipping ca/signing cert setup",
             level=WARNING)
         return
