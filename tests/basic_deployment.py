@@ -231,22 +231,33 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph-radosgw to ceph', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_201_ceph0_ceph_radosgw_relation(self):
-        """Verify the ceph0 to ceph-radosgw relation data."""
+    def test_201_ceph_radosgw_relation(self):
+        """Verify the ceph to ceph-radosgw relation data.
+
+        At least one unit (the leader) must have all data provided by the ceph
+        charm.
+        """
         u.log.debug('Checking ceph0:radosgw radosgw:mon relation data...')
-        unit = self.ceph0_sentry
+        s_entries = [
+            self.ceph0_sentry,
+            self.ceph1_sentry,
+            self.ceph2_sentry
+        ]
         relation = ['radosgw', 'ceph-radosgw:mon']
         expected = {
             'private-address': u.valid_ip,
             'radosgw_key': u.not_null,
-            'auth': 'none',
+            'auth': 'none',  
             'ceph-public-address': u.valid_ip,
             'fsid': u'6547bd3e-1397-11e2-82e5-53567c8d32dc'
         }
 
-        ret = u.validate_relation_data(unit, relation, expected)
-        if ret:
-            message = u.relation_error('ceph0 to ceph-radosgw', ret)
+        ret = []
+        for unit in s_entries:
+            ret.append(u.validate_relation_data(unit, relation, expected))
+
+        if not any(ret):
+            message = u.relation_error('ceph to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
     def test_202_ceph1_ceph_radosgw_relation(self):
