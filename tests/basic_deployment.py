@@ -247,7 +247,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         expected = {
             'private-address': u.valid_ip,
             'radosgw_key': u.not_null,
-            'auth': 'none',  
+            'auth': 'none',
             'ceph-public-address': u.valid_ip,
             'fsid': u'6547bd3e-1397-11e2-82e5-53567c8d32dc'
         }
