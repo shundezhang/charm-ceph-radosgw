@@ -192,13 +192,13 @@ def setup_keystone_certs(unit=None, rid=None):
         from keystoneclient.exceptions import (
             ConnectionRefused,
             Forbidden
-            )
+        )
     except ImportError:
         # Juno and older
         from keystoneclient.exceptions import (
             ConnectionError as ConnectionRefused,
             Forbidden
-            )
+        )
 
     from keystoneclient.v2_0 import client
 
