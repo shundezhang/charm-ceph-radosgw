@@ -87,6 +87,7 @@ class IdentityServiceContextTest(CharmTestCase):
             'admin_tenant_name': 'ten',
             'admin_token': 'ubuntutesting',
             'admin_user': 'admin',
+            'api_version': '2.0',
             'auth_host': '127.0.0.5',
             'auth_port': 5432,
             'auth_protocol': 'http',

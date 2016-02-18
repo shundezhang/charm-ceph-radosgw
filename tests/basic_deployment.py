@@ -1,7 +1,6 @@
 #!/usr/bin/python
 
 import amulet
-import time
 from charmhelpers.contrib.openstack.amulet.deployment import (
     OpenStackAmuletDeployment
 )
@@ -26,6 +25,13 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         self._add_relations()
         self._configure_services()
         self._deploy()
+
+        u.log.info('Waiting on extended status checks...')
+        exclude_services = ['mysql']
+
+        # Wait for deployment ready msgs, except exclusions
+        self._auto_wait_for_status(exclude_services=exclude_services)
+
         self._initialize_tests()
 
     def _add_services(self):
@@ -107,9 +113,6 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             self._get_openstack_release()))
         u.log.debug('openstack release str: {}'.format(
             self._get_openstack_release_string()))
-
-        # Let things settle a bit original moving forward
-        time.sleep(30)
 
         # Authenticate admin with keystone
         self.keystone = u.authenticate_keystone_admin(self.keystone_sentry,
@@ -228,10 +231,18 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             message = u.relation_error('ceph-radosgw to ceph', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
-    def test_201_ceph0_ceph_radosgw_relation(self):
-        """Verify the ceph0 to ceph-radosgw relation data."""
+    def test_201_ceph_radosgw_relation(self):
+        """Verify the ceph to ceph-radosgw relation data.
+
+        At least one unit (the leader) must have all data provided by the ceph
+        charm.
+        """
         u.log.debug('Checking ceph0:radosgw radosgw:mon relation data...')
-        unit = self.ceph0_sentry
+        s_entries = [
+            self.ceph0_sentry,
+            self.ceph1_sentry,
+            self.ceph2_sentry
+        ]
         relation = ['radosgw', 'ceph-radosgw:mon']
         expected = {
             'private-address': u.valid_ip,
@@ -241,45 +252,12 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'fsid': u'6547bd3e-1397-11e2-82e5-53567c8d32dc'
         }
 
-        ret = u.validate_relation_data(unit, relation, expected)
-        if ret:
-            message = u.relation_error('ceph0 to ceph-radosgw', ret)
-            amulet.raise_status(amulet.FAIL, msg=message)
+        ret = []
+        for unit in s_entries:
+            ret.append(u.validate_relation_data(unit, relation, expected))
 
-    def test_202_ceph1_ceph_radosgw_relation(self):
-        """Verify the ceph1 to ceph-radosgw relation data."""
-        u.log.debug('Checking ceph1:radosgw ceph-radosgw:mon relation data...')
-        unit = self.ceph1_sentry
-        relation = ['radosgw', 'ceph-radosgw:mon']
-        expected = {
-            'private-address': u.valid_ip,
-            'radosgw_key': u.not_null,
-            'auth': 'none',
-            'ceph-public-address': u.valid_ip,
-            'fsid': u'6547bd3e-1397-11e2-82e5-53567c8d32dc'
-        }
-
-        ret = u.validate_relation_data(unit, relation, expected)
-        if ret:
-            message = u.relation_error('ceph1 to ceph-radosgw', ret)
-            amulet.raise_status(amulet.FAIL, msg=message)
-
-    def test_203_ceph2_ceph_radosgw_relation(self):
-        """Verify the ceph2 to ceph-radosgw relation data."""
-        u.log.debug('Checking ceph2:radosgw ceph-radosgw:mon relation data...')
-        unit = self.ceph2_sentry
-        relation = ['radosgw', 'ceph-radosgw:mon']
-        expected = {
-            'private-address': u.valid_ip,
-            'radosgw_key': u.not_null,
-            'auth': 'none',
-            'ceph-public-address': u.valid_ip,
-            'fsid': u'6547bd3e-1397-11e2-82e5-53567c8d32dc'
-        }
-
-        ret = u.validate_relation_data(unit, relation, expected)
-        if ret:
-            message = u.relation_error('ceph2 to ceph-radosgw', ret)
+        if not any(ret):
+            message = u.relation_error('ceph to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
     def test_204_ceph_radosgw_keystone_relation(self):
