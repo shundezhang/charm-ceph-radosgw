@@ -1,26 +1,44 @@
 #
-# Copyright 2012 Canonical Ltd.
+# Copyright 2016 Canonical Ltd.
 #
 # Authors:
 #  James Page <james.page@ubuntu.com>
 #  Paul Collins <paul.collins@canonical.com>
+#  Edward Hope-Morley <edward.hope-morley@canonical.com>
 #
 
-import socket
-import re
 import os
-import dns.resolver
+import re
 import jinja2
+
 from copy import deepcopy
 from collections import OrderedDict
-from charmhelpers.core.hookenv import unit_get, relation_ids, status_get
-from charmhelpers.contrib.openstack import context, templating
-from charmhelpers.contrib.openstack.utils import set_os_workload_status
-from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
-from charmhelpers.core.host import cmp_pkgrevno
-from charmhelpers.fetch import filter_installed_packages
 
 import ceph_radosgw_context
+
+from charmhelpers.core.hookenv import (
+    relation_ids,
+    status_get,
+)
+from charmhelpers.contrib.openstack import (
+    context,
+    templating,
+)
+from charmhelpers.contrib.openstack.utils import (
+    os_release,
+    set_os_workload_status,
+)
+from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
+from charmhelpers.core.host import (
+    cmp_pkgrevno,
+    lsb_release,
+)
+from charmhelpers.fetch import (
+    apt_install,
+    apt_update,
+    add_source,
+    filter_installed_packages,
+)
 
 # The interface is said to be satisfied if anyone of the interfaces in the
 # list has a complete context.
@@ -32,12 +50,27 @@ TEMPLATES_DIR = 'templates'
 TEMPLATES = 'templates/'
 HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
 CEPH_CONF = '/etc/ceph/ceph.conf'
+APACHE_CONF = '/etc/apache2/sites-available/rgw'
+APACHE_24_CONF = '/etc/apache2/sites-available/rgw.conf'
+APACHE_PORTS_CONF = '/etc/apache2/ports.conf'
 
 BASE_RESOURCE_MAP = OrderedDict([
     (HAPROXY_CONF, {
         'contexts': [context.HAProxyContext(singlenode_mode=True),
                      ceph_radosgw_context.HAProxyContext()],
         'services': ['haproxy'],
+    }),
+    (APACHE_CONF, {
+        'contexts': [ceph_radosgw_context.ApacheContext()],
+        'services': ['apache2'],
+    }),
+    (APACHE_24_CONF, {
+        'contexts': [ceph_radosgw_context.ApacheContext()],
+        'services': ['apache2'],
+    }),
+    (APACHE_PORTS_CONF, {
+        'contexts': [ceph_radosgw_context.ApacheContext()],
+        'services': ['apache2'],
     }),
     (CEPH_CONF, {
         'contexts': [ceph_radosgw_context.MonContext()],
@@ -51,6 +84,11 @@ def resource_map():
     Dynamically generate a map of resources that will be managed for a single
     hook execution.
     '''
+    if os.path.exists('/etc/apache2/conf-available'):
+        BASE_RESOURCE_MAP.pop(APACHE_CONF)
+    else:
+        BASE_RESOURCE_MAP.pop(APACHE_24_CONF)
+
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     return resource_map
 
@@ -92,28 +130,6 @@ def enable_pocket(pocket):
                 sources.write(line)
 
 
-def get_host_ip(hostname=None):
-    try:
-        if not hostname:
-            hostname = unit_get('private-address')
-        # Test to see if already an IPv4 address
-        socket.inet_aton(hostname)
-        return hostname
-    except socket.error:
-        # This may throw an NXDOMAIN exception; in which case
-        # things are badly broken so just let it kill the hook
-        answers = dns.resolver.query(hostname, 'A')
-        if answers:
-            return answers[0].address
-
-
-def is_apache_24():
-    if os.path.exists('/etc/apache2/conf-available'):
-        return True
-    else:
-        return False
-
-
 def check_optional_relations(configs):
     required_interfaces = {}
     if relation_ids('ha'):
@@ -132,3 +148,18 @@ def check_optional_relations(configs):
         return status_get()
     else:
         return 'unknown', 'No optional relations'
+
+
+def setup_ipv6():
+    ubuntu_rel = lsb_release()['DISTRIB_CODENAME'].lower()
+    if ubuntu_rel < "trusty":
+        raise Exception("IPv6 is not supported in the charms for Ubuntu "
+                        "versions less than Trusty 14.04")
+
+    # Need haproxy >= 1.5.3 for ipv6 so for Trusty if we are <= Kilo we need to
+    # use trusty-backports otherwise we can use the UCA.
+    if ubuntu_rel == 'trusty' and os_release('ceph-common') < 'liberty':
+        add_source('deb http://archive.ubuntu.com/ubuntu trusty-backports '
+                   'main')
+        apt_update(fatal=True)
+        apt_install('haproxy/trusty-backports', fatal=True)

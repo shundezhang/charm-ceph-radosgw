@@ -13,6 +13,7 @@ TO_PATCH = [
     'related_units',
     'cmp_pkgrevno',
     'socket',
+    'is_apache_24',
 ]
 
 
@@ -147,8 +148,9 @@ class MonContextTest(CharmTestCase):
         super(MonContextTest, self).setUp(context, TO_PATCH)
         self.config.side_effect = self.test_config.get
 
-    def test_ctxt(self):
-        self.socket.gethostname.return_value = '10.0.0.10'
+    @patch.object(context, 'ensure_host_resolvable_v6')
+    def test_ctxt(self, mock_ensure_rsv_v6):
+        self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
         addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
 
@@ -157,6 +159,7 @@ class MonContextTest(CharmTestCase):
                 return addresses.pop()
             elif attr == 'auth':
                 return 'cephx'
+
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
@@ -164,17 +167,26 @@ class MonContextTest(CharmTestCase):
             'auth_supported': 'cephx',
             'embedded_webserver': False,
             'disable_100_continue': True,
-            'hostname': '10.0.0.10',
+            'hostname': 'testhost',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
-            'port': 70
+            'port': 70,
+            'ipv6': False
         }
         self.assertEqual(expect, mon_ctxt())
+        self.assertFalse(mock_ensure_rsv_v6.called)
+
+        self.test_config.set('prefer-ipv6', True)
+        addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
+        expect['ipv6'] = True
+        expect['port'] = "[::]:%s" % (70)
+        self.assertEqual(expect, mon_ctxt())
+        self.assertTrue(mock_ensure_rsv_v6.called)
 
     def test_ctxt_missing_data(self):
-        self.socket.gethostname.return_value = '10.0.0.10'
+        self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
         self.relation_get.return_value = None
         self.relation_ids.return_value = ['mon:6']
@@ -182,7 +194,7 @@ class MonContextTest(CharmTestCase):
         self.assertEqual({}, mon_ctxt())
 
     def test_ctxt_inconsistent_auths(self):
-        self.socket.gethostname.return_value = '10.0.0.10'
+        self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
         addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
         auths = ['cephx', 'cephy', 'cephz']
@@ -199,17 +211,18 @@ class MonContextTest(CharmTestCase):
             'auth_supported': 'none',
             'embedded_webserver': False,
             'disable_100_continue': True,
-            'hostname': '10.0.0.10',
+            'hostname': 'testhost',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
-            'port': 70
+            'port': 70,
+            'ipv6': False
         }
         self.assertEqual(expect, mon_ctxt())
 
     def test_ctxt_consistent_auths(self):
-        self.socket.gethostname.return_value = '10.0.0.10'
+        self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
         addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
         auths = ['cephx', 'cephx', 'cephx']
@@ -226,11 +239,19 @@ class MonContextTest(CharmTestCase):
             'auth_supported': 'cephx',
             'embedded_webserver': False,
             'disable_100_continue': True,
-            'hostname': '10.0.0.10',
+            'hostname': 'testhost',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
-            'port': 70
+            'port': 70,
+            'ipv6': False
         }
         self.assertEqual(expect, mon_ctxt())
+
+
+class ApacheContextTest(CharmTestCase):
+
+    def setUp(self):
+        super(ApacheContextTest, self).setUp(context, TO_PATCH)
+        self.config.side_effect = self.test_config.get

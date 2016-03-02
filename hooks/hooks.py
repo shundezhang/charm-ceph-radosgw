@@ -1,17 +1,16 @@
 #!/usr/bin/python
-
 #
-# Copyright 2012 Canonical Ltd.
+# Copyright 2016 Canonical Ltd.
 #
 # Authors:
 #  James Page <james.page@ubuntu.com>
+#  Edward Hope-Morley <edward.hope-morley@canonical.com>
 #
 
-import shutil
+import os
 import subprocess
 import sys
-import glob
-import os
+
 import ceph
 
 from charmhelpers.core.hookenv import (
@@ -39,27 +38,17 @@ from charmhelpers.core.host import (
     lsb_release,
     restart_on_change,
 )
-from charmhelpers.contrib.hahelpers.cluster import (
-    determine_apache_port,
-)
-from utils import (
-    render_template,
-    enable_pocket,
-    is_apache_24,
-    CEPHRG_HA_RES,
-    register_configs,
-    REQUIRED_INTERFACES,
-    check_optional_relations,
-)
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import (
     cmp_pkgrevno,
     mkdir,
 )
-
 from charmhelpers.contrib.network.ip import (
+    format_ipv6_addr,
+    get_ipv6_addr,
     get_iface_for_address,
     get_netmask_for_address,
+    is_ipv6,
 )
 from charmhelpers.contrib.openstack.ip import (
     canonical_url,
@@ -72,18 +61,17 @@ from charmhelpers.contrib.storage.linux.ceph import (
     send_request_if_needed,
     is_request_complete,
 )
-
-APACHE_PORTS_CONF = '/etc/apache2/ports.conf'
+from utils import (
+    enable_pocket,
+    CEPHRG_HA_RES,
+    register_configs,
+    REQUIRED_INTERFACES,
+    check_optional_relations,
+    setup_ipv6,
+)
 
 hooks = Hooks()
 CONFIGS = register_configs()
-
-
-def install_www_scripts():
-    for x in glob.glob('files/www/*'):
-        shutil.copy(x, '/var/www/')
-
-
 NSS_DIR = '/var/lib/ceph/nss'
 
 
@@ -145,43 +133,6 @@ def install():
         os.makedirs('/etc/ceph')
 
 
-def emit_apacheconf():
-    apachecontext = {
-        "hostname": unit_get('private-address'),
-        "port": determine_apache_port(config('port'), singlenode_mode=True)
-    }
-    site_conf = '/etc/apache2/sites-available/rgw'
-    if is_apache_24():
-        site_conf = '/etc/apache2/sites-available/rgw.conf'
-    with open(site_conf, 'w') as apacheconf:
-        apacheconf.write(render_template('rgw', apachecontext))
-
-
-def apache_sites():
-    if is_apache_24():
-        subprocess.check_call(['a2dissite', '000-default'])
-    else:
-        subprocess.check_call(['a2dissite', 'default'])
-    subprocess.check_call(['a2ensite', 'rgw'])
-
-
-def apache_modules():
-    subprocess.check_call(['a2enmod', 'fastcgi'])
-    subprocess.check_call(['a2enmod', 'rewrite'])
-
-
-def apache_reload():
-    subprocess.call(['service', 'apache2', 'reload'])
-
-
-def apache_ports():
-    portscontext = {
-        "port": determine_apache_port(config('port'), singlenode_mode=True)
-    }
-    with open(APACHE_PORTS_CONF, 'w') as portsconf:
-        portsconf.write(render_template('ports.conf', portscontext))
-
-
 def setup_keystone_certs(unit=None, rid=None):
     """
     Get CA and signing certs from Keystone used to decrypt revoked token list.
@@ -212,6 +163,9 @@ def setup_keystone_certs(unit=None, rid=None):
     settings = {}
     for key in required_keys:
         settings[key] = rdata.get(key)
+
+    if is_ipv6(settings.get('auth_host')):
+        settings['auth_host'] = format_ipv6_addr(settings.get('auth_host'))
 
     if not all(settings.values()):
         log("Missing relation settings (%s) - skipping cert setup" %
@@ -288,18 +242,28 @@ def setup_keystone_certs(unit=None, rid=None):
                     '/etc/haproxy/haproxy.cfg': ['haproxy']})
 def config_changed():
     install_packages()
-    CONFIGS.write_all()
-    if not config('use-embedded-webserver'):
-        status_set('maintenance', 'configuring apache')
-        emit_apacheconf()
-        install_www_scripts()
-        apache_sites()
-        apache_modules()
-        apache_ports()
-        apache_reload()
+
+    if config('prefer-ipv6'):
+        status_set('maintenance', 'configuring ipv6')
+        setup_ipv6()
 
     for r_id in relation_ids('identity-service'):
         identity_changed(relid=r_id)
+
+    for r_id in relation_ids('cluster'):
+        cluster_joined(rid=r_id)
+
+    CONFIGS.write_all()
+
+    if not config('use-embedded-webserver'):
+        try:
+            subprocess.check_call(['a2ensite', 'rgw'])
+        except subprocess.CalledProcessError as e:
+            log("Error enabling apache module 'rgw' - %s" % e, level=WARNING)
+
+        # Ensure started but do a soft reload
+        subprocess.call(['service', 'apache2', 'start'])
+        subprocess.call(['service', 'apache2', 'reload'])
 
 
 @hooks.hook('mon-relation-departed',
@@ -373,8 +337,18 @@ def identity_changed(relid=None):
     restart()
 
 
-@hooks.hook('cluster-relation-changed',
-            'cluster-relation-joined')
+@hooks.hook('cluster-relation-joined')
+@restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
+def cluster_joined(rid=None):
+    settings = {}
+    if config('prefer-ipv6'):
+        private_addr = get_ipv6_addr(exc_list=[config('vip')])[0]
+        settings['private-address'] = private_addr
+
+    relation_set(relation_id=rid, **settings)
+
+
+@hooks.hook('cluster-relation-changed')
 @restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
 def cluster_changed():
     CONFIGS.write_all()
@@ -384,17 +358,12 @@ def cluster_changed():
 
 @hooks.hook('ha-relation-joined')
 def ha_relation_joined():
-    # Obtain the config values necessary for the cluster config. These
-    # include multicast port and interface to bind to.
-    corosync_bindiface = config('ha-bindiface')
-    corosync_mcastport = config('ha-mcastport')
     vip = config('vip')
     if not vip:
-        log('Unable to configure hacluster as vip not provided',
-            level=ERROR)
+        log('Unable to configure hacluster as vip not provided', level=ERROR)
         sys.exit(1)
+
     # Obtain resources
-    # SWIFT_HA_RES = 'grp_swift_vips'
     resources = {
         'res_cephrg_haproxy': 'lsb:haproxy'
     }
@@ -404,15 +373,25 @@ def ha_relation_joined():
 
     vip_group = []
     for vip in vip.split():
+        if is_ipv6(vip):
+            res_rgw_vip = 'ocf:heartbeat:IPv6addr'
+            vip_params = 'ipv6addr'
+        else:
+            res_rgw_vip = 'ocf:heartbeat:IPaddr2'
+            vip_params = 'ip'
+
         iface = get_iface_for_address(vip)
+        netmask = get_netmask_for_address(vip)
+
         if iface is not None:
             vip_key = 'res_cephrg_{}_vip'.format(iface)
-            resources[vip_key] = 'ocf:heartbeat:IPaddr2'
+            resources[vip_key] = res_rgw_vip
             resource_params[vip_key] = (
-                'params ip="{vip}" cidr_netmask="{netmask}"'
-                ' nic="{iface}"'.format(vip=vip,
+                'params {ip}="{vip}" cidr_netmask="{netmask}"'
+                ' nic="{iface}"'.format(ip=vip_params,
+                                        vip=vip,
                                         iface=iface,
-                                        netmask=get_netmask_for_address(vip))
+                                        netmask=netmask)
             )
             vip_group.append(vip_key)
 
@@ -425,6 +404,11 @@ def ha_relation_joined():
     clones = {
         'cl_cephrg_haproxy': 'res_cephrg_haproxy'
     }
+
+    # Obtain the config values necessary for the cluster config. These
+    # include multicast port and interface to bind to.
+    corosync_bindiface = config('ha-bindiface')
+    corosync_mcastport = config('ha-mcastport')
 
     relation_set(init_services=init_services,
                  corosync_bindiface=corosync_bindiface,

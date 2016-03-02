@@ -6,7 +6,6 @@ from mock import (
 
 from test_utils import (
     CharmTestCase,
-    patch_open
 )
 from charmhelpers.contrib.openstack.ip import PUBLIC
 
@@ -34,8 +33,6 @@ TO_PATCH = [
     'enable_pocket',
     'get_iface_for_address',
     'get_netmask_for_address',
-    'glob',
-    'is_apache_24',
     'log',
     'lsb_release',
     'open_port',
@@ -44,8 +41,6 @@ TO_PATCH = [
     'relation_set',
     'relation_get',
     'related_units',
-    'render_template',
-    'shutil',
     'status_set',
     'subprocess',
     'sys',
@@ -61,11 +56,6 @@ class CephRadosGWTests(CharmTestCase):
         self.test_config.set('source', 'distro')
         self.test_config.set('key', 'secretkey')
         self.test_config.set('use-syslog', False)
-
-    def test_install_www_scripts(self):
-        self.glob.glob.return_value = ['files/www/bob']
-        ceph_hooks.install_www_scripts()
-        self.shutil.copy.assert_called_with('files/www/bob', '/var/www/')
 
     def test_install_ceph_optimised_packages(self):
         self.lsb_release.return_value = {'DISTRIB_CODENAME': 'vivid'}
@@ -122,69 +112,12 @@ class CephRadosGWTests(CharmTestCase):
         self.enable_pocket.assert_called_with('multiverse')
         self.os.makedirs.called_with('/var/lib/ceph/nss')
 
-    def test_emit_apacheconf(self):
-        self.is_apache_24.return_value = True
-        self.unit_get.return_value = '10.0.0.1'
-        apachecontext = {
-            "hostname": '10.0.0.1',
-            "port": 70,
-        }
-        vhost_file = '/etc/apache2/sites-available/rgw.conf'
-        with patch_open() as (_open, _file):
-            ceph_hooks.emit_apacheconf()
-            _open.assert_called_with(vhost_file, 'w')
-            self.render_template.assert_called_with('rgw', apachecontext)
-
-    def test_apache_sites24(self):
-        self.is_apache_24.return_value = True
-        ceph_hooks.apache_sites()
-        calls = [
-            call(['a2dissite', '000-default']),
-            call(['a2ensite', 'rgw']),
-        ]
-        self.subprocess.check_call.assert_has_calls(calls)
-
-    def test_apache_sites22(self):
-        self.is_apache_24.return_value = False
-        ceph_hooks.apache_sites()
-        calls = [
-            call(['a2dissite', 'default']),
-            call(['a2ensite', 'rgw']),
-        ]
-        self.subprocess.check_call.assert_has_calls(calls)
-
-    def test_apache_modules(self):
-        ceph_hooks.apache_modules()
-        calls = [
-            call(['a2enmod', 'fastcgi']),
-            call(['a2enmod', 'rewrite']),
-        ]
-        self.subprocess.check_call.assert_has_calls(calls)
-
-    def test_apache_reload(self):
-        ceph_hooks.apache_reload()
-        calls = [
-            call(['service', 'apache2', 'reload']),
-        ]
-        self.subprocess.call.assert_has_calls(calls)
-
-    @patch.object(ceph_hooks, 'apache_ports', lambda *args: True)
     @patch.object(ceph_hooks, 'mkdir', lambda *args: None)
     def test_config_changed(self):
         _install_packages = self.patch('install_packages')
-        _emit_apacheconf = self.patch('emit_apacheconf')
-        _install_www_scripts = self.patch('install_www_scripts')
-        _apache_sites = self.patch('apache_sites')
-        _apache_modules = self.patch('apache_modules')
-        _apache_reload = self.patch('apache_reload')
         ceph_hooks.config_changed()
         self.assertTrue(_install_packages.called)
         self.CONFIGS.write_all.assert_called_with()
-        self.assertTrue(_emit_apacheconf.called)
-        self.assertTrue(_install_www_scripts.called)
-        self.assertTrue(_apache_sites.called)
-        self.assertTrue(_apache_modules.called)
-        self.assertTrue(_apache_reload.called)
 
     @patch.object(ceph_hooks, 'is_request_complete',
                   lambda *args, **kwargs: True)
