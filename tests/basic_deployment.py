@@ -89,11 +89,13 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'ephemeral-unmount': '/mnt',
             'osd-devices': '/dev/vdb /srv/ceph'
         }
+        radosgw_config = {"use-embedded-webserver": True}
 
         configs = {'keystone': keystone_config,
                    'mysql': mysql_config,
                    'cinder': cinder_config,
-                   'ceph': ceph_config}
+                   'ceph': ceph_config,
+                   'ceph-radosgw': radosgw_config}
         super(CephRadosGwBasicDeployment, self)._configure_services(configs)
 
     def _initialize_tests(self):
@@ -329,12 +331,12 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                 'keyring': '/etc/ceph/keyring.rados.gateway',
                 'rgw socket path': '/tmp/radosgw.sock',
                 'log file': '/var/log/ceph/radosgw.log',
-                'rgw print continue': 'false',
                 'rgw keystone url': 'http://{}:35357/'.format(keystone_ip),
                 'rgw keystone admin token': 'ubuntutesting',
                 'rgw keystone accepted roles': 'Member,Admin',
                 'rgw keystone token cache size': '500',
-                'rgw keystone revocation interval': '600'
+                'rgw keystone revocation interval': '600',
+                'rgw frontends': 'civetweb port=70',
             },
         }
 

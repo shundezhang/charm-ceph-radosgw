@@ -19,6 +19,7 @@ import ceph_radosgw_context
 from charmhelpers.core.hookenv import (
     relation_ids,
     status_get,
+    config,
 )
 from charmhelpers.contrib.openstack import (
     context,
@@ -84,10 +85,15 @@ def resource_map():
     Dynamically generate a map of resources that will be managed for a single
     hook execution.
     '''
-    if os.path.exists('/etc/apache2/conf-available'):
-        BASE_RESOURCE_MAP.pop(APACHE_CONF)
+    if not config('use-embedded-webserver'):
+        if os.path.exists('/etc/apache2/conf-available'):
+            BASE_RESOURCE_MAP.pop(APACHE_CONF)
+        else:
+            BASE_RESOURCE_MAP.pop(APACHE_24_CONF)
     else:
+        BASE_RESOURCE_MAP.pop(APACHE_CONF)
         BASE_RESOURCE_MAP.pop(APACHE_24_CONF)
+        BASE_RESOURCE_MAP.pop(APACHE_PORTS_CONF)
 
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     return resource_map
