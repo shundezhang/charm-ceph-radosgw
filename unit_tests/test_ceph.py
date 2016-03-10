@@ -1,4 +1,5 @@
 import ceph
+from mock import patch, call
 
 from test_utils import CharmTestCase
 
@@ -10,8 +11,14 @@ TO_PATCH = [
 ]
 
 
-class CephRadosGWCephTests(CharmTestCase):
+def config_side_effect(*args):
+    if args[0] == 'ceph-osd-replication-count':
+        return 3
+    elif args[0] == 'rgw-lightweight-pool-pg-num':
+        return 10
 
+
+class CephRadosGWCephTests(CharmTestCase):
     def setUp(self):
         super(CephRadosGWCephTests, self).setUp(ceph, TO_PATCH)
 
@@ -65,6 +72,7 @@ class CephRadosGWCephTests(CharmTestCase):
 
         def quorum():
             return results.pop()
+
         _is_quorum = self.patch('is_quorum')
         _is_quorum.side_effect = quorum
         ceph.wait_for_quorum()
@@ -81,6 +89,7 @@ class CephRadosGWCephTests(CharmTestCase):
 
         def bootstrapped():
             return results.pop()
+
         _is_bootstrapped = self.patch('is_bootstrapped')
         _is_bootstrapped.side_effect = bootstrapped
         ceph.wait_for_bootstrap()
@@ -195,3 +204,65 @@ class CephRadosGWCephTests(CharmTestCase):
             'mon', 'allow r', 'osd', 'allow rwx'
         ]
         self.subprocess.check_output.assert_called_with(cmd)
+
+    @patch('ceph.CephBrokerRq')
+    @patch('ceph.config')
+    def test_create_rgw_pools_rq_with_prefix(self, config, broker):
+        config.side_effect = config_side_effect
+        ceph.get_create_rgw_pools_rq(prefix='us-east')
+        broker.assert_has_calls([
+            call().add_op_create_pool(
+                replica_count=3, name='.rgw.buckets'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.rgw'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.rgw.root'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.rgw.control'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.rgw.gc'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.rgw.buckets'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.rgw.buckets.index'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.rgw.buckets.extra'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.log'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='us-east.intent-log.usage'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3,
+                name='us-east.users.users.email.users.swift.users.uid')]
+        )
+
+    @patch('ceph.CephBrokerRq')
+    @patch('ceph.config')
+    def test_create_rgw_pools_rq_without_prefix(self, config, broker):
+        config.side_effect = config_side_effect
+        ceph.get_create_rgw_pools_rq(prefix=None)
+        broker.assert_has_calls([
+            call().add_op_create_pool(
+                replica_count=3, name='.rgw.buckets'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.rgw'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.rgw.root'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.rgw.control'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.rgw.gc'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.rgw.buckets'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.rgw.buckets.index'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.rgw.buckets.extra'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.log'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.intent-log.usage'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3,
+                name='.users.users.email.users.swift.users.uid')]
+        )

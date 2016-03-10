@@ -165,3 +165,13 @@ options:
       order for this charm to function correctly, the privacy extension must be
       disabled and a non-temporary address must be configured/available on
       your network interface.
+  pool-prefix:
+    type: string
+    default:
+    description: |
+      The rados gateway stores objects in many different pools.  If you would
+      like to have multiple rados gateways each pointing to a separate set of
+      pools set this prefix.  The charm will then set up a new set of pools.
+      If your prefix has a dash in it that will be used to split the prefix
+      into region and zone.  Please read the documentation on federated rados
+      gateways for more information on region and zone.
