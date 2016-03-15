@@ -21,6 +21,9 @@ requires:
     interface: hacluster
     scope: container
 provides:
+  nrpe-external-master:
+    interface: nrpe-external-master
+    scope: container
   gateway:
     interface: http
 peers:

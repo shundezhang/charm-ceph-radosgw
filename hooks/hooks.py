@@ -68,7 +68,9 @@ from utils import (
     REQUIRED_INTERFACES,
     check_optional_relations,
     setup_ipv6,
+    services,
 )
+from charmhelpers.contrib.charmsupport import nrpe
 
 hooks = Hooks()
 CONFIGS = register_configs()
@@ -265,6 +267,7 @@ def config_changed():
         # Ensure started but do a soft reload
         subprocess.call(['service', 'apache2', 'start'])
         subprocess.call(['service', 'apache2', 'reload'])
+    update_nrpe_config()
 
 
 @hooks.hook('mon-relation-departed',
@@ -430,6 +433,20 @@ def ha_relation_changed():
         # the VIP instead
         for r_id in relation_ids('identity-service'):
             identity_joined(relid=r_id)
+
+
+@hooks.hook('nrpe-external-master-relation-joined',
+            'nrpe-external-master-relation-changed')
+def update_nrpe_config():
+    # python-dbus is used by check_upstart_job
+    apt_install('python-dbus')
+    hostname = nrpe.get_nagios_hostname()
+    current_unit = nrpe.get_nagios_unit_name()
+    nrpe_setup = nrpe.NRPE(hostname=hostname)
+    nrpe.copy_nrpe_checks()
+    nrpe.add_init_service_checks(nrpe_setup, services(), current_unit)
+    nrpe.add_haproxy_checks(nrpe_setup, current_unit)
+    nrpe_setup.write()
 
 
 if __name__ == '__main__':

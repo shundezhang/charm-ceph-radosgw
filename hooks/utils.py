@@ -124,6 +124,14 @@ def render_template(template_name, context, template_dir=TEMPLATES_DIR):
     return template.render(context)
 
 
+def services():
+    ''' Returns a list of services associate with this charm '''
+    _services = []
+    for v in BASE_RESOURCE_MAP.values():
+        _services.extend(v.get('services', []))
+    return list(set(_services))
+
+
 def enable_pocket(pocket):
     apt_sources = "/etc/apt/sources.list"
     with open(apt_sources, "r") as sources:
