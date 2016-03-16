@@ -138,6 +138,7 @@ def setup_keystone_certs(unit=None, rid=None):
     Get CA and signing certs from Keystone used to decrypt revoked token list.
     """
     import requests
+
     try:
         # Kilo and newer
         from keystoneclient.exceptions import (
@@ -270,7 +271,8 @@ def config_changed():
             'mon-relation-changed')
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def mon_relation():
-    rq = ceph.get_create_rgw_pools_rq()
+    rq = ceph.get_create_rgw_pools_rq(
+        prefix=config('pool-prefix'))
     if is_request_complete(rq, relation='mon'):
         log('Broker request complete', level=DEBUG)
         CONFIGS.write_all()

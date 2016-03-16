@@ -1,4 +1,3 @@
-
 #
 # Copyright 2012 Canonical Ltd.
 #
@@ -93,6 +92,7 @@ def add_bootstrap_hint(peer):
         # Ignore any errors for this call
         subprocess.call(cmd)
 
+
 DISK_FORMATS = [
     'xfs',
     'ext4',
@@ -106,7 +106,7 @@ def is_osd_disk(dev):
         info = info.split("\n")  # IGNORE:E1103
         for line in info:
             if line.startswith(
-                'Partition GUID code: 4FBD7E29-9D25-41B8-AFD0-062C0CEFF05D'
+                    'Partition GUID code: 4FBD7E29-9D25-41B8-AFD0-062C0CEFF05D'
             ):
                 return True
     except subprocess.CalledProcessError:
@@ -229,8 +229,9 @@ def get_named_key(name, caps=None):
     return key
 
 
-def get_create_rgw_pools_rq():
-    """Pre-create RGW pools so that they have the correct settings.
+def get_create_rgw_pools_rq(prefix):
+    """Pre-create RGW pools so that they have the correct settings. This
+    will prepend a prefix onto the pools if specified in the config.yaml
 
     When RGW creates its own pools it will create them with non-optimal
     settings (LP: #1476749).
@@ -267,6 +268,11 @@ def get_create_rgw_pools_rq():
              '.users.uid']
     pg_num = config('rgw-lightweight-pool-pg-num')
     for pool in light:
+        if prefix:
+            pool = "{prefix}{pool}".format(
+                prefix=prefix,
+                pool=pool)
+
         rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=pg_num)
 
     return rq
