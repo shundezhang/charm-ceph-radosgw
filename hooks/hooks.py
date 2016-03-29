@@ -36,7 +36,6 @@ from charmhelpers.fetch import (
 )
 from charmhelpers.core.host import (
     lsb_release,
-    restart_on_change,
 )
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import (
@@ -54,21 +53,21 @@ from charmhelpers.contrib.openstack.ip import (
     canonical_url,
     PUBLIC, INTERNAL, ADMIN,
 )
-from charmhelpers.contrib.openstack.utils import (
-    set_os_workload_status,
-)
 from charmhelpers.contrib.storage.linux.ceph import (
     send_request_if_needed,
     is_request_complete,
+)
+from charmhelpers.contrib.openstack.utils import (
+    is_unit_paused_set,
+    pausable_restart_on_change as restart_on_change,
 )
 from utils import (
     enable_pocket,
     CEPHRG_HA_RES,
     register_configs,
-    REQUIRED_INTERFACES,
-    check_optional_relations,
     setup_ipv6,
     services,
+    assess_status,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 
@@ -282,7 +281,8 @@ def mon_relation():
         key = relation_get('radosgw_key')
         if key:
             ceph.import_radosgw_key(key)
-            restart()  # TODO figure out a better way todo this
+            if not is_unit_paused_set():
+                restart()  # TODO figure out a better way todo this
     else:
         send_request_if_needed(rq, relation='mon')
 
@@ -339,7 +339,8 @@ def identity_joined(relid=None):
 def identity_changed(relid=None):
     identity_joined(relid)
     CONFIGS.write_all()
-    restart()
+    if not is_unit_paused_set():
+        restart()
 
 
 @hooks.hook('cluster-relation-joined')
@@ -454,5 +455,4 @@ if __name__ == '__main__':
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         log('Unknown hook {} - skipping.'.format(e))
-    set_os_workload_status(CONFIGS, REQUIRED_INTERFACES,
-                           charm_func=check_optional_relations)
+    assess_status(CONFIGS)

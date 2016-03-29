@@ -1,0 +1,4 @@
+pause:
+  description: Pause the ceph-radosgw unit.
+resume:
+  descrpition: Resume the ceph-radosgw unit.
