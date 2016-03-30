@@ -131,7 +131,8 @@ def install():
     execd_preinstall()
     enable_pocket('multiverse')
     install_packages()
-    os.makedirs(NSS_DIR)
+    if not os.path.exists(NSS_DIR):
+        os.makedirs(NSS_DIR)
     if not os.path.exists('/etc/ceph'):
         os.makedirs('/etc/ceph')
 
@@ -158,7 +159,8 @@ def setup_keystone_certs(unit=None, rid=None):
     from keystoneclient.v2_0 import client
 
     certs_path = '/var/lib/ceph/nss'
-    mkdir(certs_path)
+    if not os.path.exists(certs_path):
+        mkdir(certs_path)
 
     rdata = relation_get(unit=unit, rid=rid)
     auth_protocol = rdata.get('auth_protocol', 'http')
