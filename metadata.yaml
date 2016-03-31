@@ -12,6 +12,10 @@ tags:
   - storage
   - file-servers
   - misc
+extra-bindings:
+  public:
+  admin:
+  internal:
 requires:
   mon:
     interface: ceph-radosgw

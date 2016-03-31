@@ -6,3 +6,4 @@ tags
 *.sw[nop]
 *.pyc
 .idea
+.unit-state.db
