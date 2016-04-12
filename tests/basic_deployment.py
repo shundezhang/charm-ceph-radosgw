@@ -243,6 +243,9 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             services[self.ceph2_sentry] = ceph_services
             services[self.ceph_radosgw_sentry] = ['radosgw-all']
 
+        if self._get_openstack_release() >= self.trusty_liberty:
+            services[self.keystone_sentry] = ['apache2']
+
         ret = u.validate_services_by_name(services)
         if ret:
             amulet.raise_status(amulet.FAIL, msg=ret)
