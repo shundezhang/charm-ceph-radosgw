@@ -230,10 +230,22 @@ class CephRadosGWCephTests(CharmTestCase):
             call().add_op_create_pool(
                 pg_num=10, replica_count=3, name='us-east.log'),
             call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.intent-log.usage'),
+                pg_num=10, replica_count=3, name='us-east.intent-log'),
             call().add_op_create_pool(
                 pg_num=10, replica_count=3,
-                name='us-east.users.users.email.users.swift.users.uid')]
+                name='us-east.usage'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3,
+                name='us-east.users'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3,
+                name='us-east.users.email'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3,
+                name='us-east.users.swift'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3,
+                name='us-east.users.uid')]
         )
 
     @patch('ceph.CephBrokerRq')
@@ -261,8 +273,15 @@ class CephRadosGWCephTests(CharmTestCase):
             call().add_op_create_pool(
                 pg_num=10, replica_count=3, name='.log'),
             call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.intent-log.usage'),
+                pg_num=10, replica_count=3, name='.intent-log'),
             call().add_op_create_pool(
-                pg_num=10, replica_count=3,
-                name='.users.users.email.users.swift.users.uid')]
+                pg_num=10, replica_count=3, name='.usage'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.users'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.users.email'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.users.swift'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='.users.uid')]
         )

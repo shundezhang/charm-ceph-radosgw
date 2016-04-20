@@ -260,11 +260,11 @@ def get_create_rgw_pools_rq(prefix):
              '.rgw.buckets.index',
              '.rgw.buckets.extra',
              '.log',
-             '.intent-log'
+             '.intent-log',
              '.usage',
-             '.users'
-             '.users.email'
-             '.users.swift'
+             '.users',
+             '.users.email',
+             '.users.swift',
              '.users.uid']
     pg_num = config('rgw-lightweight-pool-pg-num')
     for pool in light:

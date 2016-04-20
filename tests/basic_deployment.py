@@ -290,7 +290,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         for unit in s_entries:
             ret.append(u.validate_relation_data(unit, relation, expected))
 
-        if not any(ret):
+        if any(ret):
             message = u.relation_error('ceph to ceph-radosgw', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
@@ -493,12 +493,12 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         the ceph_radosgw unit."""
         sentry_units = [self.ceph_radosgw_sentry]
         commands = [
-            'sudo radosgw-admin regions list',
             'sudo radosgw-admin bucket list',
             'sudo radosgw-admin zone list',
             'sudo radosgw-admin metadata list',
             'sudo radosgw-admin gc list'
         ]
+
         ret = u.check_commands_on_units(commands, sentry_units)
         if ret:
             amulet.raise_status(amulet.FAIL, msg=ret)
