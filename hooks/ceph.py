@@ -7,19 +7,20 @@
 #
 
 import json
+import os
 import subprocess
 import time
-import os
+
 
 from socket import gethostname as get_unit_hostname
 
 from charmhelpers.core.hookenv import (
     config,
 )
-
 from charmhelpers.contrib.storage.linux.ceph import (
     CephBrokerRq,
 )
+from charmhelpers.fetch import apt_cache
 
 LEADER = 'leader'
 PEON = 'peon'
@@ -229,9 +230,17 @@ def get_named_key(name, caps=None):
     return key
 
 
-def get_create_rgw_pools_rq(prefix):
-    """Pre-create RGW pools so that they have the correct settings. This
-    will prepend a prefix onto the pools if specified in the config.yaml
+def get_rgw_version():
+    from apt import apt_pkg
+    pkg = apt_cache()['radosgw']
+    version = apt_pkg.upstream_version(pkg.current_ver.ver_str)
+    return version
+
+
+def get_create_rgw_pools_rq(prefix=None):
+    """Pre-create RGW pools so that they have the correct settings.
+
+    If a prefix is provided it will be prepended to each pool name.
 
     When RGW creates its own pools it will create them with non-optimal
     settings (LP: #1476749).
@@ -240,14 +249,26 @@ def get_create_rgw_pools_rq(prefix):
           http://docs.ceph.com/docs/master/radosgw/config/#create-pools for
           list of supported/required pools.
     """
+    from apt import apt_pkg
+
+    apt_pkg.init()
     rq = CephBrokerRq()
     replicas = config('ceph-osd-replication-count')
+
+    # Jewel and above automatically always prefix pool names with zone when
+    # creating them (see LP: 1573549).
+    if prefix is None:
+        vc = apt_pkg.version_compare(get_rgw_version(), '10.0.0')
+        if vc >= 0:
+            prefix = 'default'
+        else:
+            prefix = ''
 
     # Buckets likely to contain the most data and therefore requiring the most
     # PGs
     heavy = ['.rgw.buckets']
-
     for pool in heavy:
+        pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
         rq.add_op_create_pool(name=pool, replica_count=replicas)
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
@@ -268,11 +289,7 @@ def get_create_rgw_pools_rq(prefix):
              '.users.uid']
     pg_num = config('rgw-lightweight-pool-pg-num')
     for pool in light:
-        if prefix:
-            pool = "{prefix}{pool}".format(
-                prefix=prefix,
-                pool=pool)
-
+        pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
         rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=pg_num)
 
     return rq
