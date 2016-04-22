@@ -447,6 +447,17 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         u.log.debug('Checking pools on ceph units...')
 
         expected_pools = self.get_ceph_expected_pools(radosgw=True)
+
+        if self._get_openstack_release() >= self.trusty_mitaka:
+            non_rgw_pools = self.get_ceph_expected_pools()
+            _expected_pools = []
+            for pool in expected_pools:
+                if pool not in non_rgw_pools:
+                    # prepend zone name
+                    _expected_pools.append('default%s' % (pool))
+
+            expected_pools = _expected_pools
+
         results = []
         sentries = [
             self.ceph_radosgw_sentry,

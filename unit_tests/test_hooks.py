@@ -1,5 +1,3 @@
-import sys
-
 from mock import (
     call,
     patch,
@@ -10,13 +8,6 @@ from test_utils import (
     CharmTestCase,
 )
 from charmhelpers.contrib.openstack.ip import PUBLIC
-
-# python-apt is not installed as part of test-requirements but is imported by
-# some charmhelpers modules so create a fake import.
-mock_apt = MagicMock()
-sys.modules['apt'] = mock_apt
-mock_apt.apt_pkg = MagicMock()
-
 
 dnsmock = MagicMock()
 modules = {

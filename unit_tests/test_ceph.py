@@ -1,5 +1,15 @@
+import sys
+
+from mock import patch, call, MagicMock
+
+# python-apt is not installed as part of test-requirements but is imported by
+# some charmhelpers modules so create a fake import.
+mock_apt = MagicMock()
+mock_apt.apt_pkg = MagicMock()
+sys.modules['apt'] = mock_apt
+sys.modules['apt_pkg'] = mock_apt.apt_pkg
+
 import ceph
-from mock import patch, call
 
 from test_utils import CharmTestCase
 
@@ -205,14 +215,12 @@ class CephRadosGWCephTests(CharmTestCase):
         ]
         self.subprocess.check_output.assert_called_with(cmd)
 
-    @patch('ceph.CephBrokerRq')
-    @patch('ceph.config')
-    def test_create_rgw_pools_rq_with_prefix(self, config, broker):
-        config.side_effect = config_side_effect
+    @patch.object(ceph, 'CephBrokerRq')
+    @patch.object(ceph, 'config')
+    def test_create_rgw_pools_rq_with_prefix(self, mock_config, mock_broker):
+        mock_config.side_effect = config_side_effect
         ceph.get_create_rgw_pools_rq(prefix='us-east')
-        broker.assert_has_calls([
-            call().add_op_create_pool(
-                replica_count=3, name='.rgw.buckets'),
+        mock_broker.assert_has_calls([
             call().add_op_create_pool(
                 pg_num=10, replica_count=3, name='us-east.rgw'),
             call().add_op_create_pool(
@@ -248,12 +256,14 @@ class CephRadosGWCephTests(CharmTestCase):
                 name='us-east.users.uid')]
         )
 
-    @patch('ceph.CephBrokerRq')
-    @patch('ceph.config')
-    def test_create_rgw_pools_rq_without_prefix(self, config, broker):
-        config.side_effect = config_side_effect
+    @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: -1)
+    @patch.object(ceph, 'CephBrokerRq')
+    @patch.object(ceph, 'config')
+    def test_create_rgw_pools_rq_no_prefix_pre_jewel(self, mock_config,
+                                                     mock_broker):
+        mock_config.side_effect = config_side_effect
         ceph.get_create_rgw_pools_rq(prefix=None)
-        broker.assert_has_calls([
+        mock_broker.assert_has_calls([
             call().add_op_create_pool(
                 replica_count=3, name='.rgw.buckets'),
             call().add_op_create_pool(
@@ -284,4 +294,44 @@ class CephRadosGWCephTests(CharmTestCase):
                 pg_num=10, replica_count=3, name='.users.swift'),
             call().add_op_create_pool(
                 pg_num=10, replica_count=3, name='.users.uid')]
+        )
+
+    @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: 0)
+    @patch.object(ceph, 'CephBrokerRq')
+    @patch.object(ceph, 'config')
+    def test_create_rgw_pools_rq_no_prefix_post_jewel(self, mock_config,
+                                                      mock_broker):
+        mock_config.side_effect = config_side_effect
+        ceph.get_create_rgw_pools_rq(prefix=None)
+        mock_broker.assert_has_calls([
+            call().add_op_create_pool(
+                replica_count=3, name='default.rgw.buckets'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.rgw'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.rgw.root'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.rgw.control'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.rgw.gc'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.rgw.buckets'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.rgw.buckets.index'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.rgw.buckets.extra'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.log'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.intent-log'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.usage'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.users'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.users.email'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.users.swift'),
+            call().add_op_create_pool(
+                pg_num=10, replica_count=3, name='default.users.uid')]
         )
