@@ -14,13 +14,14 @@ import time
 
 from socket import gethostname as get_unit_hostname
 
+from utils import get_pkg_version
+
 from charmhelpers.core.hookenv import (
     config,
 )
 from charmhelpers.contrib.storage.linux.ceph import (
     CephBrokerRq,
 )
-from charmhelpers.fetch import apt_cache
 
 LEADER = 'leader'
 PEON = 'peon'
@@ -230,13 +231,6 @@ def get_named_key(name, caps=None):
     return key
 
 
-def get_rgw_version():
-    from apt import apt_pkg
-    pkg = apt_cache()['radosgw']
-    version = apt_pkg.upstream_version(pkg.current_ver.ver_str)
-    return version
-
-
 def get_create_rgw_pools_rq(prefix=None):
     """Pre-create RGW pools so that they have the correct settings.
 
@@ -258,7 +252,7 @@ def get_create_rgw_pools_rq(prefix=None):
     # Jewel and above automatically always prefix pool names with zone when
     # creating them (see LP: 1573549).
     if prefix is None:
-        vc = apt_pkg.version_compare(get_rgw_version(), '10.0.0')
+        vc = apt_pkg.version_compare(get_pkg_version('radosgw'), '10.0.0')
         if vc >= 0:
             prefix = 'default'
         else:

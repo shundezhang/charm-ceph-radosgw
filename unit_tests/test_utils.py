@@ -11,9 +11,10 @@ from mock import (
 
 
 def load_config():
-    '''Walk backwords from __file__ looking for config.yaml,
-    load and return the 'options' section'
-    '''
+    """Walk backwards from __file__ looking for config.yaml.
+
+    Load and return the 'options' section.
+    """
     config = None
     f = __file__
     while config is None:
@@ -32,9 +33,10 @@ def load_config():
 
 
 def get_default_config():
-    '''Load default charm config from config.yaml return as a dict.
+    """Load default charm config from config.yaml return as a dict.
+
     If no default is set in config.yaml, its value is None.
-    '''
+    """
     default_config = {}
     config = load_config()
     for k, v in config.iteritems():
@@ -106,10 +108,11 @@ class TestRelation(object):
 
 @contextmanager
 def patch_open():
-    '''Patch open() to allow mocking both open() itself and the file that is
+    """Patch open() to allow mocking both open() itself and the file that is
     yielded.
+
     Yields the mock for "open" and "file", respectively.
-    '''
+    """
     mock_open = MagicMock(spec=open)
     mock_file = MagicMock(spec=file)
 
