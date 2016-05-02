@@ -26,7 +26,6 @@ from charmhelpers.contrib.openstack import (
     templating,
 )
 from charmhelpers.contrib.openstack.utils import (
-    os_release,
     set_os_workload_status,
     make_assess_status_func,
     pause_unit,
@@ -43,6 +42,7 @@ from charmhelpers.fetch import (
     add_source,
     filter_installed_packages,
 )
+from charmhelpers.fetch import apt_cache
 
 # The interface is said to be satisfied if anyone of the interfaces in the
 # list has a complete context.
@@ -173,9 +173,13 @@ def setup_ipv6():
         raise Exception("IPv6 is not supported in the charms for Ubuntu "
                         "versions less than Trusty 14.04")
 
+    from apt import apt_pkg
+    apt_pkg.init()
+
     # Need haproxy >= 1.5.3 for ipv6 so for Trusty if we are <= Kilo we need to
     # use trusty-backports otherwise we can use the UCA.
-    if ubuntu_rel == 'trusty' and os_release('ceph-common') < 'liberty':
+    vc = apt_pkg.version_compare(get_pkg_version('haproxy'), '1.5.3')
+    if ubuntu_rel == 'trusty' and vc == -1:
         add_source('deb http://archive.ubuntu.com/ubuntu trusty-backports '
                    'main')
         apt_update(fatal=True)
@@ -247,3 +251,10 @@ def _pause_resume_helper(f, configs):
     f(assess_status_func(configs),
       services=services(),
       ports=None)
+
+
+def get_pkg_version(name):
+    from apt import apt_pkg
+    pkg = apt_cache()[name]
+    version = apt_pkg.upstream_version(pkg.current_ver.ver_str)
+    return version

@@ -10,6 +10,7 @@ sys.modules['apt'] = mock_apt
 sys.modules['apt_pkg'] = mock_apt.apt_pkg
 
 import ceph
+import utils
 
 from test_utils import CharmTestCase
 
@@ -335,3 +336,29 @@ class CephRadosGWCephTests(CharmTestCase):
             call().add_op_create_pool(
                 pg_num=10, replica_count=3, name='default.users.uid')]
         )
+
+    @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: -1)
+    @patch.object(utils, 'lsb_release',
+                  lambda: {'DISTRIB_CODENAME': 'trusty'})
+    @patch.object(utils, 'add_source')
+    @patch.object(utils, 'apt_update')
+    @patch.object(utils, 'apt_install')
+    def test_setup_ipv6_install_backports(self, mock_add_source,
+                                          mock_apt_update,
+                                          mock_apt_install):
+        utils.setup_ipv6()
+        self.assertTrue(mock_apt_update.called)
+        self.assertTrue(mock_apt_install.called)
+
+    @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: 0)
+    @patch.object(utils, 'lsb_release',
+                  lambda: {'DISTRIB_CODENAME': 'trusty'})
+    @patch.object(utils, 'add_source')
+    @patch.object(utils, 'apt_update')
+    @patch.object(utils, 'apt_install')
+    def test_setup_ipv6_not_install_backports(self, mock_add_source,
+                                              mock_apt_update,
+                                              mock_apt_install):
+        utils.setup_ipv6()
+        self.assertFalse(mock_apt_update.called)
+        self.assertFalse(mock_apt_install.called)

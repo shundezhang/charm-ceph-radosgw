@@ -1,21 +1,12 @@
 from mock import (
     call,
     patch,
-    MagicMock
 )
 
 from test_utils import (
     CharmTestCase,
 )
 from charmhelpers.contrib.openstack.ip import PUBLIC
-
-dnsmock = MagicMock()
-modules = {
-    'dns': dnsmock,
-    'dns.resolver': dnsmock,
-}
-module_patcher = patch.dict('sys.modules', modules)
-module_patcher.start()
 
 with patch('charmhelpers.contrib.hardening.harden.harden') as mock_dec:
     mock_dec.side_effect = (lambda *dargs, **dkwargs: lambda f:
