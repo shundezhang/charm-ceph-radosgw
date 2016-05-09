@@ -34,16 +34,10 @@ from charmhelpers.fetch import (
     apt_purge,
     add_source,
 )
-from charmhelpers.core.host import (
-    lsb_release,
-)
+from charmhelpers.core.host import lsb_release
 from charmhelpers.payload.execd import execd_preinstall
-from charmhelpers.core.host import (
-    cmp_pkgrevno,
-    mkdir,
-)
+from charmhelpers.core.host import cmp_pkgrevno
 from charmhelpers.contrib.network.ip import (
-    format_ipv6_addr,
     get_ipv6_addr,
     get_iface_for_address,
     get_netmask_for_address,
@@ -68,6 +62,7 @@ from utils import (
     setup_ipv6,
     services,
     assess_status,
+    setup_keystone_certs,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 from charmhelpers.contrib.hardening.harden import harden
@@ -93,14 +88,14 @@ def install_ceph_optimised_packages():
 
 
 PACKAGES = [
-    'radosgw',
-    'ntp',
     'haproxy',
     'libnss3-tools',
+    'ntp',
     'python-keystoneclient',
     'python-six',  # Ensures correct version is installed for precise
                    # since python-keystoneclient does not pull in icehouse
                    # version
+    'radosgw',
 ]
 
 APACHE_PACKAGES = [
@@ -135,111 +130,6 @@ def install():
         os.makedirs(NSS_DIR)
     if not os.path.exists('/etc/ceph'):
         os.makedirs('/etc/ceph')
-
-
-def setup_keystone_certs(unit=None, rid=None):
-    """
-    Get CA and signing certs from Keystone used to decrypt revoked token list.
-    """
-    import requests
-
-    try:
-        # Kilo and newer
-        from keystoneclient.exceptions import (
-            ConnectionRefused,
-            Forbidden
-        )
-    except ImportError:
-        # Juno and older
-        from keystoneclient.exceptions import (
-            ConnectionError as ConnectionRefused,
-            Forbidden
-        )
-
-    from keystoneclient.v2_0 import client
-
-    certs_path = '/var/lib/ceph/nss'
-    if not os.path.exists(certs_path):
-        mkdir(certs_path)
-
-    rdata = relation_get(unit=unit, rid=rid)
-    auth_protocol = rdata.get('auth_protocol', 'http')
-
-    required_keys = ['admin_token', 'auth_host', 'auth_port']
-    settings = {}
-    for key in required_keys:
-        settings[key] = rdata.get(key)
-
-    if is_ipv6(settings.get('auth_host')):
-        settings['auth_host'] = format_ipv6_addr(settings.get('auth_host'))
-
-    if not all(settings.values()):
-        log("Missing relation settings (%s) - skipping cert setup" %
-            (', '.join([k for k in settings.keys() if not settings[k]])),
-            level=DEBUG)
-        return
-
-    auth_endpoint = "%s://%s:%s/v2.0" % (auth_protocol, settings['auth_host'],
-                                         settings['auth_port'])
-    keystone = client.Client(token=settings['admin_token'],
-                             endpoint=auth_endpoint)
-
-    # CA
-    try:
-        try:
-            # Kilo and newer
-            ca_cert = keystone.certificates.get_ca_certificate()
-        except AttributeError:
-            # Juno and older
-            ca_cert = requests.request('GET', auth_endpoint +
-                                       '/certificates/ca').text
-    except (ConnectionRefused, requests.exceptions.ConnectionError, Forbidden):
-        log("Error connecting to keystone - skipping ca/signing cert setup",
-            level=WARNING)
-        return
-
-    if ca_cert:
-        log("Updating ca cert from keystone", level=DEBUG)
-        ca = os.path.join(certs_path, 'ca.pem')
-        with open(ca, 'w') as fd:
-            fd.write(ca_cert)
-
-        out = subprocess.check_output(['openssl', 'x509', '-in', ca,
-                                       '-pubkey'])
-        p = subprocess.Popen(['certutil', '-d', certs_path, '-A', '-n', 'ca',
-                              '-t', 'TCu,Cu,Tuw'], stdin=subprocess.PIPE)
-        p.communicate(out)
-    else:
-        log("No ca cert available from keystone", level=DEBUG)
-
-    # Signing cert
-    try:
-        try:
-            # Kilo and newer
-            signing_cert = keystone.certificates.get_signing_certificate()
-        except AttributeError:
-            # Juno and older
-            signing_cert = requests.request('GET', auth_endpoint +
-                                            '/certificates/signing').text
-    except (ConnectionRefused, requests.exceptions.ConnectionError):
-        log("Error connecting to keystone - skipping ca/signing cert setup",
-            level=WARNING)
-        return
-
-    if signing_cert:
-        log("Updating signing cert from keystone", level=DEBUG)
-        signing_cert_path = os.path.join(certs_path, 'signing_certificate.pem')
-        with open(signing_cert_path, 'w') as fd:
-            fd.write(signing_cert)
-
-        out = subprocess.check_output(['openssl', 'x509', '-in',
-                                       signing_cert_path, '-pubkey'])
-        p = subprocess.Popen(['certutil', '-A', '-d', certs_path, '-n',
-                              'signing_cert', '-t', 'P,P,P'],
-                             stdin=subprocess.PIPE)
-        p.communicate(out)
-    else:
-        log("No signing cert available from keystone", level=DEBUG)
 
 
 @hooks.hook('upgrade-charm',

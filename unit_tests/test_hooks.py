@@ -107,7 +107,6 @@ class CephRadosGWTests(CharmTestCase):
         self.os.makedirs.called_with('/var/lib/ceph/nss')
 
     @patch.object(ceph_hooks, 'update_nrpe_config')
-    @patch.object(ceph_hooks, 'mkdir', lambda *args: None)
     def test_config_changed(self, update_nrpe_config):
         _install_packages = self.patch('install_packages')
         ceph_hooks.config_changed()

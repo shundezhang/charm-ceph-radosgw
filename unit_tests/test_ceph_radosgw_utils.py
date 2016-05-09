@@ -1,5 +1,13 @@
+import sys
+
+from mock import (
+    call,
+    patch,
+    mock_open,
+    MagicMock,
+)
+
 import utils
-from mock import patch, MagicMock
 
 from test_utils import CharmTestCase
 
@@ -9,7 +17,7 @@ TO_PATCH = [
 
 class CephRadosGWUtilTests(CharmTestCase):
     def setUp(self):
-        super(CephRadosGWUtilTests, self).setUp(utils, TO_PATCH)
+        super(CephRadosGWUtilTests, self).setUp(None, TO_PATCH)
 
     def test_assess_status(self):
         with patch.object(utils, 'assess_status_func') as asf:
@@ -54,3 +62,101 @@ class CephRadosGWUtilTests(CharmTestCase):
             asf.assert_called_once_with('some-config')
             # ports=None whilst port checks are disabled.
             f.assert_called_once_with('assessor', services='s1', ports=None)
+
+    @patch.dict('sys.modules', {'requests': MagicMock(),
+                                'keystoneclient': MagicMock()})
+    @patch.object(utils, 'is_ipv6', lambda addr: False)
+    @patch.object(utils, 'get_ks_signing_cert')
+    @patch.object(utils, 'get_ks_ca_cert')
+    @patch.object(utils, 'relation_get')
+    @patch.object(utils, 'mkdir')
+    def test_setup_keystone_certs(self, mock_mkdir, mock_relation_get,
+                                  mock_get_ks_ca_cert,
+                                  mock_get_ks_signing_cert):
+        auth_host = 'foo/bar'
+        auth_port = 80
+        admin_token = '666'
+        auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
+        mock_relation_get.return_value = {'auth_host': auth_host,
+                                          'auth_port': auth_port,
+                                          'admin_token': admin_token}
+        utils.setup_keystone_certs()
+        mock_get_ks_signing_cert.assert_has_calls([call(admin_token, auth_url,
+                                                        '/var/lib/ceph/nss')])
+        mock_get_ks_ca_cert.assert_has_calls([call(admin_token, auth_url,
+                                                   '/var/lib/ceph/nss')])
+
+    def test_get_ks_signing_cert(self):
+        auth_host = 'foo/bar'
+        auth_port = 80
+        admin_token = '666'
+        auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
+
+        mock_ksclient = MagicMock
+        m = mock_open()
+        with patch.dict('sys.modules',
+                        {'requests': MagicMock(),
+                         'keystoneclient': mock_ksclient,
+                         'keystoneclient.exceptions': MagicMock(),
+                         'keystoneclient.exceptions.ConnectionRefused':
+                         MagicMock(),
+                         'keystoneclient.exceptions.Forbidden': MagicMock(),
+                         'keystoneclient.v2_0': MagicMock(),
+                         'keystoneclient.v2_0.client': MagicMock()}):
+            # Reimport
+            del sys.modules['utils']
+            import utils
+            with patch.object(utils, 'subprocess') as mock_subprocess:
+                with patch.object(utils, 'open', m, create=True):
+                    mock_certificates = MagicMock()
+                    mock_ksclient.certificates = mock_certificates
+                    mock_certificates.get_signing_certificate.return_value = \
+                        'signing_cert_data'
+                    utils.get_ks_signing_cert(admin_token, auth_url,
+                                              '/foo/bar')
+                    mock_certificates.get_signing_certificate.return_value = \
+                        None
+                    self.assertRaises(utils.KSCertSetupException,
+                                      utils.get_ks_signing_cert, admin_token,
+                                      auth_url, '/foo/bar')
+
+                c = ['openssl', 'x509', '-in',
+                     '/foo/bar/signing_certificate.pem',
+                     '-pubkey']
+                mock_subprocess.check_output.assert_called_with(c)
+
+    def test_get_ks_ca_cert(self):
+        auth_host = 'foo/bar'
+        auth_port = 80
+        admin_token = '666'
+        auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
+
+        mock_ksclient = MagicMock
+        m = mock_open()
+        with patch.dict('sys.modules',
+                        {'requests': MagicMock(),
+                         'keystoneclient': mock_ksclient,
+                         'keystoneclient.exceptions': MagicMock(),
+                         'keystoneclient.exceptions.ConnectionRefused':
+                         MagicMock(),
+                         'keystoneclient.exceptions.Forbidden': MagicMock(),
+                         'keystoneclient.v2_0': MagicMock(),
+                         'keystoneclient.v2_0.client': MagicMock()}):
+            # Reimport
+            del sys.modules['utils']
+            import utils
+            with patch.object(utils, 'subprocess') as mock_subprocess:
+                with patch.object(utils, 'open', m, create=True):
+                    mock_certificates = MagicMock()
+                    mock_ksclient.certificates = mock_certificates
+                    mock_certificates.get_ca_certificate.return_value = \
+                        'ca_cert_data'
+                    utils.get_ks_ca_cert(admin_token, auth_url, '/foo/bar')
+                    mock_certificates.get_ca_certificate.return_value = None
+                    self.assertRaises(utils.KSCertSetupException,
+                                      utils.get_ks_ca_cert, admin_token,
+                                      auth_url, '/foo/bar')
+
+                c = ['openssl', 'x509', '-in', '/foo/bar/ca.pem',
+                     '-pubkey']
+                mock_subprocess.check_output.assert_called_with(c)
