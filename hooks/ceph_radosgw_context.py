@@ -27,6 +27,7 @@ from charmhelpers.contrib.network.ip import (
     get_host_ip,
     get_ipv6_addr,
 )
+from charmhelpers.contrib.storage.linux.ceph import CephConfContext
 
 
 def is_apache_24():
@@ -223,6 +224,14 @@ class MonContext(context.OSContextGenerator):
         else:
             # NOTE: currently only applied if NOT using embedded webserver
             ctxt['disable_100_continue'] = True
+
+        # NOTE(dosaboy): these sections must correspond to what is supported in
+        #                the config template.
+        sections = ['global', 'client.radosgw.gateway']
+        user_provided = CephConfContext(permitted_sections=sections)()
+        user_provided = {k.replace('.', '_'): user_provided[k]
+                         for k in user_provided}
+        ctxt.update(user_provided)
 
         if self.context_complete(ctxt):
             return ctxt

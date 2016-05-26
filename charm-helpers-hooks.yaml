@@ -4,16 +4,13 @@ include:
     - core
     - cli
     - fetch
-    - contrib.storage.linux:
-        - utils
+    - contrib.python.packages
+    - contrib.storage.linux
     - contrib.hahelpers:
         - apache
         - cluster
     - payload.execd
-    - contrib.openstack|inc=* 
     - contrib.network.ip
-    - contrib.openstack.ip
-    - contrib.storage.linux
-    - contrib.python.packages
+    - contrib.openstack|inc=*
     - contrib.charmsupport
     - contrib.hardening|inc=*

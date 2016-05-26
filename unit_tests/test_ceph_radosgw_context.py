@@ -1,9 +1,10 @@
 from mock import patch
 
 import ceph_radosgw_context as context
+import charmhelpers
+import charmhelpers.contrib.storage.linux.ceph as ceph
 
 from test_utils import CharmTestCase
-import charmhelpers
 
 TO_PATCH = [
     'config',
@@ -148,6 +149,8 @@ class MonContextTest(CharmTestCase):
         super(MonContextTest, self).setUp(context, TO_PATCH)
         self.config.side_effect = self.test_config.get
 
+    @patch.object(ceph, 'config', lambda *args:
+                  '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
     @patch.object(context, 'ensure_host_resolvable_v6')
     def test_ctxt(self, mock_ensure_rsv_v6):
         self.socket.gethostname.return_value = 'testhost'
@@ -173,6 +176,7 @@ class MonContextTest(CharmTestCase):
             'use_syslog': 'false',
             'loglevel': 1,
             'port': 70,
+            'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False
         }
         self.assertEqual(expect, mon_ctxt())
@@ -185,6 +189,8 @@ class MonContextTest(CharmTestCase):
         self.assertEqual(expect, mon_ctxt())
         self.assertTrue(mock_ensure_rsv_v6.called)
 
+    @patch.object(ceph, 'config', lambda *args:
+                  '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
     def test_ctxt_missing_data(self):
         self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
@@ -193,6 +199,8 @@ class MonContextTest(CharmTestCase):
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
         self.assertEqual({}, mon_ctxt())
 
+    @patch.object(ceph, 'config', lambda *args:
+                  '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
     def test_ctxt_inconsistent_auths(self):
         self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
@@ -217,10 +225,13 @@ class MonContextTest(CharmTestCase):
             'use_syslog': 'false',
             'loglevel': 1,
             'port': 70,
+            'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False
         }
         self.assertEqual(expect, mon_ctxt())
 
+    @patch.object(ceph, 'config', lambda *args:
+                  '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
     def test_ctxt_consistent_auths(self):
         self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
@@ -245,6 +256,7 @@ class MonContextTest(CharmTestCase):
             'use_syslog': 'false',
             'loglevel': 1,
             'port': 70,
+            'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False
         }
         self.assertEqual(expect, mon_ctxt())
