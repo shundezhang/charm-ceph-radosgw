@@ -95,6 +95,12 @@ options:
 
       Enable this option to disable use of Apache and enable the embedded
       web container feature.
+  dns-ha:
+    type: boolean
+    default: False
+    description: |
+        Use DNS HA with MAAS 2.0. Note if this is set do not set vip
+        settings below.
   vip:
     type: string
     default:
@@ -153,6 +159,30 @@ options:
       the following public endpoint for the ceph-radosgw:
 
       https://files.example.com:80/swift/v1
+  os-internal-hostname:
+    type: string
+    default:
+    description: |
+      The hostname or address of the internal endpoints created for ceph-radosgw
+      in the keystone identity provider.
+
+      This value will be used for internal endpoints. For example, an
+      os-internal-hostname set to 'files.internal.example.com' with will create
+      the following internal endpoint for the ceph-radosgw:
+
+      https://files.internal.example.com:80/swift/v1
+  os-admin-hostname:
+    type: string
+    default:
+    description: |
+      The hostname or address of the admin endpoints created for ceph-radosgw
+      in the keystone identity provider.
+
+      This value will be used for admin endpoints. For example, an
+      os-admin-hostname set to 'files.admin.example.com' with will create
+      the following admin endpoint for the ceph-radosgw:
+
+      https://files.admin.example.com:80/swift/v1
   ceph-osd-replication-count:
     type: int
     default: 3

@@ -24,7 +24,6 @@ from charmhelpers.core.hookenv import (
     log,
     DEBUG,
     WARNING,
-    ERROR,
     Hooks, UnregisteredHookError,
     status_set,
 )
@@ -54,6 +53,12 @@ from charmhelpers.contrib.storage.linux.ceph import (
 from charmhelpers.contrib.openstack.utils import (
     is_unit_paused_set,
     pausable_restart_on_change as restart_on_change,
+)
+from charmhelpers.contrib.hahelpers.cluster import (
+    get_hacluster_config,
+)
+from charmhelpers.contrib.openstack.ha.utils import (
+    update_dns_ha_resource_params,
 )
 from utils import (
     enable_pocket,
@@ -258,12 +263,8 @@ def cluster_changed():
 
 
 @hooks.hook('ha-relation-joined')
-def ha_relation_joined():
-    vip = config('vip')
-    if not vip:
-        log('Unable to configure hacluster as vip not provided', level=ERROR)
-        sys.exit(1)
-
+def ha_relation_joined(relation_id=None):
+    cluster_config = get_hacluster_config()
     # Obtain resources
     resources = {
         'res_cephrg_haproxy': 'lsb:haproxy'
@@ -272,32 +273,37 @@ def ha_relation_joined():
         'res_cephrg_haproxy': 'op monitor interval="5s"'
     }
 
-    vip_group = []
-    for vip in vip.split():
-        if is_ipv6(vip):
-            res_rgw_vip = 'ocf:heartbeat:IPv6addr'
-            vip_params = 'ipv6addr'
-        else:
-            res_rgw_vip = 'ocf:heartbeat:IPaddr2'
-            vip_params = 'ip'
+    if config('dns-ha'):
+        update_dns_ha_resource_params(relation_id=relation_id,
+                                      resources=resources,
+                                      resource_params=resource_params)
+    else:
+        vip_group = []
+        for vip in cluster_config['vip'].split():
+            if is_ipv6(vip):
+                res_rgw_vip = 'ocf:heartbeat:IPv6addr'
+                vip_params = 'ipv6addr'
+            else:
+                res_rgw_vip = 'ocf:heartbeat:IPaddr2'
+                vip_params = 'ip'
 
-        iface = get_iface_for_address(vip)
-        netmask = get_netmask_for_address(vip)
+            iface = get_iface_for_address(vip)
+            netmask = get_netmask_for_address(vip)
 
-        if iface is not None:
-            vip_key = 'res_cephrg_{}_vip'.format(iface)
-            resources[vip_key] = res_rgw_vip
-            resource_params[vip_key] = (
-                'params {ip}="{vip}" cidr_netmask="{netmask}"'
-                ' nic="{iface}"'.format(ip=vip_params,
-                                        vip=vip,
-                                        iface=iface,
-                                        netmask=netmask)
-            )
-            vip_group.append(vip_key)
+            if iface is not None:
+                vip_key = 'res_cephrg_{}_vip'.format(iface)
+                resources[vip_key] = res_rgw_vip
+                resource_params[vip_key] = (
+                    'params {ip}="{vip}" cidr_netmask="{netmask}"'
+                    ' nic="{iface}"'.format(ip=vip_params,
+                                            vip=vip,
+                                            iface=iface,
+                                            netmask=netmask)
+                )
+                vip_group.append(vip_key)
 
-    if len(vip_group) >= 1:
-        relation_set(groups={CEPHRG_HA_RES: ' '.join(vip_group)})
+        if len(vip_group) >= 1:
+            relation_set(groups={CEPHRG_HA_RES: ' '.join(vip_group)})
 
     init_services = {
         'res_cephrg_haproxy': 'haproxy'
@@ -306,14 +312,10 @@ def ha_relation_joined():
         'cl_cephrg_haproxy': 'res_cephrg_haproxy'
     }
 
-    # Obtain the config values necessary for the cluster config. These
-    # include multicast port and interface to bind to.
-    corosync_bindiface = config('ha-bindiface')
-    corosync_mcastport = config('ha-mcastport')
-
-    relation_set(init_services=init_services,
-                 corosync_bindiface=corosync_bindiface,
-                 corosync_mcastport=corosync_mcastport,
+    relation_set(relation_id=relation_id,
+                 init_services=init_services,
+                 corosync_bindiface=cluster_config['ha-bindiface'],
+                 corosync_mcastport=cluster_config['ha-mcastport'],
                  resources=resources,
                  resource_params=resource_params,
                  clones=clones)
