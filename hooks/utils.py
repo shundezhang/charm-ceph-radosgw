@@ -24,7 +24,6 @@ from charmhelpers.core.hookenv import (
     INFO,
     relation_get,
     relation_ids,
-    status_get,
 )
 from charmhelpers.contrib.network.ip import (
     format_ipv6_addr,
@@ -38,7 +37,6 @@ from charmhelpers.contrib.openstack.utils import (
     make_assess_status_func,
     pause_unit,
     resume_unit,
-    set_os_workload_status,
 )
 from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
 from charmhelpers.core.host import (
@@ -184,24 +182,40 @@ def enable_pocket(pocket):
                 sources.write(line)
 
 
-def check_optional_relations(configs):
-    required_interfaces = {}
+def get_optional_interfaces():
+    """Return the optional interfaces that should be checked if the relavent
+    relations have appeared.
+    :returns: {general_interface: [specific_int1, specific_int2, ...], ...}
+    """
+    optional_interfaces = {}
     if relation_ids('ha'):
-        required_interfaces['ha'] = ['cluster']
+        optional_interfaces['ha'] = ['cluster']
+    if (cmp_pkgrevno('radosgw', '0.55') >= 0 and
+            relation_ids('identity-service')):
+        optional_interfaces['identity'] = ['identity-service']
+    return optional_interfaces
+
+
+def check_optional_relations(configs):
+    """Check that if we have a relation_id for high availability that we can
+    get the hacluster config.  If we can't then we are blocked.  This function
+    is called from assess_status/set_os_workload_status as the charm_func and
+    needs to return either 'unknown', '' if there is no problem or the status,
+    message if there is a problem.
+
+    :param configs: an OSConfigRender() instance.
+    :return 2-tuple: (string, string) = (status, message)
+    """
+    if relation_ids('ha'):
         try:
             get_hacluster_config()
         except:
             return ('blocked',
                     'hacluster missing configuration: '
                     'vip, vip_iface, vip_cidr')
-    if cmp_pkgrevno('radosgw', '0.55') >= 0 and \
-            relation_ids('identity-service'):
-        required_interfaces['identity'] = ['identity-service']
-    if required_interfaces:
-        set_os_workload_status(configs, required_interfaces)
-        return status_get()
-    else:
-        return 'unknown', 'No optional relations'
+    # return 'unknown' as the lowest priority to not clobber an existing
+    # status.
+    return 'unknown', ''
 
 
 def setup_ipv6():
@@ -245,14 +259,20 @@ def assess_status_func(configs):
     Used directly by assess_status() and also for pausing and resuming
     the unit.
 
+    NOTE: REQUIRED_INTERFACES is augmented with the optional interfaces
+    depending on the current config before being passed to the
+    make_assess_status_func() function.
+
     NOTE(ajkavanagh) ports are not checked due to race hazards with services
     that don't behave sychronously w.r.t their service scripts.  e.g.
     apache2.
     @param configs: a templating.OSConfigRenderer() object
     @return f() -> None : a function that assesses the unit's workload status
     """
+    required_interfaces = REQUIRED_INTERFACES.copy()
+    required_interfaces.update(get_optional_interfaces())
     return make_assess_status_func(
-        configs, REQUIRED_INTERFACES,
+        configs, required_interfaces,
         charm_func=check_optional_relations,
         services=services(), ports=None)
 
