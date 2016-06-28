@@ -191,9 +191,20 @@ options:
       it stores within RGW pools. Note that once the RGW pools have been
       created, changing this value will not have any effect (although it can be
       changed in ceph by manually configuring your ceph cluster).
+  rgw-buckets-pool-weight:
+    type: int
+    default: 20
+    description: |
+      Defines a relative weighting of the pool as a percentage of the total
+      amount of data in the Ceph cluster. This effectively weights the number
+      of placement groups for the pool created to be appropriately portioned
+      to the amount of data expected. For example, if the amount of data loaded
+      into the RADOS Gateway/S3 interface is expected to be reserved for or
+      consume 20% of the data in the Ceph cluster, then this value would be
+      specified as 20.
   rgw-lightweight-pool-pg-num:
     type: int
-    default: 64
+    default: -1
     description: |
       When the Rados Gatway is installed it, by default, creates pools with
       pg_num 8 which, in the majority of cases is suboptimal. A few rgw pools
@@ -203,7 +214,8 @@ options:
       up+in the cluster at the time the pool is created. For others it will use
       this value which can be altered depending on how big you cluster is. Note
       that once a pool has been created, changes to this setting will be
-      ignored.
+      ignored. Setting this value to -1, enables the number of placement
+      groups to be calculated based on the Ceph placement group calculator.
   haproxy-server-timeout:
     type: int
     default:

@@ -23,12 +23,13 @@ mock_apt.apt_pkg = MagicMock()
 sys.modules['apt'] = mock_apt
 sys.modules['apt_pkg'] = mock_apt.apt_pkg
 
-import ceph
-import utils
+import ceph  # noqa
+import utils  # noqa
 
-from test_utils import CharmTestCase
+from test_utils import CharmTestCase  # noqa
 
 TO_PATCH = [
+    'config',
     'get_unit_hostname',
     'os',
     'subprocess',
@@ -36,16 +37,10 @@ TO_PATCH = [
 ]
 
 
-def config_side_effect(*args):
-    if args[0] == 'ceph-osd-replication-count':
-        return 3
-    elif args[0] == 'rgw-lightweight-pool-pg-num':
-        return 10
-
-
 class CephRadosGWCephTests(CharmTestCase):
     def setUp(self):
         super(CephRadosGWCephTests, self).setUp(ceph, TO_PATCH)
+        self.config.side_effect = self.test_config.get
 
     def test_is_quorum_leader(self):
         self.os.path.exists.return_value = True
@@ -230,125 +225,80 @@ class CephRadosGWCephTests(CharmTestCase):
         ]
         self.subprocess.check_output.assert_called_with(cmd)
 
-    @patch.object(ceph, 'CephBrokerRq')
-    @patch.object(ceph, 'config')
-    def test_create_rgw_pools_rq_with_prefix(self, mock_config, mock_broker):
-        mock_config.side_effect = config_side_effect
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_create_pool')
+    def test_create_rgw_pools_rq_with_prefix(self, mock_broker):
+        self.test_config.set('rgw-lightweight-pool-pg-num', 10)
+        self.test_config.set('ceph-osd-replication-count', 3)
+        self.test_config.set('rgw-buckets-pool-weight', 19)
         ceph.get_create_rgw_pools_rq(prefix='us-east')
         mock_broker.assert_has_calls([
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.rgw'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.rgw.root'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.rgw.control'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.rgw.gc'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.rgw.buckets'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.rgw.buckets.index'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.rgw.buckets.extra'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.log'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='us-east.intent-log'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3,
-                name='us-east.usage'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3,
-                name='us-east.users'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3,
-                name='us-east.users.email'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3,
-                name='us-east.users.swift'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3,
-                name='us-east.users.uid')]
+            call(replica_count=3, weight=19, name='us-east.rgw.buckets'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.root'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.control'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.gc'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.index'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.extra'),
+            call(pg_num=10, replica_count=3, name='us-east.log'),
+            call(pg_num=10, replica_count=3, name='us-east.intent-log'),
+            call(pg_num=10, replica_count=3, name='us-east.usage'),
+            call(pg_num=10, replica_count=3, name='us-east.users'),
+            call(pg_num=10, replica_count=3, name='us-east.users.email'),
+            call(pg_num=10, replica_count=3, name='us-east.users.swift'),
+            call(pg_num=10, replica_count=3, name='us-east.users.uid')]
         )
 
     @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: -1)
-    @patch.object(ceph, 'CephBrokerRq')
-    @patch.object(ceph, 'config')
-    def test_create_rgw_pools_rq_no_prefix_pre_jewel(self, mock_config,
-                                                     mock_broker):
-        mock_config.side_effect = config_side_effect
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_create_pool')
+    def test_create_rgw_pools_rq_no_prefix_pre_jewel(self, mock_broker):
+        self.test_config.set('rgw-lightweight-pool-pg-num', -1)
+        self.test_config.set('ceph-osd-replication-count', 3)
+        self.test_config.set('rgw-buckets-pool-weight', 19)
         ceph.get_create_rgw_pools_rq(prefix=None)
         mock_broker.assert_has_calls([
-            call().add_op_create_pool(
-                replica_count=3, name='.rgw.buckets'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.rgw'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.rgw.root'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.rgw.control'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.rgw.gc'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.rgw.buckets'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.rgw.buckets.index'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.rgw.buckets.extra'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.log'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.intent-log'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.usage'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.users'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.users.email'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.users.swift'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='.users.uid')]
+            call(weight=19, replica_count=3, name='.rgw.buckets'),
+            call(weight=0.10, replica_count=3, name='.rgw'),
+            call(weight=0.10, replica_count=3, name='.rgw.root'),
+            call(weight=0.10, replica_count=3, name='.rgw.control'),
+            call(weight=0.10, replica_count=3, name='.rgw.gc'),
+            call(weight=1.00, replica_count=3, name='.rgw.buckets.index'),
+            call(weight=1.00, replica_count=3, name='.rgw.buckets.extra'),
+            call(weight=0.10, replica_count=3, name='.log'),
+            call(weight=0.10, replica_count=3, name='.intent-log'),
+            call(weight=0.10, replica_count=3, name='.usage'),
+            call(weight=0.10, replica_count=3, name='.users'),
+            call(weight=0.10, replica_count=3, name='.users.email'),
+            call(weight=0.10, replica_count=3, name='.users.swift'),
+            call(weight=0.10, replica_count=3, name='.users.uid')]
         )
 
     @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: 0)
-    @patch.object(ceph, 'CephBrokerRq')
-    @patch.object(ceph, 'config')
-    def test_create_rgw_pools_rq_no_prefix_post_jewel(self, mock_config,
-                                                      mock_broker):
-        mock_config.side_effect = config_side_effect
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_create_pool')
+    def test_create_rgw_pools_rq_no_prefix_post_jewel(self, mock_broker):
+        self.test_config.set('rgw-lightweight-pool-pg-num', -1)
+        self.test_config.set('ceph-osd-replication-count', 3)
+        self.test_config.set('rgw-buckets-pool-weight', 19)
         ceph.get_create_rgw_pools_rq(prefix=None)
         mock_broker.assert_has_calls([
-            call().add_op_create_pool(
-                replica_count=3, name='default.rgw.buckets'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.rgw'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.rgw.root'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.rgw.control'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.rgw.gc'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.rgw.buckets'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.rgw.buckets.index'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.rgw.buckets.extra'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.log'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.intent-log'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.usage'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.users'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.users.email'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.users.swift'),
-            call().add_op_create_pool(
-                pg_num=10, replica_count=3, name='default.users.uid')]
+            call(weight=19, replica_count=3, name='default.rgw.buckets'),
+            call(weight=0.10, replica_count=3, name='default.rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.root'),
+            call(weight=0.10, replica_count=3, name='default.rgw.control'),
+            call(weight=0.10, replica_count=3, name='default.rgw.gc'),
+            call(weight=1.00, replica_count=3,
+                 name='default.rgw.buckets.index'),
+            call(weight=1.00, replica_count=3,
+                 name='default.rgw.buckets.extra'),
+            call(weight=0.10, replica_count=3, name='default.log'),
+            call(weight=0.10, replica_count=3, name='default.intent-log'),
+            call(weight=0.10, replica_count=3, name='default.usage'),
+            call(weight=0.10, replica_count=3, name='default.users'),
+            call(weight=0.10, replica_count=3, name='default.users.email'),
+            call(weight=0.10, replica_count=3, name='default.users.swift'),
+            call(weight=0.10, replica_count=3, name='default.users.uid')]
         )
 
     @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: -1)

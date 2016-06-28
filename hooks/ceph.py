@@ -268,9 +268,11 @@ def get_create_rgw_pools_rq(prefix=None):
     # Buckets likely to contain the most data and therefore requiring the most
     # PGs
     heavy = ['.rgw.buckets']
+    bucket_weight = config('rgw-buckets-pool-weight')
     for pool in heavy:
         pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
-        rq.add_op_create_pool(name=pool, replica_count=replicas)
+        rq.add_op_create_pool(name=pool, replica_count=replicas,
+                              weight=bucket_weight)
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
     # others since they are not expected to contain as much data
@@ -278,7 +280,6 @@ def get_create_rgw_pools_rq(prefix=None):
              '.rgw.root',
              '.rgw.control',
              '.rgw.gc',
-             '.rgw.buckets',
              '.rgw.buckets.index',
              '.rgw.buckets.extra',
              '.log',
@@ -288,9 +289,20 @@ def get_create_rgw_pools_rq(prefix=None):
              '.users.email',
              '.users.swift',
              '.users.uid']
+    weights = {
+        '.rgw.buckets.index': 1.00,
+        '.rgw.buckets.extra': 1.00
+    }
     pg_num = config('rgw-lightweight-pool-pg-num')
     for pool in light:
+        # Per the Ceph PG Calculator, all of the lightweight pools get 0.10%
+        # of the data by default and only the .rgw.buckets.* get higher values
+        w = weights.get(pool, 0.10)
         pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
-        rq.add_op_create_pool(name=pool, replica_count=replicas, pg_num=pg_num)
+        if pg_num > 0:
+            rq.add_op_create_pool(name=pool, replica_count=replicas,
+                                  pg_num=pg_num)
+        else:
+            rq.add_op_create_pool(name=pool, replica_count=replicas, weight=w)
 
     return rq
