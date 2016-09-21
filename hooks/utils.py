@@ -29,6 +29,7 @@ from charmhelpers.core.hookenv import (
     INFO,
     relation_get,
     relation_ids,
+    application_version_set,
 )
 from charmhelpers.contrib.network.ip import (
     format_ipv6_addr,
@@ -55,6 +56,7 @@ from charmhelpers.fetch import (
     apt_update,
     add_source,
     filter_installed_packages,
+    get_upstream_version,
 )
 
 # NOTE: some packages are installed by the charm so may not be available
@@ -97,6 +99,8 @@ CEPH_CONF = '/etc/ceph/ceph.conf'
 APACHE_CONF = '/etc/apache2/sites-available/rgw'
 APACHE_24_CONF = '/etc/apache2/sites-available/rgw.conf'
 APACHE_PORTS_CONF = '/etc/apache2/ports.conf'
+
+VERSION_PACKAGE = 'radosgw'
 
 BASE_RESOURCE_MAP = OrderedDict([
     (HAPROXY_CONF, {
@@ -254,6 +258,7 @@ def assess_status(configs):
     @returns None - this function is executed for its side-effect
     """
     assess_status_func(configs)()
+    application_version_set(get_upstream_version(VERSION_PACKAGE))
 
 
 def assess_status_func(configs):

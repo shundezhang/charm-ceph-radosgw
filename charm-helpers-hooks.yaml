@@ -3,6 +3,7 @@ destination: hooks/charmhelpers
 include:
     - core
     - cli
+    - osplatform
     - fetch
     - contrib.python.packages
     - contrib.storage.linux

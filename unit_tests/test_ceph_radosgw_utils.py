@@ -26,12 +26,15 @@ import utils
 from test_utils import CharmTestCase
 
 TO_PATCH = [
+    'application_version_set',
+    'get_upstream_version',
 ]
 
 
 class CephRadosGWUtilTests(CharmTestCase):
     def setUp(self):
-        super(CephRadosGWUtilTests, self).setUp(None, TO_PATCH)
+        super(CephRadosGWUtilTests, self).setUp(utils, TO_PATCH)
+        self.get_upstream_version.return_value = '10.2.2'
 
     def test_assess_status(self):
         with patch.object(utils, 'assess_status_func') as asf:
@@ -40,6 +43,10 @@ class CephRadosGWUtilTests(CharmTestCase):
             utils.assess_status('test-config')
             asf.assert_called_once_with('test-config')
             callee.assert_called_once_with()
+            self.get_upstream_version.assert_called_with(
+                utils.VERSION_PACKAGE
+            )
+            self.application_version_set.assert_called_with('10.2.2')
 
     @patch.object(utils, 'get_optional_interfaces')
     @patch.object(utils, 'check_optional_relations')
