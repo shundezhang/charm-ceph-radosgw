@@ -44,11 +44,13 @@ from charmhelpers.core.host import lsb_release
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import cmp_pkgrevno
 from charmhelpers.contrib.network.ip import (
+    get_address_in_network,
     get_ipv6_addr,
     get_iface_for_address,
     get_netmask_for_address,
     is_ipv6,
 )
+from charmhelpers.contrib.openstack.context import ADDRESS_TYPES
 from charmhelpers.contrib.openstack.ip import (
     canonical_url,
     PUBLIC, INTERNAL, ADMIN,
@@ -254,6 +256,17 @@ def identity_changed(relid=None):
 @restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
 def cluster_joined(rid=None):
     settings = {}
+
+    for addr_type in ADDRESS_TYPES:
+        address = get_address_in_network(
+            config('os-{}-network'.format(addr_type))
+        )
+        if address:
+            relation_set(
+                relation_id=rid,
+                settings={'{}-address'.format(addr_type): address}
+            )
+
     if config('prefer-ipv6'):
         private_addr = get_ipv6_addr(exc_list=[config('vip')])[0]
         settings['private-address'] = private_addr
