@@ -14,10 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Amulet tests on a basic ceph-radosgw deployment on yakkety-newton."""
+"""Amulet tests on a basic ceph-radosgw deployment on xenial-ocata."""
 
 from basic_deployment import CephRadosGwBasicDeployment
 
 if __name__ == '__main__':
-    deployment = CephRadosGwBasicDeployment(series='yakkety')
+    deployment = CephRadosGwBasicDeployment(series='xenial',
+                                     openstack='cloud:xenial-ocata',
+                                     source='cloud:xenial-updates/ocata')
     deployment.run_tests()
