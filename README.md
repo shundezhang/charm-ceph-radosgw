@@ -13,16 +13,16 @@ Usage
 In order to use this charm, it is assumed that you have already deployed a ceph
 storage cluster using the 'ceph' charm with something like this::
 
-   juju deploy -n 3 --config ceph.yaml ceph
+    juju deploy -n 3 --config ceph.yaml ceph
 
 To deploy the RADOS gateway simple do::
 
-   juju deploy ceph-radosgw
-   juju add-relation ceph-radosgw ceph
+    juju deploy ceph-radosgw
+    juju add-relation ceph-radosgw ceph
 
 You can then directly access the RADOS gateway by exposing the service::
 
-   juju expose ceph-radosgw
+    juju expose ceph-radosgw
 
 The gateway can be accessed over port 80 (as show in juju status exposed
 ports).
@@ -33,7 +33,7 @@ Access
 Note that you will need to login to one of the service units supporting the
 ceph charm to generate some access credentials::
 
-   juju ssh ceph/0 \
+    juju ssh ceph/0 \
       'sudo radosgw-admin user create --uid="ubuntu" --display-name="Ubuntu Ceph"'
 
 For security reasons the ceph-radosgw charm is not set up with appropriate
@@ -46,8 +46,8 @@ Ceph >= 0.55 integrates with Openstack Keystone for authentication of Swift requ
 
 This is enabled by relating the ceph-radosgw service with keystone::
 
-   juju deploy keystone
-   juju add-relation keystone ceph-radosgw
+    juju deploy keystone
+    juju add-relation keystone ceph-radosgw
 
 If you try to relate the radosgw to keystone with an earlier version of ceph the hook
 will error out to let you know.
