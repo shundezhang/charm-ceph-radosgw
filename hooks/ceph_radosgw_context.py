@@ -16,9 +16,7 @@ import os
 import re
 import socket
 import tempfile
-import glob
 import shutil
-import subprocess
 
 from charmhelpers.contrib.openstack import context
 from charmhelpers.contrib.hahelpers.cluster import (
@@ -34,7 +32,6 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     related_units,
     relation_get,
-    status_set,
 )
 from charmhelpers.contrib.network.ip import (
     format_ipv6_addr,
@@ -42,55 +39,6 @@ from charmhelpers.contrib.network.ip import (
     get_ipv6_addr,
 )
 from charmhelpers.contrib.storage.linux.ceph import CephConfContext
-
-
-def is_apache_24():
-    if os.path.exists('/etc/apache2/conf-available'):
-        return True
-    else:
-        return False
-
-
-class ApacheContext(context.OSContextGenerator):
-    interfaces = ['http']
-    service_namespace = 'ceph-radosgw'
-
-    def __call__(self):
-        ctxt = {}
-        if config('use-embedded-webserver'):
-            log("Skipping ApacheContext since we are using the embedded "
-                "webserver")
-            return {}
-
-        status_set('maintenance', 'configuring apache')
-
-        src = 'files/www/*'
-        dst = '/var/www/'
-        log("Installing www scripts", level=DEBUG)
-        try:
-            for x in glob.glob(src):
-                shutil.copy(x, dst)
-        except IOError as e:
-            log("Error copying files from '%s' to '%s': %s" % (src, dst, e),
-                level=WARNING)
-
-        try:
-            subprocess.check_call(['a2enmod', 'fastcgi'])
-            subprocess.check_call(['a2enmod', 'rewrite'])
-        except subprocess.CalledProcessError as e:
-            log("Error enabling apache modules - %s" % e, level=WARNING)
-
-        try:
-            if is_apache_24():
-                subprocess.check_call(['a2dissite', '000-default'])
-            else:
-                subprocess.check_call(['a2dissite', 'default'])
-        except subprocess.CalledProcessError as e:
-            log("Error disabling apache sites - %s" % e, level=WARNING)
-
-        ctxt['hostname'] = socket.gethostname()
-        ctxt['port'] = determine_api_port(config('port'), singlenode_mode=True)
-        return ctxt
 
 
 class HAProxyContext(context.HAProxyContext):
@@ -220,7 +168,6 @@ class MonContext(context.OSContextGenerator):
             'hostname': host,
             'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
             'use_syslog': str(config('use-syslog')).lower(),
-            'embedded_webserver': config('use-embedded-webserver'),
             'loglevel': config('loglevel'),
             'port': port,
             'ipv6': config('prefer-ipv6')
@@ -231,13 +178,6 @@ class MonContext(context.OSContextGenerator):
                  os.path.join(certs_path, 'signing_certificate.pem')]
         if all([os.path.isfile(p) for p in paths]):
             ctxt['cms'] = True
-
-        if (config('use-ceph-optimised-packages') and
-                not config('use-embedded-webserver')):
-            ctxt['disable_100_continue'] = False
-        else:
-            # NOTE: currently only applied if NOT using embedded webserver
-            ctxt['disable_100_continue'] = True
 
         # NOTE(dosaboy): these sections must correspond to what is supported in
         #                the config template.

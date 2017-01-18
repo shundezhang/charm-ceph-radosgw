@@ -23,7 +23,6 @@ from copy import deepcopy
 import ceph_radosgw_context
 
 from charmhelpers.core.hookenv import (
-    config,
     log,
     DEBUG,
     INFO,
@@ -96,9 +95,6 @@ TEMPLATES_DIR = 'templates'
 TEMPLATES = 'templates/'
 HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
 CEPH_CONF = '/etc/ceph/ceph.conf'
-APACHE_CONF = '/etc/apache2/sites-available/rgw'
-APACHE_24_CONF = '/etc/apache2/sites-available/rgw.conf'
-APACHE_PORTS_CONF = '/etc/apache2/ports.conf'
 
 VERSION_PACKAGE = 'radosgw'
 
@@ -107,18 +103,6 @@ BASE_RESOURCE_MAP = OrderedDict([
         'contexts': [context.HAProxyContext(singlenode_mode=True),
                      ceph_radosgw_context.HAProxyContext()],
         'services': ['haproxy'],
-    }),
-    (APACHE_CONF, {
-        'contexts': [ceph_radosgw_context.ApacheContext()],
-        'services': ['apache2'],
-    }),
-    (APACHE_24_CONF, {
-        'contexts': [ceph_radosgw_context.ApacheContext()],
-        'services': ['apache2'],
-    }),
-    (APACHE_PORTS_CONF, {
-        'contexts': [ceph_radosgw_context.ApacheContext()],
-        'services': ['apache2'],
     }),
     (CEPH_CONF, {
         'contexts': [ceph_radosgw_context.MonContext()],
@@ -140,16 +124,6 @@ def resource_map():
 
     These will be managed for a single hook execution.
     """
-    if not config('use-embedded-webserver'):
-        if os.path.exists('/etc/apache2/conf-available'):
-            BASE_RESOURCE_MAP.pop(APACHE_CONF)
-        else:
-            BASE_RESOURCE_MAP.pop(APACHE_24_CONF)
-    else:
-        BASE_RESOURCE_MAP.pop(APACHE_CONF)
-        BASE_RESOURCE_MAP.pop(APACHE_24_CONF)
-        BASE_RESOURCE_MAP.pop(APACHE_PORTS_CONF)
-
     resource_map = deepcopy(BASE_RESOURCE_MAP)
     return resource_map
 

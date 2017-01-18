@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from mock import (
-    call,
     patch,
 )
 
@@ -42,7 +41,6 @@ TO_PATCH = [
     'get_iface_for_address',
     'get_netmask_for_address',
     'log',
-    'lsb_release',
     'open_port',
     'os',
     'relation_ids',
@@ -67,50 +65,10 @@ class CephRadosGWTests(CharmTestCase):
         self.test_config.set('key', 'secretkey')
         self.test_config.set('use-syslog', False)
 
-    def test_install_ceph_optimised_packages(self):
-        self.lsb_release.return_value = {'DISTRIB_CODENAME': 'vivid'}
-        fastcgi_source = (
-            'http://gitbuilder.ceph.com/'
-            'libapache-mod-fastcgi-deb-vivid-x86_64-basic/ref/master')
-        apache_source = (
-            'http://gitbuilder.ceph.com/'
-            'apache2-deb-vivid-x86_64-basic/ref/master')
-        calls = [
-            call(fastcgi_source, key='6EAEAE2203C3951A'),
-            call(apache_source, key='6EAEAE2203C3951A'),
-        ]
-        ceph_hooks.install_ceph_optimised_packages()
-        self.add_source.assert_has_calls(calls)
-
     def test_install_packages(self):
-        self.test_config.set('use-ceph-optimised-packages', '')
         ceph_hooks.install_packages()
         self.add_source.assert_called_with('distro', 'secretkey')
         self.assertTrue(self.apt_update.called)
-        self.apt_install.assert_called_with(['libapache2-mod-fastcgi',
-                                             'apache2'], fatal=True)
-
-    def test_install_optimised_packages_no_embedded(self):
-        self.test_config.set('use-ceph-optimised-packages', True)
-        self.test_config.set('use-embedded-webserver', False)
-        _install_packages = self.patch('install_ceph_optimised_packages')
-        ceph_hooks.install_packages()
-        self.add_source.assert_called_with('distro', 'secretkey')
-        self.assertTrue(self.apt_update.called)
-        self.assertTrue(_install_packages.called)
-        self.apt_install.assert_called_with(['libapache2-mod-fastcgi',
-                                             'apache2'], fatal=True)
-
-    def test_install_optimised_packages_embedded(self):
-        self.test_config.set('use-ceph-optimised-packages', True)
-        self.test_config.set('use-embedded-webserver', True)
-        _install_packages = self.patch('install_ceph_optimised_packages')
-        ceph_hooks.install_packages()
-        self.add_source.assert_called_with('distro', 'secretkey')
-        self.assertTrue(self.apt_update.called)
-        self.assertFalse(_install_packages.called)
-        self.apt_install.assert_called_with(ceph_hooks.PACKAGES,
-                                            fatal=True)
         self.apt_purge.assert_called_with(['libapache2-mod-fastcgi',
                                            'apache2'])
 

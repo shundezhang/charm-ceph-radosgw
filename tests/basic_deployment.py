@@ -115,13 +115,11 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'ephemeral-unmount': '/mnt',
             'osd-devices': '/dev/vdb /srv/ceph'
         }
-        radosgw_config = {"use-embedded-webserver": True}
 
         configs = {'keystone': keystone_config,
                    'percona-cluster': pxc_config,
                    'cinder': cinder_config,
-                   'ceph': ceph_config,
-                   'ceph-radosgw': radosgw_config}
+                   'ceph': ceph_config}
         super(CephRadosGwBasicDeployment, self)._configure_services(configs)
 
     def _run_action(self, unit_id, action, *args):

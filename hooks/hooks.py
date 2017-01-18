@@ -30,7 +30,6 @@ from charmhelpers.core.hookenv import (
     relation_set,
     log,
     DEBUG,
-    WARNING,
     Hooks, UnregisteredHookError,
     status_set,
 )
@@ -39,8 +38,8 @@ from charmhelpers.fetch import (
     apt_install,
     apt_purge,
     add_source,
+    filter_installed_packages,
 )
-from charmhelpers.core.host import lsb_release
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import cmp_pkgrevno
 from charmhelpers.contrib.network.ip import (
@@ -86,21 +85,6 @@ CONFIGS = register_configs()
 NSS_DIR = '/var/lib/ceph/nss'
 
 
-def install_ceph_optimised_packages():
-    """Inktank provides patched/optimised packages for HTTP 100-continue
-    support that does has not yet been ported to upstream. These can
-    optionally be installed from ceph.com archives.
-    """
-    prolog = "http://gitbuilder.ceph.com/"
-    epilog = "-x86_64-basic/ref/master"
-    rel = lsb_release()['DISTRIB_CODENAME']
-    fastcgi_source = "%slibapache-mod-fastcgi-deb-%s%s" % (prolog, rel, epilog)
-    apache_source = "%sapache2-deb-%s%s" % (prolog, rel, epilog)
-
-    for source in [fastcgi_source, apache_source]:
-        add_source(source, key='6EAEAE2203C3951A')
-
-
 PACKAGES = [
     'haproxy',
     'libnss3-tools',
@@ -119,18 +103,13 @@ APACHE_PACKAGES = [
 
 
 def install_packages():
-    status_set('maintenance', 'Installing apt packages')
     add_source(config('source'), config('key'))
-    if (config('use-ceph-optimised-packages') and
-            not config('use-embedded-webserver')):
-        install_ceph_optimised_packages()
-
     apt_update(fatal=True)
-    apt_install(PACKAGES, fatal=True)
-    if config('use-embedded-webserver'):
-        apt_purge(APACHE_PACKAGES)
-    else:
-        apt_install(APACHE_PACKAGES, fatal=True)
+    pkgs = filter_installed_packages(PACKAGES)
+    if pkgs:
+        status_set('maintenance', 'Installing radosgw packages')
+        apt_install(PACKAGES, fatal=True)
+    apt_purge(APACHE_PACKAGES)
 
 
 @hooks.hook('install.real')
@@ -166,15 +145,6 @@ def config_changed():
 
     CONFIGS.write_all()
 
-    if not config('use-embedded-webserver'):
-        try:
-            subprocess.check_call(['a2ensite', 'rgw'])
-        except subprocess.CalledProcessError as e:
-            log("Error enabling apache module 'rgw' - %s" % e, level=WARNING)
-
-        # Ensure started but do a soft reload
-        subprocess.call(['service', 'apache2', 'start'])
-        subprocess.call(['service', 'apache2', 'reload'])
     update_nrpe_config()
 
 

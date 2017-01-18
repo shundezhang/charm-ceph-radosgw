@@ -28,7 +28,6 @@ TO_PATCH = [
     'related_units',
     'cmp_pkgrevno',
     'socket',
-    'is_apache_24',
 ]
 
 
@@ -182,8 +181,6 @@ class MonContextTest(CharmTestCase):
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
         expect = {
             'auth_supported': 'cephx',
-            'embedded_webserver': False,
-            'disable_100_continue': True,
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
@@ -231,8 +228,6 @@ class MonContextTest(CharmTestCase):
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
         expect = {
             'auth_supported': 'none',
-            'embedded_webserver': False,
-            'disable_100_continue': True,
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
@@ -262,8 +257,6 @@ class MonContextTest(CharmTestCase):
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
         expect = {
             'auth_supported': 'cephx',
-            'embedded_webserver': False,
-            'disable_100_continue': True,
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
             'old_auth': False,
