@@ -15,7 +15,9 @@
 # limitations under the License.
 
 import amulet
+import keystoneclient
 import subprocess
+import swiftclient
 import json
 import time
 from charmhelpers.contrib.openstack.amulet.deployment import (
@@ -184,10 +186,21 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                                                   description='demo tenant',
                                                   enabled=True)
             self.keystone.roles.create(name=self.demo_role)
-            self.keystone.users.create(name=self.demo_user,
-                                       password='password',
-                                       tenant_id=tenant.id,
-                                       email='demo@demo.com')
+            user = self.keystone.users.create(name=self.demo_user,
+                                              password='password',
+                                              tenant_id=tenant.id,
+                                              email='demo@demo.com')
+
+            # Grant Member role to demo_user
+            roles = [r._info for r in self.keystone.roles.list()]
+            for r in roles:
+                if r['name'].lower() == 'member':
+                    self.keystone_member_role_id = r['id']
+
+            self.keystone.roles.add_user_role(
+                user=user.id,
+                role=self.keystone_member_role_id,
+                tenant=tenant.id)
 
         # Authenticate demo user with keystone
         self.keystone_demo = u.authenticate_keystone_user(self.keystone,
@@ -210,6 +223,77 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             user=ks_obj_rel['service_username'],
             password=ks_obj_rel['service_password'],
             tenant=ks_obj_rel['service_tenant'])
+
+        self.keystone_v3 = None
+
+    def _initialize_keystone_v3(self):
+        u.log.debug('Initializing Keystone v3 tests...')
+        if self.keystone_v3 is not None:
+            u.log.debug('...allready initialized.')
+            return
+
+        se_rels = [(self.keystone_sentry, 'ceph-radosgw:identity-service')]
+        u.keystone_configure_api_version(se_rels, self, 3)
+
+        # Prepare Keystone Client with a domain scoped token for admin user
+        self.keystone_v3 = u.authenticate_keystone(
+            self.keystone_sentry.info['public-address'],
+            'admin', 'openstack', api_version=3,
+            user_domain_name='admin_domain', domain_name='admin_domain'
+        )
+
+        # Create a demo domain, project and user
+        self.demo_domain = 'demoDomain'
+        self.demo_project = 'demoProject'
+
+        try:
+            domain = self.keystone_v3.domains.create(
+                self.demo_domain,
+                description='Demo Domain',
+                enabled=True,
+            )
+        except keystoneclient.exceptions.Conflict:
+            u.log.debug('Domain {} already exists, proceeding.'
+                        ''.format(self.demo_domain))
+
+        try:
+            project = self.keystone_v3.projects.create(
+                self.demo_project,
+                domain,
+                description='Demo Project',
+                enabled=True,
+            )
+        except keystoneclient.exceptions.Conflict:
+            u.log.debug('Project {} already exists in domain {}, proceeding.'
+                        ''.format(self.demo_project, domain.name))
+
+        try:
+            user = self.keystone_v3.users.create(
+                self.demo_user,
+                domain=domain.id,
+                project=self.demo_project,
+                password='password',
+                email='demov3@demo.com',
+                description='Demo v3',
+                enabled=True,
+            )
+        except keystoneclient.exceptions.Conflict:
+            u.log.debug('User {} already exists in domain {}, proceeding.'
+                        ''.format(self.demo_user, domain.name))
+        self.keystone_v3.roles.grant(self.keystone_member_role_id,
+                                     user=user.id,
+                                     project=project.id)
+
+        # Prepare Keystone Client with a project scoped token for demo user
+        self.keystone_demo_v3 = u.authenticate_keystone(
+            self.keystone_sentry.info['public-address'],
+            self.demo_user, 'password', api_version=3,
+            user_domain_name=self.demo_domain,
+            project_domain_name=self.demo_domain,
+            project_name=self.demo_project,
+        )
+
+        u.log.debug('OK')
 
     def test_100_ceph_processes(self):
         """Verify that the expected service processes are running
@@ -519,6 +603,69 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         assert('content-type' in headers.keys())
         assert(containers == [])
 
+    def test_403_swift_keystone_auth(self, api_version=2):
+        """Check Swift Object Storage functionlaity"""
+        u.log.debug('Check Swift Object Storage functionality (api_version={})'
+                    ''.format(api_version))
+        keystone_ip = self.keystone_sentry.info['public-address']
+        base_ep = "http://{}:5000".format(keystone_ip.strip().decode('utf-8'))
+        if api_version == 3:
+            self._initialize_keystone_v3()
+            ep = base_ep + '/v3'
+            os_options = {
+                'user_domain_name': self.demo_domain,
+                'project_domain_name': self.demo_domain,
+                'project_name': self.demo_project,
+            }
+            conn = swiftclient.client.Connection(
+                authurl=ep,
+                user=self.demo_user,
+                key='password',
+                os_options=os_options,
+                auth_version=api_version,
+            )
+        else:
+            ep = base_ep + '/v2.0'
+            conn = swiftclient.client.Connection(
+                authurl=ep,
+                user=self.demo_user,
+                key='password',
+                tenant_name=self.demo_tenant,
+                auth_version=api_version,
+            )
+        u.log.debug('Create container')
+        container = 'demo-container'
+        try:
+            conn.put_container(container)
+        except swiftclient.exceptions.ClientException as e:
+            if api_version == 3 and e.http_status == 409:
+                # Ceph RadosGW is currently configured with a global namespace
+                # for container names. Make use of this to verify that we
+                # cannot create a container with a name already taken by a
+                # same username authenticated in different domain in the
+                # previous run of this function. If / when we support per
+                # tenant namespace this logic must be replaced.
+                u.log.debug('v3 user not allowed to overwrite previously '
+                            'created container created by v2 user...OK')
+                container = 'demo-container-v3'
+                conn.put_container(container)
+            else:
+                raise(e)
+
+        resp_headers, containers = conn.get_account()
+        if (len(containers) and 'name' in containers[0] and
+                containers[0]['name'] == container):
+            u.log.debug('OK')
+        else:
+            amulet.raise_status(amulet.FAIL, 'container not created {} {}'
+                                ''.format(resp_headers, containers))
+
+    def test_403_swift_keystone_auth_v3(self):
+        if self._get_openstack_release() >= self.trusty_liberty:
+            self.test_403_swift_keystone_auth(api_version=3)
+        else:
+            u.log.debug('Skipping test for openstack_release < trusty_liberty')
+
     def test_498_radosgw_cmds_exit_zero(self):
         """Check basic functionality of radosgw cli commands against
         the ceph_radosgw unit."""
@@ -570,7 +717,6 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         assert self._wait_on_action(action_id), "Resume action failed."
         assert u.status_get(unit)[0] == "active"
         u.log.debug('OK')
-    # Note(beisner): need to add basic object store functional checks.
 
     # FYI: No restart check as ceph services do not restart
     # when charm config changes, unless monitor count increases.

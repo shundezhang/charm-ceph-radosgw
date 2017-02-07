@@ -73,7 +73,7 @@ class IdentityServiceContextTest(CharmTestCase):
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
     @patch.object(charmhelpers.contrib.openstack.context, 'log')
     def test_ids_ctxt(self, _log, _rids, _runits, _rget, _ctxt_comp,
-                      _format_ipv6_addr):
+                      _format_ipv6_addr, jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
         self.test_config.set('revocation-check-interval', '7500000')
@@ -84,6 +84,9 @@ class IdentityServiceContextTest(CharmTestCase):
         _rids.return_value = 'rid1'
         _runits.return_value = 'runit'
         _ctxt_comp.return_value = True
+        self.cmp_pkgrevno.return_value = -1
+        if jewel_installed:
+            self.cmp_pkgrevno.return_value = 0
         id_data = {
             'service_port': 9876,
             'service_host': '127.0.0.4',
@@ -114,7 +117,12 @@ class IdentityServiceContextTest(CharmTestCase):
             'service_protocol': 'http',
             'user_roles': 'Babel',
         }
+        if jewel_installed:
+            expect['auth_keystone_v3_supported'] = True
         self.assertEqual(expect, ids_ctxt())
+
+    def test_ids_ctxt_jewel(self):
+        self.test_ids_ctxt(jewel_installed=True)
 
     @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
     @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')

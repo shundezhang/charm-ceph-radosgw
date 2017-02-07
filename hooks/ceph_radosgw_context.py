@@ -79,6 +79,8 @@ class IdentityServiceContext(context.IdentityServiceContext):
                     ctxt['admin_token'] = \
                         relation_get('admin_token', unit, relid)
 
+        if cmp_pkgrevno('radosgw', "10.2.0") >= 0:
+            ctxt['auth_keystone_v3_supported'] = True
         ctxt['auth_type'] = 'keystone'
         ctxt['user_roles'] = config('operator-roles')
         ctxt['cache_size'] = config('cache-size')
