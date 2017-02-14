@@ -143,6 +143,12 @@ def config_changed():
     for r_id in relation_ids('cluster'):
         cluster_joined(rid=r_id)
 
+    # NOTE(jamespage): Re-exec mon relation for any changes to
+    #                  enable ceph pool permissions restrictions
+    for r_id in relation_ids('mon'):
+        for unit in related_units(r_id):
+            mon_relation(r_id, unit)
+
     CONFIGS.write_all()
 
     update_nrpe_config()
@@ -151,13 +157,14 @@ def config_changed():
 @hooks.hook('mon-relation-departed',
             'mon-relation-changed')
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
-def mon_relation():
+def mon_relation(rid=None, unit=None):
     rq = ceph.get_create_rgw_pools_rq(
         prefix=config('pool-prefix'))
     if is_request_complete(rq, relation='mon'):
         log('Broker request complete', level=DEBUG)
         CONFIGS.write_all()
-        key = relation_get('radosgw_key')
+        key = relation_get(attribute='radosgw_key',
+                           rid=rid, unit=unit)
         if key:
             ceph.import_radosgw_key(key)
             if not is_unit_paused_set():

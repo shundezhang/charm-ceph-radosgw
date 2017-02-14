@@ -233,20 +233,36 @@ class CephRadosGWCephTests(CharmTestCase):
         self.test_config.set('rgw-buckets-pool-weight', 19)
         ceph.get_create_rgw_pools_rq(prefix='us-east')
         mock_broker.assert_has_calls([
-            call(replica_count=3, weight=19, name='us-east.rgw.buckets'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.root'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.control'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.gc'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.index'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.extra'),
-            call(pg_num=10, replica_count=3, name='us-east.log'),
-            call(pg_num=10, replica_count=3, name='us-east.intent-log'),
-            call(pg_num=10, replica_count=3, name='us-east.usage'),
-            call(pg_num=10, replica_count=3, name='us-east.users'),
-            call(pg_num=10, replica_count=3, name='us-east.users.email'),
-            call(pg_num=10, replica_count=3, name='us-east.users.swift'),
-            call(pg_num=10, replica_count=3, name='us-east.users.uid')]
+            call(replica_count=3, weight=19, name='us-east.rgw.buckets',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.root',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.control',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.gc',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.index',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.extra',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.log',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.intent-log',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.usage',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.users',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.users.email',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.users.swift',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='us-east.users.uid',
+                 group='objects'),
+            call(pg_num=10, replica_count=3, name='.rgw.root',
+                 group='objects')]
         )
 
     @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: -1)
@@ -258,48 +274,85 @@ class CephRadosGWCephTests(CharmTestCase):
         self.test_config.set('rgw-buckets-pool-weight', 19)
         ceph.get_create_rgw_pools_rq(prefix=None)
         mock_broker.assert_has_calls([
-            call(weight=19, replica_count=3, name='.rgw.buckets'),
-            call(weight=0.10, replica_count=3, name='.rgw'),
-            call(weight=0.10, replica_count=3, name='.rgw.root'),
-            call(weight=0.10, replica_count=3, name='.rgw.control'),
-            call(weight=0.10, replica_count=3, name='.rgw.gc'),
-            call(weight=1.00, replica_count=3, name='.rgw.buckets.index'),
-            call(weight=1.00, replica_count=3, name='.rgw.buckets.extra'),
-            call(weight=0.10, replica_count=3, name='.log'),
-            call(weight=0.10, replica_count=3, name='.intent-log'),
-            call(weight=0.10, replica_count=3, name='.usage'),
-            call(weight=0.10, replica_count=3, name='.users'),
-            call(weight=0.10, replica_count=3, name='.users.email'),
-            call(weight=0.10, replica_count=3, name='.users.swift'),
-            call(weight=0.10, replica_count=3, name='.users.uid')]
+            call(weight=19, replica_count=3, name='.rgw.buckets',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.rgw',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.rgw.root',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.rgw.control',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.rgw.gc',
+                 group='objects'),
+            call(weight=1.00, replica_count=3, name='.rgw.buckets.index',
+                 group='objects'),
+            call(weight=1.00, replica_count=3, name='.rgw.buckets.extra',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.log',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.intent-log',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.usage',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.users',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.users.email',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.users.swift',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.users.uid',
+                 group='objects')]
         )
 
     @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: 0)
     @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_request_access_to_group')
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
            '.add_op_create_pool')
-    def test_create_rgw_pools_rq_no_prefix_post_jewel(self, mock_broker):
+    def test_create_rgw_pools_rq_no_prefix_post_jewel(self, mock_broker,
+                                                      mock_request_access):
         self.test_config.set('rgw-lightweight-pool-pg-num', -1)
         self.test_config.set('ceph-osd-replication-count', 3)
         self.test_config.set('rgw-buckets-pool-weight', 19)
+        self.test_config.set('restrict-ceph-pools', True)
         ceph.get_create_rgw_pools_rq(prefix=None)
         mock_broker.assert_has_calls([
-            call(weight=19, replica_count=3, name='default.rgw.buckets'),
-            call(weight=0.10, replica_count=3, name='default.rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.root'),
-            call(weight=0.10, replica_count=3, name='default.rgw.control'),
-            call(weight=0.10, replica_count=3, name='default.rgw.gc'),
+            call(weight=19, replica_count=3, name='default.rgw.buckets',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.rgw',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.rgw.root',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.rgw.control',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.rgw.gc',
+                 group='objects'),
             call(weight=1.00, replica_count=3,
-                 name='default.rgw.buckets.index'),
+                 name='default.rgw.buckets.index',
+                 group='objects'),
             call(weight=1.00, replica_count=3,
-                 name='default.rgw.buckets.extra'),
-            call(weight=0.10, replica_count=3, name='default.log'),
-            call(weight=0.10, replica_count=3, name='default.intent-log'),
-            call(weight=0.10, replica_count=3, name='default.usage'),
-            call(weight=0.10, replica_count=3, name='default.users'),
-            call(weight=0.10, replica_count=3, name='default.users.email'),
-            call(weight=0.10, replica_count=3, name='default.users.swift'),
-            call(weight=0.10, replica_count=3, name='default.users.uid')]
+                 name='default.rgw.buckets.extra',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.log',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.intent-log',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.usage',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.users',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.users.email',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.users.swift',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='default.users.uid',
+                 group='objects'),
+            call(weight=0.10, replica_count=3, name='.rgw.root',
+                 group='objects')]
         )
+        mock_request_access.assert_called_with(key_name='radosgw.gateway',
+                                               name='objects',
+                                               permission='rwx')
 
     @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: -1)
     @patch.object(utils, 'lsb_release',

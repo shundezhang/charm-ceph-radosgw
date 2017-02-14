@@ -250,6 +250,23 @@ def get_create_rgw_pools_rq(prefix=None):
           http://docs.ceph.com/docs/master/radosgw/config/#create-pools for
           list of supported/required pools.
     """
+    def _add_light_pool(rq, pool, pg_num, prefix=None):
+        # Per the Ceph PG Calculator, all of the lightweight pools get 0.10%
+        # of the data by default and only the .rgw.buckets.* get higher values
+        weights = {
+            '.rgw.buckets.index': 1.00,
+            '.rgw.buckets.extra': 1.00
+        }
+        w = weights.get(pool, 0.10)
+        if prefix:
+            pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
+        if pg_num > 0:
+            rq.add_op_create_pool(name=pool, replica_count=replicas,
+                                  pg_num=pg_num, group='objects')
+        else:
+            rq.add_op_create_pool(name=pool, replica_count=replicas,
+                                  weight=w, group='objects')
+
     from apt import apt_pkg
 
     apt_pkg.init()
@@ -272,7 +289,7 @@ def get_create_rgw_pools_rq(prefix=None):
     for pool in heavy:
         pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
         rq.add_op_create_pool(name=pool, replica_count=replicas,
-                              weight=bucket_weight)
+                              weight=bucket_weight, group='objects')
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
     # others since they are not expected to contain as much data
@@ -289,20 +306,18 @@ def get_create_rgw_pools_rq(prefix=None):
              '.users.email',
              '.users.swift',
              '.users.uid']
-    weights = {
-        '.rgw.buckets.index': 1.00,
-        '.rgw.buckets.extra': 1.00
-    }
     pg_num = config('rgw-lightweight-pool-pg-num')
     for pool in light:
-        # Per the Ceph PG Calculator, all of the lightweight pools get 0.10%
-        # of the data by default and only the .rgw.buckets.* get higher values
-        w = weights.get(pool, 0.10)
-        pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
-        if pg_num > 0:
-            rq.add_op_create_pool(name=pool, replica_count=replicas,
-                                  pg_num=pg_num)
-        else:
-            rq.add_op_create_pool(name=pool, replica_count=replicas, weight=w)
+        _add_light_pool(rq, pool, pg_num, prefix)
+
+    if prefix:
+        light_unprefixed = ['.rgw.root']
+        for pool in light_unprefixed:
+            _add_light_pool(rq, pool, pg_num)
+
+    if config('restrict-ceph-pools'):
+        rq.add_op_request_access_to_group(name="objects",
+                                          permission='rwx',
+                                          key_name='radosgw.gateway')
 
     return rq
