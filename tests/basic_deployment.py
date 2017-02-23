@@ -36,7 +36,7 @@ u = OpenStackAmuletUtils(DEBUG)
 class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
     """Amulet tests on a basic ceph-radosgw deployment."""
 
-    def __init__(self, series=None, openstack=None, source=None, stable=False):
+    def __init__(self, series=None, openstack=None, source=None, stable=True):
         """Deploy the entire test environment."""
         super(CephRadosGwBasicDeployment, self).__init__(series, openstack,
                                                          source, stable)
