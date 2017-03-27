@@ -35,7 +35,6 @@ from charmhelpers.core.hookenv import (
 )
 from charmhelpers.contrib.network.ip import (
     format_ipv6_addr,
-    get_host_ip,
     get_ipv6_addr,
 )
 from charmhelpers.contrib.storage.linux.ceph import CephConfContext
@@ -125,7 +124,7 @@ def ensure_host_resolvable_v6(hostname):
         shutil.rmtree(dtmp)
 
 
-class MonContext(context.OSContextGenerator):
+class MonContext(context.CephContext):
     interfaces = ['ceph-radosgw']
 
     def __call__(self):
@@ -133,17 +132,21 @@ class MonContext(context.OSContextGenerator):
             return {}
         mon_hosts = []
         auths = []
-        for relid in relation_ids('mon'):
-            for unit in related_units(relid):
-                ceph_public_addr = relation_get('ceph-public-address', unit,
-                                                relid)
-                if ceph_public_addr:
-                    host_ip = format_ipv6_addr(ceph_public_addr) or \
-                        get_host_ip(ceph_public_addr)
-                    mon_hosts.append('{}:6789'.format(host_ip))
-                    _auth = relation_get('auth', unit, relid)
-                    if _auth:
-                        auths.append(_auth)
+
+        for rid in relation_ids('mon'):
+            for unit in related_units(rid):
+                _auth = relation_get('auth', rid=rid, unit=unit)
+                if _auth:
+                    auths.append(_auth)
+
+                ceph_pub_addr = relation_get('ceph-public-address', rid=rid,
+                                             unit=unit)
+                unit_priv_addr = relation_get('private-address', rid=rid,
+                                              unit=unit)
+                ceph_addr = ceph_pub_addr or unit_priv_addr
+                ceph_addr = format_ipv6_addr(ceph_addr) or ceph_addr
+                if ceph_addr:
+                    mon_hosts.append(ceph_addr)
 
         if len(set(auths)) != 1:
             e = ("Inconsistent or absent auth returned by mon units. Setting "
