@@ -16,10 +16,7 @@
 
 import amulet
 import keystoneclient
-import subprocess
 import swiftclient
-import json
-import time
 from charmhelpers.contrib.openstack.amulet.deployment import (
     OpenStackAmuletDeployment
 )
@@ -123,32 +120,6 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                    'cinder': cinder_config,
                    'ceph': ceph_config}
         super(CephRadosGwBasicDeployment, self)._configure_services(configs)
-
-    def _run_action(self, unit_id, action, *args):
-        command = ["juju", "action", "do", "--format=json", unit_id, action]
-        command.extend(args)
-        print("Running command: %s\n" % " ".join(command))
-        output = subprocess.check_output(command)
-        output_json = output.decode(encoding="UTF-8")
-        data = json.loads(output_json)
-        action_id = data[u'Action queued with id']
-        return action_id
-
-    def _wait_on_action(self, action_id):
-        command = ["juju", "action", "fetch", "--format=json", action_id]
-        while True:
-            try:
-                output = subprocess.check_output(command)
-            except Exception as e:
-                print(e)
-                return False
-            output_json = output.decode(encoding="UTF-8")
-            data = json.loads(output_json)
-            if data[u"status"] == "completed":
-                return True
-            elif data[u"status"] == "failed":
-                return False
-            time.sleep(2)
 
     def _initialize_tests(self):
         """Perform final initialization before tests get run."""
@@ -705,16 +676,15 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         """The services can be paused and resumed. """
         u.log.debug('Checking pause and resume actions...')
         unit = self.ceph_radosgw_sentry
-        unit_name = unit.info['unit_name']
 
         assert u.status_get(unit)[0] == "active"
 
-        action_id = self._run_action(unit_name, "pause")
-        assert self._wait_on_action(action_id), "Pause action failed."
+        action_id = u.run_action(unit, "pause")
+        assert u.wait_on_action(action_id), "Pause action failed."
         assert u.status_get(unit)[0] == "maintenance"
 
-        action_id = self._run_action(unit_name, "resume")
-        assert self._wait_on_action(action_id), "Resume action failed."
+        action_id = u.run_action(unit, "resume")
+        assert u.wait_on_action(action_id), "Resume action failed."
         assert u.status_get(unit)[0] == "active"
         u.log.debug('OK')
 

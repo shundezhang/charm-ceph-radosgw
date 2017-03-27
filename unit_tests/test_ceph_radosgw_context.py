@@ -190,7 +190,7 @@ class MonContextTest(CharmTestCase):
         expect = {
             'auth_supported': 'cephx',
             'hostname': 'testhost',
-            'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
+            'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
@@ -203,6 +203,44 @@ class MonContextTest(CharmTestCase):
 
         self.test_config.set('prefer-ipv6', True)
         addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
+        expect['ipv6'] = True
+        expect['port'] = "[::]:%s" % (70)
+        self.assertEqual(expect, mon_ctxt())
+        self.assertTrue(mock_ensure_rsv_v6.called)
+
+    @patch.object(ceph, 'config', lambda *args:
+                  '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
+    @patch.object(context, 'ensure_host_resolvable_v6')
+    def test_list_of_addresses_from_ceph_proxy(self, mock_ensure_rsv_v6):
+        self.socket.gethostname.return_value = 'testhost'
+        mon_ctxt = context.MonContext()
+        addresses = ['10.5.4.1 10.5.4.2 10.5.4.3']
+
+        def _relation_get(attr, unit, rid):
+            if attr == 'ceph-public-address':
+                return addresses.pop()
+            elif attr == 'auth':
+                return 'cephx'
+
+        self.relation_get.side_effect = _relation_get
+        self.relation_ids.return_value = ['mon:6']
+        self.related_units.return_value = ['ceph-proxy/0']
+        expect = {
+            'auth_supported': 'cephx',
+            'hostname': 'testhost',
+            'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
+            'old_auth': False,
+            'use_syslog': 'false',
+            'loglevel': 1,
+            'port': 70,
+            'client_radosgw_gateway': {'rgw init timeout': 60},
+            'ipv6': False
+        }
+        self.assertEqual(expect, mon_ctxt())
+        self.assertFalse(mock_ensure_rsv_v6.called)
+
+        self.test_config.set('prefer-ipv6', True)
+        addresses = ['10.5.4.1 10.5.4.2 10.5.4.3']
         expect['ipv6'] = True
         expect['port'] = "[::]:%s" % (70)
         self.assertEqual(expect, mon_ctxt())
@@ -237,7 +275,7 @@ class MonContextTest(CharmTestCase):
         expect = {
             'auth_supported': 'none',
             'hostname': 'testhost',
-            'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
+            'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
@@ -266,7 +304,7 @@ class MonContextTest(CharmTestCase):
         expect = {
             'auth_supported': 'cephx',
             'hostname': 'testhost',
-            'mon_hosts': '10.5.4.1:6789 10.5.4.2:6789 10.5.4.3:6789',
+            'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
             'use_syslog': 'false',
             'loglevel': 1,
