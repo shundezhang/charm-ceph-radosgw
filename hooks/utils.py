@@ -48,6 +48,7 @@ from charmhelpers.core.host import (
     cmp_pkgrevno,
     lsb_release,
     mkdir,
+    CompareHostReleases,
 )
 from charmhelpers.fetch import (
     apt_cache,
@@ -203,7 +204,7 @@ def check_optional_relations(configs):
 
 def setup_ipv6():
     ubuntu_rel = lsb_release()['DISTRIB_CODENAME'].lower()
-    if ubuntu_rel < "trusty":
+    if CompareHostReleases(ubuntu_rel) < "trusty":
         raise Exception("IPv6 is not supported in the charms for Ubuntu "
                         "versions less than Trusty 14.04")
 
