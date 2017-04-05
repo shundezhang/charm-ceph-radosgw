@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from mock import (
-    patch,
+    patch, call
 )
 
 from test_utils import (
@@ -217,6 +217,28 @@ class CephRadosGWTests(CharmTestCase):
         _is_clustered.return_value = False
         self.assertEquals(ceph_hooks.canonical_url({}, PUBLIC),
                           'http://[%s]' % ipv6_addr)
+
+    @patch.object(ceph_hooks, 'get_address_in_network')
+    def test_cluster_joined(self, mock_get_addr):
+        addrs = {'10.0.0.0/24': '10.0.0.1',
+                 '10.0.1.0/24': '10.0.1.1',
+                 '10.0.2.0/24': '10.0.2.1'}
+
+        def fake_get_address_in_network(network):
+            return addrs.get(network)
+
+        mock_get_addr.side_effect = fake_get_address_in_network
+
+        self.test_config.set('os-public-network', '10.0.0.0/24')
+        self.test_config.set('os-admin-network', '10.0.1.0/24')
+        self.test_config.set('os-internal-network', '10.0.2.0/24')
+
+        ceph_hooks.cluster_joined()
+        self.relation_set.assert_has_calls(
+            [call(relation_id=None,
+                  **{'admin-address': '10.0.1.1',
+                     'internal-address': '10.0.2.1',
+                     'public-address': '10.0.0.1'})])
 
     def test_cluster_changed(self):
         _id_joined = self.patch('identity_joined')
