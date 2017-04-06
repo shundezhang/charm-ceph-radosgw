@@ -239,10 +239,7 @@ def cluster_joined(rid=None):
             config('os-{}-network'.format(addr_type))
         )
         if address:
-            relation_set(
-                relation_id=rid,
-                settings={'{}-address'.format(addr_type): address}
-            )
+            settings['{}-address'.format(addr_type)] = address
 
     if config('prefer-ipv6'):
         private_addr = get_ipv6_addr(exc_list=[config('vip')])[0]
