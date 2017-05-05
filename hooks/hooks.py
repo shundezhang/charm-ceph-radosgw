@@ -25,7 +25,6 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     related_units,
     config,
-    unit_get,
     open_port,
     relation_set,
     log,
@@ -43,8 +42,7 @@ from charmhelpers.fetch import (
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import cmp_pkgrevno
 from charmhelpers.contrib.network.ip import (
-    get_address_in_network,
-    get_ipv6_addr,
+    get_relation_ip,
     get_iface_for_address,
     get_netmask_for_address,
     is_ipv6,
@@ -175,7 +173,7 @@ def mon_relation(rid=None, unit=None):
 
 @hooks.hook('gateway-relation-joined')
 def gateway_relation():
-    relation_set(hostname=unit_get('private-address'),
+    relation_set(hostname=get_relation_ip('gateway-relation'),
                  port=config('port'))
 
 
@@ -235,17 +233,15 @@ def cluster_joined(rid=None):
     settings = {}
 
     for addr_type in ADDRESS_TYPES:
-        address = get_address_in_network(
-            config('os-{}-network'.format(addr_type))
-        )
+        address = get_relation_ip(
+            addr_type,
+            cidr_network=config('os-{}-network'.format(addr_type)))
         if address:
             settings['{}-address'.format(addr_type)] = address
 
-    if config('prefer-ipv6'):
-        private_addr = get_ipv6_addr(exc_list=[config('vip')])[0]
-        settings['private-address'] = private_addr
+    settings['private-address'] = get_relation_ip('cluster')
 
-    relation_set(relation_id=rid, **settings)
+    relation_set(relation_id=rid, relation_settings=settings)
 
 
 @hooks.hook('cluster-relation-changed')

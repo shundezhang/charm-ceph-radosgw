@@ -50,9 +50,9 @@ TO_PATCH = [
     'status_set',
     'subprocess',
     'sys',
-    'unit_get',
     'get_hacluster_config',
     'update_dns_ha_resource_params',
+    'get_relation_ip',
 ]
 
 
@@ -125,9 +125,9 @@ class CephRadosGWTests(CharmTestCase):
         self.assertTrue(mock_send_request_if_needed.called)
 
     def test_gateway_relation(self):
-        self.unit_get.return_value = 'myserver'
+        self.get_relation_ip.return_value = '10.0.0.1'
         ceph_hooks.gateway_relation()
-        self.relation_set.assert_called_with(hostname='myserver', port=80)
+        self.relation_set.assert_called_with(hostname='10.0.0.1', port=80)
 
     def test_start(self):
         ceph_hooks.start()
@@ -166,7 +166,6 @@ class CephRadosGWTests(CharmTestCase):
         _config.side_effect = self.test_config.get
         self.test_config.set('region', 'region1')
         self.test_config.set('operator-roles', 'admin')
-        self.unit_get.return_value = 'myserv'
         ceph_hooks.identity_joined(relid='rid')
         self.relation_set.assert_called_with(
             service='swift',
@@ -218,17 +217,11 @@ class CephRadosGWTests(CharmTestCase):
         self.assertEquals(ceph_hooks.canonical_url({}, PUBLIC),
                           'http://[%s]' % ipv6_addr)
 
-    @patch.object(ceph_hooks, 'get_address_in_network')
-    def test_cluster_joined(self, mock_get_addr):
-        addrs = {'10.0.0.0/24': '10.0.0.1',
-                 '10.0.1.0/24': '10.0.1.1',
-                 '10.0.2.0/24': '10.0.2.1'}
-
-        def fake_get_address_in_network(network):
-            return addrs.get(network)
-
-        mock_get_addr.side_effect = fake_get_address_in_network
-
+    def test_cluster_joined(self):
+        self.get_relation_ip.side_effect = ['10.0.0.1',
+                                            '10.0.1.1',
+                                            '10.0.2.1',
+                                            '10.0.3.1']
         self.test_config.set('os-public-network', '10.0.0.0/24')
         self.test_config.set('os-admin-network', '10.0.1.0/24')
         self.test_config.set('os-internal-network', '10.0.2.0/24')
@@ -236,9 +229,11 @@ class CephRadosGWTests(CharmTestCase):
         ceph_hooks.cluster_joined()
         self.relation_set.assert_has_calls(
             [call(relation_id=None,
-                  **{'admin-address': '10.0.1.1',
-                     'internal-address': '10.0.2.1',
-                     'public-address': '10.0.0.1'})])
+                  relation_settings={
+                      'admin-address': '10.0.0.1',
+                      'public-address': '10.0.2.1',
+                      'internal-address': '10.0.1.1',
+                      'private-address': '10.0.3.1'})])
 
     def test_cluster_changed(self):
         _id_joined = self.patch('identity_joined')
