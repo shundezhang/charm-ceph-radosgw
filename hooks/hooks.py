@@ -40,7 +40,10 @@ from charmhelpers.fetch import (
     filter_installed_packages,
 )
 from charmhelpers.payload.execd import execd_preinstall
-from charmhelpers.core.host import cmp_pkgrevno
+from charmhelpers.core.host import (
+    cmp_pkgrevno,
+    is_container,
+)
 from charmhelpers.contrib.network.ip import (
     get_relation_ip,
     get_iface_for_address,
@@ -103,6 +106,8 @@ APACHE_PACKAGES = [
 def install_packages():
     add_source(config('source'), config('key'))
     apt_update(fatal=True)
+    if is_container():
+        PACKAGES.remove('ntp')
     pkgs = filter_installed_packages(PACKAGES)
     if pkgs:
         status_set('maintenance', 'Installing radosgw packages')
