@@ -28,6 +28,7 @@ from test_utils import CharmTestCase
 TO_PATCH = [
     'application_version_set',
     'get_upstream_version',
+    'format_endpoint',
 ]
 
 
@@ -103,9 +104,11 @@ class CephRadosGWUtilTests(CharmTestCase):
         auth_port = 80
         admin_token = '666'
         auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
+        self.format_endpoint.return_value = auth_url
         mock_relation_get.return_value = {'auth_host': auth_host,
                                           'auth_port': auth_port,
-                                          'admin_token': admin_token}
+                                          'admin_token': admin_token,
+                                          'api_version': '2'}
         utils.setup_keystone_certs()
         mock_get_ks_signing_cert.assert_has_calls([call(admin_token, auth_url,
                                                         '/var/lib/ceph/nss')])

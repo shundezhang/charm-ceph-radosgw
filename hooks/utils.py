@@ -43,6 +43,9 @@ from charmhelpers.contrib.openstack.utils import (
     pause_unit,
     resume_unit,
 )
+from charmhelpers.contrib.openstack.keystone import (
+    format_endpoint,
+)
 from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
 from charmhelpers.core.host import (
     cmp_pkgrevno,
@@ -435,7 +438,7 @@ def setup_keystone_certs(unit=None, rid=None):
         mkdir(certs_path)
 
     rdata = relation_get(unit=unit, rid=rid)
-    required = ['admin_token', 'auth_host', 'auth_port']
+    required = ['admin_token', 'auth_host', 'auth_port', 'api_version']
     settings = {key: rdata.get(key) for key in required}
     if not all(settings.values()):
         log("Missing relation settings ({}) - deferring cert setup".format(
@@ -447,9 +450,10 @@ def setup_keystone_certs(unit=None, rid=None):
     if is_ipv6(settings.get('auth_host')):
         settings['auth_host'] = format_ipv6_addr(settings.get('auth_host'))
 
-    auth_endpoint = "{}://{}:{}/v2.0".format(auth_protocol,
-                                             settings['auth_host'],
-                                             settings['auth_port'])
+    auth_endpoint = format_endpoint(auth_protocol,
+                                    settings['auth_host'],
+                                    settings['auth_port'],
+                                    settings['api_version'])
 
     try:
         get_ks_ca_cert(settings['admin_token'], auth_endpoint, certs_path)
