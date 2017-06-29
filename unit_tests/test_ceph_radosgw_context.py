@@ -28,6 +28,7 @@ TO_PATCH = [
     'related_units',
     'cmp_pkgrevno',
     'socket',
+    'unit_public_ip',
 ]
 
 
@@ -170,6 +171,7 @@ class MonContextTest(CharmTestCase):
     def setUp(self):
         super(MonContextTest, self).setUp(context, TO_PATCH)
         self.config.side_effect = self.test_config.get
+        self.unit_public_ip.return_value = '10.255.255.255'
 
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
@@ -193,6 +195,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,
             'port': 70,
@@ -231,6 +234,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,
             'port': 70,
@@ -278,6 +282,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,
             'port': 70,
@@ -307,6 +312,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,
             'port': 70,
