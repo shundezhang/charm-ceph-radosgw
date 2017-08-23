@@ -73,12 +73,14 @@ try:
         from keystoneclient.exceptions import (
             ConnectionRefused,
             Forbidden,
+            InternalServerError,
         )
     except ImportError:
         # Juno and older
         from keystoneclient.exceptions import (
             ConnectionError as ConnectionRefused,
             Forbidden,
+            InternalServerError,
         )
 except ImportError:
     keystoneclient = None
@@ -352,7 +354,8 @@ def get_ks_cert(ksclient, auth_endpoint, cert_type):
             # Juno and older
             cert = requests.request('GET', "{}/certificates/{}".
                                     format(auth_endpoint, cert_type)).text
-    except (ConnectionRefused, requests.exceptions.ConnectionError, Forbidden):
+    except (ConnectionRefused, requests.exceptions.ConnectionError,
+            Forbidden, InternalServerError):
         raise KSCertSetupException("Error connecting to keystone")
 
     return cert
