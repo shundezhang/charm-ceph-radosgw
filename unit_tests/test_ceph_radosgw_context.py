@@ -29,6 +29,7 @@ TO_PATCH = [
     'cmp_pkgrevno',
     'socket',
     'unit_public_ip',
+    'determine_api_port'
 ]
 
 
@@ -54,6 +55,7 @@ class HAProxyContextTests(CharmTestCase):
         _haconfig.side_effect = self.test_config.get
         _harelation_ids.return_value = []
         haproxy_context = context.HAProxyContext()
+        self.determine_api_port.return_value = 70
         expect = {
             'cephradosgw_bind_port': 70,
             'service_ports': {'cephradosgw-server': [80, 70]}
@@ -190,6 +192,7 @@ class MonContextTest(CharmTestCase):
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.determine_api_port.return_value = 70
         expect = {
             'auth_supported': 'cephx',
             'hostname': 'testhost',
@@ -229,6 +232,7 @@ class MonContextTest(CharmTestCase):
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph-proxy/0']
+        self.determine_api_port.return_value = 70
         expect = {
             'auth_supported': 'cephx',
             'hostname': 'testhost',
@@ -277,6 +281,7 @@ class MonContextTest(CharmTestCase):
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.determine_api_port.return_value = 70
         expect = {
             'auth_supported': 'none',
             'hostname': 'testhost',
@@ -307,6 +312,7 @@ class MonContextTest(CharmTestCase):
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.determine_api_port.return_value = 70
         expect = {
             'auth_supported': 'cephx',
             'hostname': 'testhost',

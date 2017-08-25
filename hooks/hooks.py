@@ -44,6 +44,7 @@ from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import (
     cmp_pkgrevno,
     is_container,
+    service_reload,
 )
 from charmhelpers.contrib.network.ip import (
     get_relation_ip,
@@ -78,6 +79,7 @@ from utils import (
     services,
     assess_status,
     setup_keystone_certs,
+    disable_unused_apache_sites,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 from charmhelpers.contrib.hardening.harden import harden
@@ -96,11 +98,11 @@ PACKAGES = [
                    # since python-keystoneclient does not pull in icehouse
                    # version
     'radosgw',
+    'apache2'
 ]
 
 APACHE_PACKAGES = [
     'libapache2-mod-fastcgi',
-    'apache2',
 ]
 
 
@@ -114,6 +116,7 @@ def install_packages():
         status_set('maintenance', 'Installing radosgw packages')
         apt_install(PACKAGES, fatal=True)
     apt_purge(APACHE_PACKAGES)
+    disable_unused_apache_sites()
 
 
 @hooks.hook('install.real')
@@ -136,6 +139,7 @@ def install():
 @harden()
 def config_changed():
     install_packages()
+    disable_unused_apache_sites()
 
     if config('prefer-ipv6'):
         status_set('maintenance', 'configuring ipv6')
@@ -154,6 +158,7 @@ def config_changed():
             mon_relation(r_id, unit)
 
     CONFIGS.write_all()
+    configure_https()
 
     update_nrpe_config()
 
@@ -205,23 +210,17 @@ def identity_joined(relid=None):
         sys.exit(1)
 
     port = config('port')
-    admin_url = '%s:%i/swift' % (canonical_url(None, ADMIN), port)
+    admin_url = '%s:%i/swift' % (canonical_url(CONFIGS, ADMIN), port)
     internal_url = '%s:%s/swift/v1' % \
-        (canonical_url(None, INTERNAL), port)
+        (canonical_url(CONFIGS, INTERNAL), port)
     public_url = '%s:%s/swift/v1' % \
-        (canonical_url(None, PUBLIC), port)
+        (canonical_url(CONFIGS, PUBLIC), port)
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
                  admin_url=admin_url,
                  requested_roles=config('operator-roles'),
                  relation_id=relid)
-
-    if relid:
-        for unit in related_units(relid):
-            setup_keystone_certs(unit=unit, rid=relid)
-    else:
-        setup_keystone_certs()
 
 
 @hooks.hook('identity-service-relation-changed')
@@ -231,6 +230,7 @@ def identity_changed(relid=None):
     CONFIGS.write_all()
     if not is_unit_paused_set():
         restart()
+    configure_https()
 
 
 @hooks.hook('cluster-relation-joined')
@@ -349,6 +349,32 @@ def update_nrpe_config():
     nrpe.add_init_service_checks(nrpe_setup, services(), current_unit)
     nrpe.add_haproxy_checks(nrpe_setup, current_unit)
     nrpe_setup.write()
+
+
+def configure_https():
+    '''Enables SSL API Apache config if appropriate and kicks
+    identity-service and image-service with any required
+    updates
+    '''
+    CONFIGS.write_all()
+    if 'https' in CONFIGS.complete_contexts():
+        cmd = ['a2ensite', 'openstack_https_frontend']
+        subprocess.check_call(cmd)
+    else:
+        cmd = ['a2dissite', 'openstack_https_frontend']
+        try:
+            subprocess.check_call(cmd)
+        except subprocess.CalledProcessError:
+            # The site is not yet enabled or
+            # https is not configured
+            pass
+
+    # TODO: improve this by checking if local CN certs are available
+    # first then checking reload status (see LP #1433114).
+    if not is_unit_paused_set():
+        service_reload('apache2', restart_on_failure=True)
+
+    setup_keystone_certs(CONFIGS)
 
 
 @hooks.hook('update-status')

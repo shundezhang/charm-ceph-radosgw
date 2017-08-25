@@ -53,6 +53,9 @@ TO_PATCH = [
     'get_hacluster_config',
     'update_dns_ha_resource_params',
     'get_relation_ip',
+    'disable_unused_apache_sites',
+    'service_reload',
+    'setup_keystone_certs',
 ]
 
 
@@ -69,8 +72,7 @@ class CephRadosGWTests(CharmTestCase):
         ceph_hooks.install_packages()
         self.add_source.assert_called_with('distro', 'secretkey')
         self.assertTrue(self.apt_update.called)
-        self.apt_purge.assert_called_with(['libapache2-mod-fastcgi',
-                                           'apache2'])
+        self.apt_purge.assert_called_with(['libapache2-mod-fastcgi'])
 
     def test_install(self):
         _install_packages = self.patch('install_packages')
@@ -144,15 +146,12 @@ class CephRadosGWTests(CharmTestCase):
         cmd = ['service', 'radosgw', 'restart']
         self.subprocess.call.assert_called_with(cmd)
 
-    @patch.object(ceph_hooks, 'setup_keystone_certs')
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.config')
-    def test_identity_joined_early_version(self, _config,
-                                           mock_setup_keystone_certs):
+    def test_identity_joined_early_version(self, _config):
         self.cmp_pkgrevno.return_value = -1
         ceph_hooks.identity_joined()
-        self.assertTrue(mock_setup_keystone_certs.called)
         self.sys.exit.assert_called_with(1)
 
     @patch('charmhelpers.contrib.openstack.ip.service_name',

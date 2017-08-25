@@ -28,6 +28,7 @@ from charmhelpers.core.hookenv import (
     INFO,
     relation_get,
     relation_ids,
+    related_units,
     application_version_set,
 )
 from charmhelpers.contrib.network.ip import (
@@ -46,7 +47,10 @@ from charmhelpers.contrib.openstack.utils import (
 from charmhelpers.contrib.openstack.keystone import (
     format_endpoint,
 )
-from charmhelpers.contrib.hahelpers.cluster import get_hacluster_config
+from charmhelpers.contrib.hahelpers.cluster import (
+    get_hacluster_config,
+    https,
+)
 from charmhelpers.core.host import (
     cmp_pkgrevno,
     lsb_release,
@@ -104,6 +108,12 @@ CEPH_CONF = '/etc/ceph/ceph.conf'
 
 VERSION_PACKAGE = 'radosgw'
 
+UNUSED_APACHE_SITE_FILES = ["/etc/apache2/sites-available/000-default.conf"]
+APACHE_PORTS_FILE = "/etc/apache2/ports.conf"
+APACHE_SITE_CONF = '/etc/apache2/sites-available/openstack_https_frontend'
+APACHE_SITE_24_CONF = '/etc/apache2/sites-available/' \
+    'openstack_https_frontend.conf'
+
 BASE_RESOURCE_MAP = OrderedDict([
     (HAPROXY_CONF, {
         'contexts': [context.HAProxyContext(singlenode_mode=True),
@@ -113,6 +123,14 @@ BASE_RESOURCE_MAP = OrderedDict([
     (CEPH_CONF, {
         'contexts': [ceph_radosgw_context.MonContext()],
         'services': ['radosgw'],
+    }),
+    (APACHE_SITE_CONF, {
+        'contexts': [ceph_radosgw_context.ApacheSSLContext()],
+        'services': ['apache2'],
+    }),
+    (APACHE_SITE_24_CONF, {
+        'contexts': [ceph_radosgw_context.ApacheSSLContext()],
+        'services': ['apache2'],
     }),
 ])
 
@@ -131,6 +149,12 @@ def resource_map():
     These will be managed for a single hook execution.
     """
     resource_map = deepcopy(BASE_RESOURCE_MAP)
+
+    if os.path.exists('/etc/apache2/conf-available'):
+        resource_map.pop(APACHE_SITE_CONF)
+    else:
+        resource_map.pop(APACHE_SITE_24_CONF)
+
     return resource_map
 
 
@@ -156,7 +180,10 @@ def services():
     _services = []
     for v in BASE_RESOURCE_MAP.values():
         _services.extend(v.get('services', []))
-    return list(set(_services))
+    _set_services = set(_services)
+    if not https():
+        _set_services.remove('apache2')
+    return list(_set_services)
 
 
 def enable_pocket(pocket):
@@ -370,7 +397,9 @@ def get_ks_ca_cert(admin_token, auth_endpoint, certs_path):
     :param certs_path: Path to local certs store
     :returns: None
     """
-    ksclient = client.Client(token=admin_token, endpoint=auth_endpoint)
+
+    ksclient = keystoneclient.httpclient.HTTPClient(token=admin_token,
+                                                    endpoint=auth_endpoint)
     ca_cert = get_ks_cert(ksclient, auth_endpoint, 'ca')
     if ca_cert:
         try:
@@ -428,7 +457,7 @@ def get_ks_signing_cert(admin_token, auth_endpoint, certs_path):
 
 
 @defer_if_unavailable(['keystoneclient'])
-def setup_keystone_certs(unit=None, rid=None):
+def setup_keystone_certs(CONFIGS):
     """
     Get CA and signing certs from Keystone used to decrypt revoked token list.
 
@@ -440,14 +469,20 @@ def setup_keystone_certs(unit=None, rid=None):
     if not os.path.exists(certs_path):
         mkdir(certs_path)
 
-    rdata = relation_get(unit=unit, rid=rid)
-    required = ['admin_token', 'auth_host', 'auth_port', 'api_version']
-    settings = {key: rdata.get(key) for key in required}
-    if not all(settings.values()):
-        log("Missing relation settings ({}) - deferring cert setup".format(
-            ', '.join([k for k in settings if not settings[k]])),
+    # Do not continue until identity-relation is complete
+    if 'identity-service' not in CONFIGS.complete_contexts():
+        log("Missing relation settings - deferring cert setup",
             level=DEBUG)
         return
+    rdata = {}
+    for relid in relation_ids('identity-service'):
+        for unit in related_units(relid):
+            rdata = relation_get(unit=unit, rid=relid)
+            if rdata:
+                break
+
+    required = ['admin_token', 'auth_host', 'auth_port', 'api_version']
+    settings = {key: rdata.get(key) for key in required}
 
     auth_protocol = rdata.get('auth_protocol', 'http')
     if is_ipv6(settings.get('auth_host')):
@@ -463,3 +498,21 @@ def setup_keystone_certs(unit=None, rid=None):
         get_ks_signing_cert(settings['admin_token'], auth_endpoint, certs_path)
     except KSCertSetupException as e:
         log("Keystone certs setup incomplete - {}".format(e), level=INFO)
+
+
+def disable_unused_apache_sites():
+    """Ensure that unused apache configurations are disabled to prevent them
+    from conflicting with the charm-provided version.
+    """
+    for apache_site_file in UNUSED_APACHE_SITE_FILES:
+        apache_site = apache_site_file.split('/')[-1].split('.')[0]
+        if os.path.exists(apache_site_file):
+            try:
+                # Try it cleanly
+                subprocess.check_call(['a2dissite', apache_site])
+            except subprocess.CalledProcessError:
+                # Remove the file
+                os.remove(apache_site_file)
+
+    with open(APACHE_PORTS_FILE, 'w') as ports:
+        ports.write("")
