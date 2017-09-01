@@ -275,3 +275,49 @@ options:
     description: |
       A comma-separated list of nagios servicegroups. If left empty,
       the nagios_context will be used as the servicegroup
+  # HAProxy Parameters
+  haproxy-server-timeout:
+    type: int
+    default:
+    description: |
+      Server timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 30000ms is used.
+  haproxy-client-timeout:
+    type: int
+    default:
+    description: |
+      Client timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 30000ms is used.
+  haproxy-queue-timeout:
+    type: int
+    default:
+    description: |
+      Queue timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 5000ms is used.
+  haproxy-connect-timeout:
+    type: int
+    default:
+    description: |
+      Connect timeout configuration in ms for haproxy, used in HA
+      configurations. If not provided, default value of 5000ms is used.
+
+  # External SSL Parameters
+  ssl_cert:
+    type: string
+    default:
+    description: |
+      SSL certificate to install and use for API ports. Setting this value
+      and ssl_key will enable reverse proxying, point Glance's entry in the
+      Keystone catalog to use https, and override any certificate and key
+      issued by Keystone (if it is configured to do so).
+  ssl_key:
+    type: string
+    default:
+    description: SSL key to use with certificate specified as ssl_cert.
+  ssl_ca:
+    type: string
+    default:
+    description: |
+      SSL CA to use with the certificate and key provided - this is only
+      required if you are providing a privately signed ssl_cert and ssl_key.
+

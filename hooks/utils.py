@@ -25,6 +25,7 @@ import ceph_radosgw_context
 from charmhelpers.core.hookenv import (
     log,
     DEBUG,
+    ERROR,
     INFO,
     relation_get,
     relation_ids,
@@ -72,6 +73,7 @@ from charmhelpers.fetch import (
 try:
     import keystoneclient
     from keystoneclient.v2_0 import client
+    from keystoneclient.v3 import client as client_v3
     try:
         # Kilo and newer
         from keystoneclient.exceptions import (
@@ -362,25 +364,32 @@ def defer_if_unavailable(modules):
 def get_ks_cert(ksclient, auth_endpoint, cert_type):
     """Get certificate from keystone.
 
-    :param admin_token: Keystone admin token
+    :param ksclient: Keystone client
     :param auth_endpoint: Keystone auth endpoint url
     :param certs_path: Path to local certs store
     :returns: certificate
     """
+    if ksclient.version == 'v3':
+        if cert_type == 'signing':
+            cert_type = 'certificates'
+        request = ("{}OS-SIMPLE-CERT/{}"
+                   "".format(auth_endpoint, cert_type))
+    else:
+        request = "{}/certificates/{}".format(auth_endpoint, cert_type)
+
     try:
         try:
             # Kilo and newer
             if cert_type == 'ca':
                 cert = ksclient.certificates.get_ca_certificate()
-            elif cert_type == 'signing':
+            elif cert_type in ['signing', 'certificates']:
                 cert = ksclient.certificates.get_signing_certificate()
             else:
                 raise KSCertSetupException("Invalid cert type "
                                            "'{}'".format(cert_type))
         except AttributeError:
-            # Juno and older
-            cert = requests.request('GET', "{}/certificates/{}".
-                                    format(auth_endpoint, cert_type)).text
+            # Keystone v3 or Juno and older
+            cert = requests.request('GET', request).text
     except (ConnectionRefused, requests.exceptions.ConnectionError,
             Forbidden, InternalServerError):
         raise KSCertSetupException("Error connecting to keystone")
@@ -389,17 +398,15 @@ def get_ks_cert(ksclient, auth_endpoint, cert_type):
 
 
 @defer_if_unavailable(['keystoneclient'])
-def get_ks_ca_cert(admin_token, auth_endpoint, certs_path):
+def get_ks_ca_cert(ksclient, auth_endpoint, certs_path):
     """"Get and store keystone CA certificate.
 
-    :param admin_token: Keystone admin token
+    :param ksclient: Keystone client
     :param auth_endpoint: Keystone auth endpoint url
     :param certs_path: Path to local certs store
     :returns: None
     """
 
-    ksclient = keystoneclient.httpclient.HTTPClient(token=admin_token,
-                                                    endpoint=auth_endpoint)
     ca_cert = get_ks_cert(ksclient, auth_endpoint, 'ca')
     if ca_cert:
         try:
@@ -424,15 +431,14 @@ def get_ks_ca_cert(admin_token, auth_endpoint, certs_path):
 
 
 @defer_if_unavailable(['keystoneclient'])
-def get_ks_signing_cert(admin_token, auth_endpoint, certs_path):
+def get_ks_signing_cert(ksclient, auth_endpoint, certs_path):
     """"Get and store keystone signing certificate.
 
-    :param admin_token: Keystone admin token
+    :param ksclient: Keystone client
     :param auth_endpoint: Keystone auth endpoint url
     :param certs_path: Path to local certs store
     :returns: None
     """
-    ksclient = client.Client(token=admin_token, endpoint=auth_endpoint)
     signing_cert = get_ks_cert(ksclient, auth_endpoint, 'signing')
     if signing_cert:
         try:
@@ -474,8 +480,32 @@ def setup_keystone_certs(CONFIGS):
         log("Missing relation settings - deferring cert setup",
             level=DEBUG)
         return
+
+    ksclient = get_keystone_client_from_relation()
+    if not ksclient:
+        log("Failed to get keystoneclient", level=ERROR)
+        return
+
+    auth_endpoint = ksclient.auth_endpoint
+
+    try:
+        get_ks_ca_cert(ksclient, auth_endpoint, certs_path)
+        get_ks_signing_cert(ksclient, auth_endpoint, certs_path)
+    except KSCertSetupException as e:
+        log("Keystone certs setup incomplete - {}".format(e), level=INFO)
+
+
+# TODO: Move to charmhelpers
+# TODO: Make it session aware
+def get_keystone_client_from_relation(relation_type='identity-service'):
+    """ Get keystone client from relation data
+
+    :param relation_type: Relation to keystone
+    :returns: Keystone client
+    """
+
     rdata = {}
-    for relid in relation_ids('identity-service'):
+    for relid in relation_ids(relation_type):
         for unit in related_units(relid):
             rdata = relation_get(unit=unit, rid=relid)
             if rdata:
@@ -488,16 +518,21 @@ def setup_keystone_certs(CONFIGS):
     if is_ipv6(settings.get('auth_host')):
         settings['auth_host'] = format_ipv6_addr(settings.get('auth_host'))
 
+    api_version = rdata.get('api_version')
     auth_endpoint = format_endpoint(auth_protocol,
                                     settings['auth_host'],
                                     settings['auth_port'],
                                     settings['api_version'])
 
-    try:
-        get_ks_ca_cert(settings['admin_token'], auth_endpoint, certs_path)
-        get_ks_signing_cert(settings['admin_token'], auth_endpoint, certs_path)
-    except KSCertSetupException as e:
-        log("Keystone certs setup incomplete - {}".format(e), level=INFO)
+    if api_version and '3' in api_version:
+        ksclient = client_v3.Client(token=settings['admin_token'],
+                                    endpoint=auth_endpoint)
+    else:
+        ksclient = client.Client(token=settings['admin_token'],
+                                 endpoint=auth_endpoint)
+    # Add simple way to retrieve keystone auth endpoint
+    ksclient.auth_endpoint = auth_endpoint
+    return ksclient
 
 
 def disable_unused_apache_sites():
