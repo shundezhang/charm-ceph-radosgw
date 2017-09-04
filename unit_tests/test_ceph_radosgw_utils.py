@@ -121,11 +121,11 @@ class CephRadosGWUtilTests(CharmTestCase):
     @patch.object(utils, 'relation_ids')
     @patch.object(utils, 'is_ipv6', lambda addr: False)
     @patch.object(utils, 'relation_get')
-    def test_get_keystone_client_from_relation(self, mock_relation_get,
-                                               mock_relation_ids,
-                                               mock_related_units,
-                                               mock_client,
-                                               mock_client_v3):
+    def test_get_ks_client_from_relation(self, mock_relation_get,
+                                         mock_relation_ids,
+                                         mock_related_units,
+                                         mock_client,
+                                         mock_client_v3):
         auth_host = 'foo/bar'
         auth_port = 80
         admin_token = '666'
@@ -150,6 +150,27 @@ class CephRadosGWUtilTests(CharmTestCase):
         utils.get_keystone_client_from_relation()
         mock_client_v3.Client.assert_called_with(endpoint=auth_url,
                                                  token=admin_token)
+
+    @patch.object(utils, 'client_v3')
+    @patch.object(utils, 'client')
+    @patch.object(utils, 'related_units')
+    @patch.object(utils, 'relation_ids')
+    @patch.object(utils, 'is_ipv6', lambda addr: False)
+    @patch.object(utils, 'relation_get')
+    def test_get_ks_client_from_relation_not_available(self, mock_relation_get,
+                                                       mock_relation_ids,
+                                                       mock_related_units,
+                                                       mock_client,
+                                                       mock_client_v3):
+        mock_relation_ids.return_value = ['identity-service:5']
+        mock_related_units.return_value = ['keystone/1']
+        rel_data = {'auth_port': '5000',
+                    'admin_token': 'foo',
+                    'api_version': '2'}
+
+        mock_relation_get.return_value = rel_data
+        ksclient = utils.get_keystone_client_from_relation()
+        self.assertIsNone(ksclient)
 
     @patch.object(utils, 'get_ks_cert')
     @patch.object(utils.subprocess, 'Popen')

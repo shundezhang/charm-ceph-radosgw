@@ -503,16 +503,21 @@ def get_keystone_client_from_relation(relation_type='identity-service'):
     :param relation_type: Relation to keystone
     :returns: Keystone client
     """
+    required = ['admin_token', 'auth_host', 'auth_port', 'api_version']
+    settings = {}
 
     rdata = {}
     for relid in relation_ids(relation_type):
         for unit in related_units(relid):
-            rdata = relation_get(unit=unit, rid=relid)
-            if rdata:
+            rdata = relation_get(unit=unit, rid=relid) or {}
+            if set(required).issubset(set(rdata.keys())):
+                settings = {key: rdata.get(key) for key in required}
                 break
 
-    required = ['admin_token', 'auth_host', 'auth_port', 'api_version']
-    settings = {key: rdata.get(key) for key in required}
+    if not settings:
+        log("Required settings not yet provided by any identity-service "
+            "relation units", INFO)
+        return None
 
     auth_protocol = rdata.get('auth_protocol', 'http')
     if is_ipv6(settings.get('auth_host')):
