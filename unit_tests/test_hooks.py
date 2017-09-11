@@ -213,8 +213,8 @@ class CephRadosGWTests(CharmTestCase):
         _config.side_effect = self.test_config.get
         _unit_get.return_value = ipv6_addr
         _is_clustered.return_value = False
-        self.assertEquals(ceph_hooks.canonical_url({}, PUBLIC),
-                          'http://[%s]' % ipv6_addr)
+        self.assertEqual(ceph_hooks.canonical_url({}, PUBLIC),
+                         'http://[%s]' % ipv6_addr)
 
     def test_cluster_joined(self):
         self.get_relation_ip.side_effect = ['10.0.0.1',

@@ -165,7 +165,7 @@ class IdentityServiceContextTest(CharmTestCase):
     def test_ids_ctxt_no_rels(self, _log, _rids):
         _rids.return_value = []
         ids_ctxt = context.IdentityServiceContext()
-        self.assertEquals(ids_ctxt(), None)
+        self.assertEqual(ids_ctxt(), None)
 
 
 class MonContextTest(CharmTestCase):
