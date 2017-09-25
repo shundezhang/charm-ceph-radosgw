@@ -389,7 +389,11 @@ def get_ks_cert(ksclient, auth_endpoint, cert_type):
                                            "'{}'".format(cert_type))
         except AttributeError:
             # Keystone v3 or Juno and older
-            cert = requests.request('GET', request).text
+            response = requests.request('GET', request)
+            if response.status_code == requests.codes.ok:
+                cert = response.text
+            else:
+                raise KSCertSetupException("Unable to retrieve certificate")
     except (ConnectionRefused, requests.exceptions.ConnectionError,
             Forbidden, InternalServerError):
         raise KSCertSetupException("Error connecting to keystone")
