@@ -66,7 +66,8 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             {'name': 'rabbitmq-server'},
             {'name': 'nova-compute'},
             {'name': 'glance'},
-            {'name': 'cinder'}
+            {'name': 'cinder'},
+            {'name': 'cinder-ceph'},
         ]
         super(CephRadosGwBasicDeployment, self)._add_services(this_service,
                                                               other_services)
@@ -87,9 +88,10 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'cinder:identity-service': 'keystone:identity-service',
             'cinder:amqp': 'rabbitmq-server:amqp',
             'cinder:image-service': 'glance:image-service',
-            'cinder:ceph': 'ceph:client',
+            'cinder-ceph:storage-backend': 'cinder:storage-backend',
+            'cinder-ceph:ceph': 'ceph:client',
             'ceph-radosgw:mon': 'ceph:radosgw',
-            'ceph-radosgw:identity-service': 'keystone:identity-service'
+            'ceph-radosgw:identity-service': 'keystone:identity-service',
         }
         super(CephRadosGwBasicDeployment, self)._add_relations(relations)
 
@@ -462,12 +464,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         u.log.debug('Checking cinder (rbd) config file data...')
         unit = self.cinder_sentry
         conf = '/etc/cinder/cinder.conf'
-        # NOTE(jamespage): Deal with section config for >= ocata.
-        if self._get_openstack_release() >= self.xenial_ocata:
-            section_key = 'CEPH'
-        else:
-            section_key = 'DEFAULT'
-
+        section_key = 'cinder-ceph'
         expected = {
             section_key: {
                 'volume_driver': 'cinder.volume.drivers.rbd.RBDDriver'
