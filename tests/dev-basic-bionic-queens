@@ -14,10 +14,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Amulet tests on a basic ceph-radosgw deployment on zesty-ocata."""
+"""Amulet tests on a basic ceph-radosgw deployment on bionic-queens."""
 
 from basic_deployment import CephRadosGwBasicDeployment
 
 if __name__ == '__main__':
-    deployment = CephRadosGwBasicDeployment(series='zesty')
+    deployment = CephRadosGwBasicDeployment(series='bionic')
     deployment.run_tests()
