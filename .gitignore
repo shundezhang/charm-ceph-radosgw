@@ -7,3 +7,5 @@ tags
 *.pyc
 .idea
 .unit-state.db
+func-results.json
+.stestr/

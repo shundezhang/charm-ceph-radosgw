@@ -70,6 +70,7 @@ class IdentityServiceContextTest(CharmTestCase):
         super(IdentityServiceContextTest, self).setUp(context, TO_PATCH)
         self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
+        self.maxDiff = None
 
     @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
     @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
@@ -96,6 +97,64 @@ class IdentityServiceContextTest(CharmTestCase):
             'service_port': 9876,
             'service_host': '127.0.0.4',
             'service_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
+            'service_domain_id': '8e50f28a556911e8aaeed33789425d23',
+            'auth_host': '127.0.0.5',
+            'auth_port': 5432,
+            'service_tenant': 'ten',
+            'service_username': 'admin',
+            'service_password': 'adminpass',
+        }
+        _rget.return_value = id_data
+        ids_ctxt = context.IdentityServiceContext()
+        expect = {
+            'admin_domain_id': '8e50f28a556911e8aaeed33789425d23',
+            'admin_password': 'adminpass',
+            'admin_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
+            'admin_tenant_name': 'ten',
+            'admin_token': 'ubuntutesting',
+            'admin_user': 'admin',
+            'api_version': '2.0',
+            'auth_host': '127.0.0.5',
+            'auth_port': 5432,
+            'auth_protocol': 'http',
+            'auth_type': 'keystone',
+            'cache_size': '42',
+            'revocation_check_interval': '7500000',
+            'service_host': '127.0.0.4',
+            'service_port': 9876,
+            'service_protocol': 'http',
+            'user_roles': 'Babel',
+        }
+        if jewel_installed:
+            expect['auth_keystone_v3_supported'] = True
+        self.assertEqual(expect, ids_ctxt())
+
+    @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
+    @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
+    @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
+    @patch.object(charmhelpers.contrib.openstack.context, 'related_units')
+    @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
+    @patch.object(charmhelpers.contrib.openstack.context, 'log')
+    def test_ids_ctxt_missing_admin_domain_id(
+            self, _log, _rids, _runits, _rget, _ctxt_comp, _format_ipv6_addr,
+            jewel_installed=False):
+        self.test_config.set('operator-roles', 'Babel')
+        self.test_config.set('cache-size', '42')
+        self.test_config.set('revocation-check-interval', '7500000')
+        self.test_relation.set({'admin_token': 'ubuntutesting'})
+        self.relation_ids.return_value = ['identity-service:5']
+        self.related_units.return_value = ['keystone/0']
+        _format_ipv6_addr.return_value = False
+        _rids.return_value = ['rid1']
+        _runits.return_value = ['runit']
+        _ctxt_comp.return_value = True
+        self.cmp_pkgrevno.return_value = -1
+        if jewel_installed:
+            self.cmp_pkgrevno.return_value = 0
+        id_data = {
+            'service_port': 9876,
+            'service_host': '127.0.0.4',
+            'service_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
             'auth_host': '127.0.0.5',
             'auth_port': 5432,
             'service_tenant': 'ten',
@@ -111,6 +170,67 @@ class IdentityServiceContextTest(CharmTestCase):
             'admin_token': 'ubuntutesting',
             'admin_user': 'admin',
             'api_version': '2.0',
+            'auth_host': '127.0.0.5',
+            'auth_port': 5432,
+            'auth_protocol': 'http',
+            'auth_type': 'keystone',
+            'cache_size': '42',
+            'revocation_check_interval': '7500000',
+            'service_host': '127.0.0.4',
+            'service_port': 9876,
+            'service_protocol': 'http',
+            'user_roles': 'Babel',
+        }
+        if jewel_installed:
+            expect['auth_keystone_v3_supported'] = True
+        self.assertEqual(expect, ids_ctxt())
+
+    @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
+    @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
+    @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
+    @patch.object(charmhelpers.contrib.openstack.context, 'related_units')
+    @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
+    @patch.object(charmhelpers.contrib.openstack.context, 'log')
+    def test_ids_ctxt_v3(
+            self, _log, _rids, _runits, _rget, _ctxt_comp, _format_ipv6_addr,
+            jewel_installed=False):
+        self.test_config.set('operator-roles', 'Babel')
+        self.test_config.set('cache-size', '42')
+        self.test_config.set('revocation-check-interval', '7500000')
+        self.test_relation.set({'admin_token': 'ubuntutesting'})
+        self.relation_ids.return_value = ['identity-service:5']
+        self.related_units.return_value = ['keystone/0']
+        _format_ipv6_addr.return_value = False
+        _rids.return_value = ['rid1']
+        _runits.return_value = ['runit']
+        _ctxt_comp.return_value = True
+        self.cmp_pkgrevno.return_value = -1
+        if jewel_installed:
+            self.cmp_pkgrevno.return_value = 0
+        id_data = {
+            'service_port': 9876,
+            'service_host': '127.0.0.4',
+            'service_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
+            'service_domain_id': '8e50f28a556911e8aaeed33789425d23',
+            'service_domain': 'service_domain',
+            'auth_host': '127.0.0.5',
+            'auth_port': 5432,
+            'service_tenant': 'ten',
+            'service_username': 'admin',
+            'service_password': 'adminpass',
+            'api_version': '3',
+        }
+        _rget.return_value = id_data
+        ids_ctxt = context.IdentityServiceContext()
+        expect = {
+            'admin_domain_id': '8e50f28a556911e8aaeed33789425d23',
+            'admin_domain_name': 'service_domain',
+            'admin_password': 'adminpass',
+            'admin_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
+            'admin_tenant_name': 'ten',
+            'admin_token': 'ubuntutesting',
+            'admin_user': 'admin',
+            'api_version': '3',
             'auth_host': '127.0.0.5',
             'auth_port': 5432,
             'auth_protocol': 'http',

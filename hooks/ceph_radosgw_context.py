@@ -90,13 +90,17 @@ class IdentityServiceContext(context.IdentityServiceContext):
 
         if cmp_pkgrevno('radosgw', "10.2.0") >= 0:
             ctxt['auth_keystone_v3_supported'] = True
+
+        if (not ctxt.get('admin_domain_id') and
+                float(ctxt.get('api_version', '2.0')) < 3):
+            ctxt.pop('admin_domain_id')
+
         ctxt['auth_type'] = 'keystone'
         ctxt['user_roles'] = config('operator-roles')
         ctxt['cache_size'] = config('cache-size')
         ctxt['revocation_check_interval'] = config('revocation-check-interval')
         if self.context_complete(ctxt):
             return ctxt
-
         return {}
 
 

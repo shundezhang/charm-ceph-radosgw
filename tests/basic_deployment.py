@@ -16,6 +16,7 @@
 
 import amulet
 import keystoneclient
+from keystoneclient.v3 import client as keystone_client_v3
 import swiftclient
 from charmhelpers.contrib.openstack.amulet.deployment import (
     OpenStackAmuletDeployment
@@ -60,7 +61,8 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
            """
         this_service = {'name': 'ceph-radosgw'}
         other_services = [
-            {'name': 'ceph', 'units': 3},
+            {'name': 'ceph-mon', 'units': 3},
+            {'name': 'ceph-osd', 'units': 3},
             {'name': 'percona-cluster', 'constraints': {'mem': '3072M'}},
             {'name': 'keystone'},
             {'name': 'rabbitmq-server'},
@@ -78,20 +80,21 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'nova-compute:shared-db': 'percona-cluster:shared-db',
             'nova-compute:amqp': 'rabbitmq-server:amqp',
             'nova-compute:image-service': 'glance:image-service',
-            'nova-compute:ceph': 'ceph:client',
+            'nova-compute:ceph': 'ceph-mon:client',
             'keystone:shared-db': 'percona-cluster:shared-db',
             'glance:shared-db': 'percona-cluster:shared-db',
             'glance:identity-service': 'keystone:identity-service',
             'glance:amqp': 'rabbitmq-server:amqp',
-            'glance:ceph': 'ceph:client',
+            'glance:ceph': 'ceph-mon:client',
             'cinder:shared-db': 'percona-cluster:shared-db',
             'cinder:identity-service': 'keystone:identity-service',
             'cinder:amqp': 'rabbitmq-server:amqp',
             'cinder:image-service': 'glance:image-service',
             'cinder-ceph:storage-backend': 'cinder:storage-backend',
-            'cinder-ceph:ceph': 'ceph:client',
-            'ceph-radosgw:mon': 'ceph:radosgw',
+            'cinder-ceph:ceph': 'ceph-mon:client',
+            'ceph-radosgw:mon': 'ceph-mon:radosgw',
             'ceph-radosgw:identity-service': 'keystone:identity-service',
+            'ceph-osd:mon': 'ceph-mon:osd',
         }
         super(CephRadosGwBasicDeployment, self)._add_relations(relations)
 
@@ -112,15 +115,21 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'auth-supported': 'none',
             'fsid': '6547bd3e-1397-11e2-82e5-53567c8d32dc',
             'monitor-secret': 'AQCXrnZQwI7KGBAAiPofmKEXKxu5bUzoYLVkbQ==',
-            'osd-reformat': 'yes',
+        }
+
+        # Include a non-existent device as osd-devices is a whitelist,
+        # and this will catch cases where proposals attempt to change that.
+        ceph_osd_config = {
+            'osd-reformat': True,
             'ephemeral-unmount': '/mnt',
-            'osd-devices': '/dev/vdb /srv/ceph'
+            'osd-devices': '/dev/vdb /srv/ceph /dev/test-non-existent'
         }
 
         configs = {'keystone': keystone_config,
                    'percona-cluster': pxc_config,
                    'cinder': cinder_config,
-                   'ceph': ceph_config}
+                   'ceph-mon': ceph_config,
+                   'ceph-osd': ceph_osd_config}
         super(CephRadosGwBasicDeployment, self)._configure_services(configs)
 
     def _initialize_tests(self):
@@ -132,9 +141,12 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         self.nova_sentry = self.d.sentry['nova-compute'][0]
         self.glance_sentry = self.d.sentry['glance'][0]
         self.cinder_sentry = self.d.sentry['cinder'][0]
-        self.ceph0_sentry = self.d.sentry['ceph'][0]
-        self.ceph1_sentry = self.d.sentry['ceph'][1]
-        self.ceph2_sentry = self.d.sentry['ceph'][2]
+        self.ceph0_sentry = self.d.sentry['ceph-mon'][0]
+        self.ceph1_sentry = self.d.sentry['ceph-mon'][1]
+        self.ceph2_sentry = self.d.sentry['ceph-mon'][2]
+        self.ceph_osd0_sentry = self.d.sentry['ceph-osd'][0]
+        self.ceph_osd1_sentry = self.d.sentry['ceph-osd'][1]
+        self.ceph_osd2_sentry = self.d.sentry['ceph-osd'][2]
         self.ceph_radosgw_sentry = self.d.sentry['ceph-radosgw'][0]
         u.log.debug('openstack release val: {}'.format(
             self._get_openstack_release()))
@@ -142,148 +154,127 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             self._get_openstack_release_string()))
 
         # Authenticate admin with keystone
-        self.keystone = u.authenticate_keystone_admin(self.keystone_sentry,
-                                                      user='admin',
-                                                      password='openstack',
-                                                      tenant='admin')
+        self.keystone_session, self.keystone = u.get_default_keystone_session(
+            self.keystone_sentry,
+            openstack_release=self._get_openstack_release())
 
         # Authenticate admin with glance endpoint
         self.glance = u.authenticate_glance_admin(self.keystone)
+
+        # Authenticate radosgw user using swift api
+        keystone_ip = self.keystone_sentry.info['public-address']
+        keystone_relation = self.keystone_sentry.relation(
+            'identity-service',
+            'ceph-radosgw:identity-service')
 
         # Create a demo tenant/role/user
         self.demo_tenant = 'demoTenant'
         self.demo_role = 'demoRole'
         self.demo_user = 'demoUser'
-        if not u.tenant_exists(self.keystone, self.demo_tenant):
-            tenant = self.keystone.tenants.create(tenant_name=self.demo_tenant,
-                                                  description='demo tenant',
-                                                  enabled=True)
-            self.keystone.roles.create(name=self.demo_role)
-            user = self.keystone.users.create(name=self.demo_user,
-                                              password='password',
-                                              tenant_id=tenant.id,
-                                              email='demo@demo.com')
-
-            # Grant Member role to demo_user
-            roles = [r._info for r in self.keystone.roles.list()]
-            for r in roles:
-                if r['name'].lower() == 'member':
-                    self.keystone_member_role_id = r['id']
-
-            self.keystone.roles.add_user_role(
-                user=user.id,
-                role=self.keystone_member_role_id,
-                tenant=tenant.id)
-
-        # Authenticate demo user with keystone
-        self.keystone_demo = u.authenticate_keystone_user(self.keystone,
-                                                          self.demo_user,
-                                                          'password',
-                                                          self.demo_tenant)
-
-        # Authenticate demo user with nova-api
-        self.nova_demo = u.authenticate_nova_user(self.keystone,
-                                                  self.demo_user,
-                                                  'password',
-                                                  self.demo_tenant)
-
-        # Authenticate radosgw user using swift api
-        ks_obj_rel = self.keystone_sentry.relation(
-            'identity-service',
-            'ceph-radosgw:identity-service')
-        self.swift = u.authenticate_swift_user(
-            self.keystone,
-            user=ks_obj_rel['service_username'],
-            password=ks_obj_rel['service_password'],
-            tenant=ks_obj_rel['service_tenant'])
-
-        self.keystone_v3 = None
-
-    def _initialize_keystone_v3(self):
-        u.log.debug('Initializing Keystone v3 tests...')
-        if self.keystone_v3 is not None:
-            u.log.debug('...allready initialized.')
-            return
-
-        se_rels = [(self.keystone_sentry, 'ceph-radosgw:identity-service')]
-        u.keystone_configure_api_version(se_rels, self, 3)
-
-        # Prepare Keystone Client with a domain scoped token for admin user
-        self.keystone_v3 = u.authenticate_keystone(
-            self.keystone_sentry.info['public-address'],
-            'admin', 'openstack', api_version=3,
-            user_domain_name='admin_domain', domain_name='admin_domain'
-        )
-
-        # Create a demo domain, project and user
-        self.demo_domain = 'demoDomain'
         self.demo_project = 'demoProject'
+        self.demo_domain = 'demoDomain'
 
+        if self._get_openstack_release() >= self.xenial_queens:
+            self.keystone_v3 = self.keystone
+            self.create_users_v3()
+            self.demo_user_session, _ = u.get_keystone_session(
+                keystone_ip,
+                self.demo_user,
+                'password',
+                api_version=3,
+                user_domain_name=self.demo_domain,
+                project_domain_name=self.demo_domain,
+                project_name=self.demo_project
+            )
+            self.keystone_demo = keystone_client_v3.Client(
+                session=self.demo_user_session)
+            self.service_session, _ = u.get_keystone_session(
+                keystone_ip,
+                keystone_relation['service_username'],
+                keystone_relation['service_password'],
+                api_version=3,
+                user_domain_name=keystone_relation['service_domain'],
+                project_domain_name=keystone_relation['service_domain'],
+                project_name=keystone_relation['service_tenant']
+            )
+        else:
+            self.keystone_v3 = None
+            self.create_users_v2()
+            # Authenticate demo user with keystone
+            self.demo_user_session, _ = u.get_keystone_session(
+                keystone_ip,
+                self.demo_user,
+                'password',
+                api_version=2,
+                project_name=self.demo_tenant,
+            )
+            self.keystone_demo = keystoneclient.client.Client(
+                session=self.demo_user_session)
+
+            self.service_session, _ = u.get_keystone_session(
+                keystone_ip,
+                keystone_relation['service_username'],
+                keystone_relation['service_password'],
+                api_version=2,
+                project_name=keystone_relation['service_tenant']
+            )
+        self.swift = swiftclient.Connection(session=self.service_session)
+
+    def create_users_v3(self):
         try:
-            domain = self.keystone_v3.domains.create(
+            self.keystone.projects.find(name=self.demo_project)
+        except keystoneclient.exceptions.NotFound:
+            domain = self.keystone.domains.create(
                 self.demo_domain,
                 description='Demo Domain',
-                enabled=True,
+                enabled=True
             )
-        except keystoneclient.exceptions.Conflict:
-            u.log.debug('Domain {} already exists, proceeding.'
-                        ''.format(self.demo_domain))
-
-        try:
-            project = self.keystone_v3.projects.create(
+            project = self.keystone.projects.create(
                 self.demo_project,
                 domain,
                 description='Demo Project',
                 enabled=True,
             )
-        except keystoneclient.exceptions.Conflict:
-            u.log.debug('Project {} already exists in domain {}, proceeding.'
-                        ''.format(self.demo_project, domain.name))
-
-        try:
-            user = self.keystone_v3.users.create(
+            user = self.keystone.users.create(
                 self.demo_user,
                 domain=domain.id,
                 project=self.demo_project,
                 password='password',
                 email='demov3@demo.com',
-                description='Demo v3',
-                enabled=True,
-            )
-        except keystoneclient.exceptions.Conflict:
-            u.log.debug('User {} already exists in domain {}, proceeding.'
-                        ''.format(self.demo_user, domain.name))
-        self.keystone_v3.roles.grant(self.keystone_member_role_id,
-                                     user=user.id,
-                                     project=project.id)
+                description='Demo',
+                enabled=True)
+            role = self.keystone.roles.find(name='Member')
+            self.keystone.roles.grant(
+                role.id,
+                user=user.id,
+                project=project.id)
 
-        # Prepare Keystone Client with a project scoped token for demo user
-        self.keystone_demo_v3 = u.authenticate_keystone(
-            self.keystone_sentry.info['public-address'],
-            self.demo_user, 'password', api_version=3,
-            user_domain_name=self.demo_domain,
-            project_domain_name=self.demo_domain,
-            project_name=self.demo_project,
-        )
+    def create_users_v2(self):
+        if not u.tenant_exists(self.keystone, self.demo_tenant):
+            tenant = self.keystone.tenants.create(tenant_name=self.demo_tenant,
+                                                  description='demo tenant',
+                                                  enabled=True)
 
-        u.log.debug('OK')
+            self.keystone.roles.create(name=self.demo_role)
+            self.keystone.users.create(name=self.demo_user,
+                                       password='password',
+                                       tenant_id=tenant.id,
+                                       email='demo@demo.com')
+            role = self.keystone.roles.find(name='Member')
+            user = self.keystone.users.find(name=self.demo_user)
+            tenant = self.keystone.tenants.find(name=self.demo_tenant)
+            self.keystone.roles.add_user_role(
+                user=user.id,
+                role=role.id,
+                tenant=tenant.id)
 
     def test_100_ceph_processes(self):
         """Verify that the expected service processes are running
         on each ceph unit."""
 
-        # Process name and quantity of processes to expect on each unit
-        ceph_processes = {
-            'ceph-mon': 1,
-            'ceph-osd': 2
-        }
-
         # Units with process names and PID quantities expected
         expected_processes = {
             self.ceph_radosgw_sentry: {'radosgw': 1},
-            self.ceph0_sentry: ceph_processes,
-            self.ceph1_sentry: ceph_processes,
-            self.ceph2_sentry: ceph_processes
         }
 
         actual_pids = u.get_unit_process_ids(expected_processes)
@@ -294,56 +285,25 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
     def test_102_services(self):
         """Verify the expected services are running on the service units."""
 
-        services = {
-            self.rabbitmq_sentry: ['rabbitmq-server'],
-            self.nova_sentry: ['nova-compute'],
-            self.keystone_sentry: ['keystone'],
-            self.glance_sentry: ['glance-registry',
-                                 'glance-api'],
-            self.cinder_sentry: ['cinder-scheduler',
-                                 'cinder-volume'],
-        }
-
         if self._get_openstack_release() < self.xenial_mitaka:
-            services[self.cinder_sentry].append('cinder-api')
-        else:
-            services[self.cinder_sentry].append('apache2')
-
-        if self._get_openstack_release() < self.xenial_mitaka:
-            # For upstart systems only.  Ceph services under systemd
-            # are checked by process name instead.
-            ceph_services = [
-                'ceph-mon-all',
-                'ceph-mon id=`hostname`',
-                'ceph-osd-all',
-                'ceph-osd id={}'.format(u.get_ceph_osd_id_cmd(0)),
-                'ceph-osd id={}'.format(u.get_ceph_osd_id_cmd(1))
-            ]
-            services[self.ceph0_sentry] = ceph_services
-            services[self.ceph1_sentry] = ceph_services
-            services[self.ceph2_sentry] = ceph_services
-            services[self.ceph_radosgw_sentry] = ['radosgw-all']
-
-        if self._get_openstack_release() >= self.trusty_liberty:
-            services[self.keystone_sentry] = ['apache2']
-
-        ret = u.validate_services_by_name(services)
-        if ret:
-            amulet.raise_status(amulet.FAIL, msg=ret)
+            services = {self.ceph_radosgw_sentry: ['radosgw-all']}
+            ret = u.validate_services_by_name(services)
+            if ret:
+                amulet.raise_status(amulet.FAIL, msg=ret)
 
     def test_200_ceph_radosgw_ceph_relation(self):
         """Verify the ceph-radosgw to ceph relation data."""
         u.log.debug('Checking ceph-radosgw:mon to ceph:radosgw '
                     'relation data...')
         unit = self.ceph_radosgw_sentry
-        relation = ['mon', 'ceph:radosgw']
+        relation = ['mon', 'ceph-mon:radosgw']
         expected = {
             'private-address': u.valid_ip
         }
 
         ret = u.validate_relation_data(unit, relation, expected)
         if ret:
-            message = u.relation_error('ceph-radosgw to ceph', ret)
+            message = u.relation_error('ceph-radosgw to ceph-mon', ret)
             amulet.raise_status(amulet.FAIL, msg=message)
 
     def test_201_ceph_radosgw_relation(self):
@@ -445,13 +405,20 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                 'rgw socket path': '/tmp/radosgw.sock',
                 'log file': '/var/log/ceph/radosgw.log',
                 'rgw keystone url': 'http://{}:35357/'.format(keystone_ip),
-                'rgw keystone admin token': 'ubuntutesting',
                 'rgw keystone accepted roles': 'Member,Admin',
                 'rgw keystone token cache size': '500',
                 'rgw keystone revocation interval': '600',
                 'rgw frontends': 'civetweb port=70',
             },
         }
+        if self._get_openstack_release() >= self.xenial_queens:
+            expected['client.radosgw.gateway']['rgw keystone admin domain'] = (
+                'service_domain')
+            (expected['client.radosgw.gateway']
+                ['rgw keystone admin project']) = 'services'
+        else:
+            expected['client.radosgw.gateway']['rgw keystone admin token'] = (
+                'ubuntutesting')
 
         for section, pairs in expected.iteritems():
             ret = u.validate_config_data(unit, conf, section, pairs)
@@ -585,38 +552,14 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         """Check Swift Object Storage functionlaity"""
         u.log.debug('Check Swift Object Storage functionality (api_version={})'
                     ''.format(api_version))
-        keystone_ip = self.keystone_sentry.info['public-address']
-        base_ep = "http://{}:5000".format(keystone_ip.strip().decode('utf-8'))
-        if api_version == 3:
-            self._initialize_keystone_v3()
-            ep = base_ep + '/v3'
-            os_options = {
-                'user_domain_name': self.demo_domain,
-                'project_domain_name': self.demo_domain,
-                'project_name': self.demo_project,
-            }
-            conn = swiftclient.client.Connection(
-                authurl=ep,
-                user=self.demo_user,
-                key='password',
-                os_options=os_options,
-                auth_version=api_version,
-            )
-        else:
-            ep = base_ep + '/v2.0'
-            conn = swiftclient.client.Connection(
-                authurl=ep,
-                user=self.demo_user,
-                key='password',
-                tenant_name=self.demo_tenant,
-                auth_version=api_version,
-            )
+        conn = swiftclient.Connection(session=self.keystone_demo.session)
         u.log.debug('Create container')
         container = 'demo-container'
         try:
             conn.put_container(container)
         except swiftclient.exceptions.ClientException as e:
-            if api_version == 3 and e.http_status == 409:
+            print "EXCEPTION", e.http_status
+            if e.http_status == 409:
                 # Ceph RadosGW is currently configured with a global namespace
                 # for container names. Make use of this to verify that we
                 # cannot create a container with a name already taken by a
