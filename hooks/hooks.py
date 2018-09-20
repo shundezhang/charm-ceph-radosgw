@@ -64,6 +64,8 @@ from charmhelpers.contrib.storage.linux.ceph import (
 from charmhelpers.contrib.openstack.utils import (
     is_unit_paused_set,
     pausable_restart_on_change as restart_on_change,
+    series_upgrade_prepare,
+    series_upgrade_complete,
 )
 from charmhelpers.contrib.hahelpers.cluster import (
     get_hacluster_config,
@@ -80,6 +82,8 @@ from utils import (
     assess_status,
     setup_keystone_certs,
     disable_unused_apache_sites,
+    pause_unit_helper,
+    resume_unit_helper,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 from charmhelpers.contrib.hardening.harden import harden
@@ -138,6 +142,12 @@ def install():
                     '/etc/haproxy/haproxy.cfg': ['haproxy']})
 @harden()
 def config_changed():
+    # if we are paused, delay doing any config changed hooks.
+    # It is forced on the resume.
+    if is_unit_paused_set():
+        log("Unit is pause or upgrading. Skipping config_changed", "WARN")
+        return
+
     install_packages()
     disable_unused_apache_sites()
 
@@ -381,6 +391,20 @@ def configure_https():
 @harden()
 def update_status():
     log('Updating status.')
+
+
+@hooks.hook('pre-series-upgrade')
+def pre_series_upgrade():
+    log("Running prepare series upgrade hook", "INFO")
+    series_upgrade_prepare(
+        pause_unit_helper, CONFIGS)
+
+
+@hooks.hook('post-series-upgrade')
+def post_series_upgrade():
+    log("Running complete series upgrade hook", "INFO")
+    series_upgrade_complete(
+        resume_unit_helper, CONFIGS)
 
 
 if __name__ == '__main__':
