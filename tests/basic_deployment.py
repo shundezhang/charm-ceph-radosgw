@@ -551,7 +551,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         try:
             conn.put_container(container)
         except swiftclient.exceptions.ClientException as e:
-            print "EXCEPTION", e.http_status
+            print("EXCEPTION {}".format(e.http_status))
             if e.http_status == 409:
                 # Ceph RadosGW is currently configured with a global namespace
                 # for container names. Make use of this to verify that we
