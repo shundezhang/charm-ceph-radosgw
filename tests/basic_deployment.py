@@ -65,6 +65,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             {'name': 'ceph-osd', 'units': 3,
              'storage': {'osd-devices': 'cinder,10G'}},
             {'name': 'percona-cluster', 'constraints': {'mem': '3072M'}},
+            {'name': 'nova-cloud-controller'},
             {'name': 'keystone'},
             {'name': 'rabbitmq-server'},
             {'name': 'nova-compute'},
@@ -81,6 +82,14 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'nova-compute:amqp': 'rabbitmq-server:amqp',
             'nova-compute:image-service': 'glance:image-service',
             'nova-compute:ceph': 'ceph-mon:client',
+            'nova-cloud-controller:shared-db': 'percona-cluster:shared-db',
+            'nova-cloud-controller:identity-service': 'keystone:'
+                                                      'identity-service',
+            'nova-cloud-controller:amqp': 'rabbitmq-server:amqp',
+            'nova-cloud-controller:cloud-compute': 'nova-compute:'
+                                                   'cloud-compute',
+            'nova-cloud-controller:image-service': 'glance:image-service',
+
             'keystone:shared-db': 'percona-cluster:shared-db',
             'glance:shared-db': 'percona-cluster:shared-db',
             'glance:identity-service': 'keystone:identity-service',
@@ -118,11 +127,16 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             'osd-devices': '/srv/ceph /dev/test-non-existent'
         }
 
+        nova_cc_config = {}
+        if self._get_openstack_release() >= self.xenial_ocata:
+            nova_cc_config['network-manager'] = 'Neutron'
+
         configs = {'keystone': keystone_config,
                    'percona-cluster': pxc_config,
                    'cinder': cinder_config,
                    'ceph-mon': ceph_config,
                    'ceph-osd': ceph_osd_config,
+                   'nova-cloud-controller': nova_cc_config,
                    }
         super(CephRadosGwBasicDeployment, self)._configure_services(configs)
 
