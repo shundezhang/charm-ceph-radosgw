@@ -21,23 +21,51 @@ from utils import get_pkg_version
 from charmhelpers.core.hookenv import (
     config,
 )
+
+from charmhelpers.core.host import (
+    mkdir
+)
 from charmhelpers.contrib.storage.linux.ceph import (
     CephBrokerRq,
 )
 
-_radosgw_keyring = "/etc/ceph/keyring.rados.gateway"
+CEPH_DIR = '/etc/ceph'
+CEPH_RADOSGW_DIR = '/var/lib/ceph/radosgw'
+_radosgw_keyring = "keyring.rados.gateway"
 
 
-def import_radosgw_key(key):
-    if not os.path.exists(_radosgw_keyring):
+def import_radosgw_key(key, name=None):
+    if name:
+        keyring_path = os.path.join(CEPH_RADOSGW_DIR,
+                                    'ceph-{}'.format(name),
+                                    'keyring')
+        owner = group = 'ceph'
+    else:
+        keyring_path = os.path.join(CEPH_DIR, _radosgw_keyring)
+        owner = group = 'root'
+
+    if not os.path.exists(keyring_path):
+        mkdir(path=os.path.dirname(keyring_path),
+              owner=owner, group=group, perms=0o750)
         cmd = [
             'ceph-authtool',
-            _radosgw_keyring,
+            keyring_path,
             '--create-keyring',
-            '--name=client.radosgw.gateway',
+            '--name=client.{}'.format(
+                name or 'radosgw.gateway'
+            ),
             '--add-key={}'.format(key)
         ]
         subprocess.check_call(cmd)
+        cmd = [
+            'chown',
+            '{}:{}'.format(owner, group),
+            keyring_path
+        ]
+        subprocess.check_call(cmd)
+        return True
+
+    return False
 
 
 def get_create_rgw_pools_rq(prefix=None):

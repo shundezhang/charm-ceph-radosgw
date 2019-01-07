@@ -55,7 +55,15 @@ TO_PATCH = [
     'get_relation_ip',
     'disable_unused_apache_sites',
     'service_reload',
+    'service_stop',
+    'service_restart',
+    'service',
     'setup_keystone_certs',
+    'service_name',
+    'socket',
+    'restart_map',
+    'systemd_based_radosgw',
+    'request_per_unit_key',
 ]
 
 
@@ -68,6 +76,9 @@ class CephRadosGWTests(CharmTestCase):
         self.test_config.set('key', 'secretkey')
         self.test_config.set('use-syslog', False)
         self.cmp_pkgrevno.return_value = 0
+        self.service_name.return_value = 'radosgw'
+        self.request_per_unit_key.return_value = False
+        self.systemd_based_radosgw.return_value = False
 
     def test_install_packages(self):
         ceph_hooks.install_packages()
@@ -95,22 +106,46 @@ class CephRadosGWTests(CharmTestCase):
                   lambda *args, **kwargs: True)
     def test_mon_relation(self):
         _ceph = self.patch('ceph')
-        _restart = self.patch('restart')
+        _ceph.import_radosgw_key.return_value = True
         self.relation_get.return_value = 'seckey'
+        self.socket.gethostname.return_value = 'testinghostname'
         ceph_hooks.mon_relation()
-        self.assertTrue(_restart.called)
-        _ceph.import_radosgw_key.assert_called_with('seckey')
+        self.relation_set.assert_not_called()
+        self.service_restart.assert_called_once_with('radosgw')
+        self.service.assert_called_once_with('enable', 'radosgw')
+        _ceph.import_radosgw_key.assert_called_with('seckey',
+                                                    name='rgw.testinghostname')
+        self.CONFIGS.write_all.assert_called_with()
+
+    @patch.object(ceph_hooks, 'is_request_complete',
+                  lambda *args, **kwargs: True)
+    def test_mon_relation_request_key(self):
+        _ceph = self.patch('ceph')
+        _ceph.import_radosgw_key.return_value = True
+        self.relation_get.return_value = 'seckey'
+        self.socket.gethostname.return_value = 'testinghostname'
+        self.request_per_unit_key.return_value = True
+        ceph_hooks.mon_relation()
+        self.relation_set.assert_called_with(
+            relation_id=None,
+            key_name='rgw.testinghostname'
+        )
+        self.service_restart.assert_called_once_with('radosgw')
+        self.service.assert_called_once_with('enable', 'radosgw')
+        _ceph.import_radosgw_key.assert_called_with('seckey',
+                                                    name='rgw.testinghostname')
         self.CONFIGS.write_all.assert_called_with()
 
     @patch.object(ceph_hooks, 'is_request_complete',
                   lambda *args, **kwargs: True)
     def test_mon_relation_nokey(self):
         _ceph = self.patch('ceph')
-        _restart = self.patch('restart')
+        _ceph.import_radosgw_key.return_value = False
         self.relation_get.return_value = None
         ceph_hooks.mon_relation()
         self.assertFalse(_ceph.import_radosgw_key.called)
-        self.assertFalse(_restart.called)
+        self.service_restart.assert_not_called()
+        self.service.assert_not_called()
         self.CONFIGS.write_all.assert_called_with()
 
     @patch.object(ceph_hooks, 'send_request_if_needed')
@@ -119,10 +154,11 @@ class CephRadosGWTests(CharmTestCase):
     def test_mon_relation_send_broker_request(self,
                                               mock_send_request_if_needed):
         _ceph = self.patch('ceph')
-        _restart = self.patch('restart')
+        _ceph.import_radosgw_key.return_value = False
         self.relation_get.return_value = 'seckey'
         ceph_hooks.mon_relation()
-        self.assertFalse(_restart.called)
+        self.service_restart.assert_not_called()
+        self.service.assert_not_called()
         self.assertFalse(_ceph.import_radosgw_key.called)
         self.assertFalse(self.CONFIGS.called)
         self.assertTrue(mock_send_request_if_needed.called)
@@ -131,21 +167,6 @@ class CephRadosGWTests(CharmTestCase):
         self.get_relation_ip.return_value = '10.0.0.1'
         ceph_hooks.gateway_relation()
         self.relation_set.assert_called_with(hostname='10.0.0.1', port=80)
-
-    def test_start(self):
-        ceph_hooks.start()
-        cmd = ['service', 'radosgw', 'start']
-        self.subprocess.call.assert_called_with(cmd)
-
-    def test_stop(self):
-        ceph_hooks.stop()
-        cmd = ['service', 'radosgw', 'stop']
-        self.subprocess.call.assert_called_with(cmd)
-
-    def test_restart(self):
-        ceph_hooks.restart()
-        cmd = ['service', 'radosgw', 'restart']
-        self.subprocess.call.assert_called_with(cmd)
 
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')
@@ -200,10 +221,8 @@ class CephRadosGWTests(CharmTestCase):
 
     @patch.object(ceph_hooks, 'identity_joined')
     def test_identity_changed(self, mock_identity_joined):
-        _restart = self.patch('restart')
         ceph_hooks.identity_changed()
         self.CONFIGS.write_all.assert_called_with()
-        self.assertTrue(_restart.called)
         self.assertTrue(mock_identity_joined.called)
 
     @patch('charmhelpers.contrib.openstack.ip.is_clustered')

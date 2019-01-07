@@ -29,7 +29,8 @@ TO_PATCH = [
     'cmp_pkgrevno',
     'socket',
     'unit_public_ip',
-    'determine_api_port'
+    'determine_api_port',
+    'cmp_pkgrevno',
 ]
 
 
@@ -312,6 +313,8 @@ class MonContextTest(CharmTestCase):
                 return addresses.pop()
             elif attr == 'auth':
                 return 'cephx'
+            elif attr == 'rgw.testhost_key':
+                return 'testkey'
 
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
@@ -322,6 +325,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'systemd_rgw': True,
             'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,
@@ -346,12 +350,15 @@ class MonContextTest(CharmTestCase):
         self.socket.gethostname.return_value = 'testhost'
         mon_ctxt = context.MonContext()
         addresses = ['10.5.4.1 10.5.4.2 10.5.4.3']
+        self.cmp_pkgrevno.return_value = 1
 
         def _relation_get(attr, unit, rid):
             if attr == 'ceph-public-address':
                 return addresses.pop()
             elif attr == 'auth':
                 return 'cephx'
+            elif attr == 'rgw.testhost_key':
+                return 'testkey'
 
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
@@ -362,6 +369,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'systemd_rgw': True,
             'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,
@@ -402,6 +410,9 @@ class MonContextTest(CharmTestCase):
                 return addresses.pop()
             elif attr == 'auth':
                 return auths.pop()
+            elif attr == 'rgw.testhost_key':
+                return 'testkey'
+
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
@@ -411,6 +422,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'systemd_rgw': True,
             'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,
@@ -433,6 +445,9 @@ class MonContextTest(CharmTestCase):
                 return addresses.pop()
             elif attr == 'auth':
                 return auths.pop()
+            elif attr == 'rgw.testhost_key':
+                return 'testkey'
+
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
@@ -442,6 +457,7 @@ class MonContextTest(CharmTestCase):
             'hostname': 'testhost',
             'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
             'old_auth': False,
+            'systemd_rgw': True,
             'unit_public_ip': '10.255.255.255',
             'use_syslog': 'false',
             'loglevel': 1,

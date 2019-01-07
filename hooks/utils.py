@@ -14,6 +14,7 @@
 
 import os
 import re
+import socket
 import subprocess
 import sys
 
@@ -57,6 +58,7 @@ from charmhelpers.core.host import (
     lsb_release,
     mkdir,
     CompareHostReleases,
+    init_is_systemd,
 )
 from charmhelpers.fetch import (
     apt_cache,
@@ -124,7 +126,7 @@ BASE_RESOURCE_MAP = OrderedDict([
     }),
     (CEPH_CONF, {
         'contexts': [ceph_radosgw_context.MonContext()],
-        'services': ['radosgw'],
+        'services': [],
     }),
     (APACHE_SITE_CONF, {
         'contexts': [ceph_radosgw_context.ApacheSSLContext()],
@@ -152,12 +154,23 @@ def resource_map():
     """
     resource_map = deepcopy(BASE_RESOURCE_MAP)
 
-    if os.path.exists('/etc/apache2/conf-available'):
+    if not https():
         resource_map.pop(APACHE_SITE_CONF)
-    else:
         resource_map.pop(APACHE_SITE_24_CONF)
+    else:
+        if os.path.exists('/etc/apache2/conf-available'):
+            resource_map.pop(APACHE_SITE_CONF)
+        else:
+            resource_map.pop(APACHE_SITE_24_CONF)
 
+    resource_map[CEPH_CONF]['services'] = [service_name()]
     return resource_map
+
+
+def restart_map():
+    return OrderedDict([(cfg, v['services'])
+                        for cfg, v in resource_map().items()
+                        if v['services']])
 
 
 # Hardcoded to icehouse to enable use of charmhelper templating/context tools
@@ -180,12 +193,9 @@ def register_configs(release='icehouse'):
 def services():
     """Returns a list of services associate with this charm."""
     _services = []
-    for v in BASE_RESOURCE_MAP.values():
+    for v in resource_map().values():
         _services.extend(v.get('services', []))
-    _set_services = set(_services)
-    if not https():
-        _set_services.remove('apache2')
-    return list(_set_services)
+    return list(set(_services))
 
 
 def enable_pocket(pocket):
@@ -560,3 +570,26 @@ def disable_unused_apache_sites():
 
     with open(APACHE_PORTS_FILE, 'w') as ports:
         ports.write("")
+
+
+def systemd_based_radosgw():
+    """Determine if install should use systemd based radosgw instances"""
+    host = socket.gethostname()
+    for rid in relation_ids('mon'):
+        for unit in related_units(rid):
+            if relation_get('rgw.{}_key'.format(host), rid=rid, unit=unit):
+                return True
+    return False
+
+
+def request_per_unit_key():
+    """Determine if a per-unit cephx key should be requested"""
+    return (cmp_pkgrevno('radosgw', '12.2.0') >= 0 and init_is_systemd())
+
+
+def service_name():
+    """Determine the name of the RADOS Gateway service"""
+    if systemd_based_radosgw():
+        return 'ceph-radosgw@rgw.{}'.format(socket.gethostname())
+    else:
+        return 'radosgw'

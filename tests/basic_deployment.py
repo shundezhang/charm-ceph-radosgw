@@ -329,7 +329,6 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         relation = ['radosgw', 'ceph-radosgw:mon']
         expected = {
             'private-address': u.valid_ip,
-            'radosgw_key': u.not_null,
             'auth': 'none',
             'ceph-public-address': u.valid_ip,
         }
@@ -394,10 +393,6 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
         u.log.debug('Checking ceph config file data...')
         unit = self.ceph_radosgw_sentry
         conf = '/etc/ceph/ceph.conf'
-        keystone_sentry = self.keystone_sentry
-        relation = keystone_sentry.relation('identity-service',
-                                            'ceph-radosgw:identity-service')
-        keystone_ip = relation['auth_host']
         expected = {
             'global': {
                 'auth cluster required': 'none',
@@ -407,26 +402,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                 'err to syslog': 'false',
                 'clog to syslog': 'false'
             },
-            'client.radosgw.gateway': {
-                'keyring': '/etc/ceph/keyring.rados.gateway',
-                'rgw socket path': '/tmp/radosgw.sock',
-                'log file': '/var/log/ceph/radosgw.log',
-                'rgw keystone url': 'http://{}:35357/'.format(keystone_ip),
-                'rgw keystone accepted roles': 'Member,Admin',
-                'rgw keystone token cache size': '500',
-                'rgw keystone revocation interval': '600',
-                'rgw frontends': 'civetweb port=70',
-            },
         }
-        if self._get_openstack_release() >= self.xenial_queens:
-            expected['client.radosgw.gateway']['rgw keystone admin domain'] = (
-                'service_domain')
-            (expected['client.radosgw.gateway']
-                ['rgw keystone admin project']) = 'services'
-        else:
-            expected['client.radosgw.gateway']['rgw keystone admin token'] = (
-                'ubuntutesting')
-
         for section, pairs in expected.items():
             ret = u.validate_config_data(unit, conf, section, pairs)
             if ret:

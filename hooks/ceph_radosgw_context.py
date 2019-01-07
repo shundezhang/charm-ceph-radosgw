@@ -144,6 +144,10 @@ class MonContext(context.CephContext):
     def __call__(self):
         if not relation_ids('mon'):
             return {}
+
+        host = socket.gethostname()
+        systemd_rgw = False
+
         mon_hosts = []
         auths = []
 
@@ -161,6 +165,8 @@ class MonContext(context.CephContext):
                 ceph_addr = format_ipv6_addr(ceph_addr) or ceph_addr
                 if ceph_addr:
                     mon_hosts.append(ceph_addr)
+                if relation_get('rgw.{}_key'.format(host), rid=rid, unit=unit):
+                    systemd_rgw = True
 
         if len(set(auths)) != 1:
             e = ("Inconsistent or absent auth returned by mon units. Setting "
@@ -172,7 +178,6 @@ class MonContext(context.CephContext):
 
         # /etc/init.d/radosgw mandates that a dns name is used for this
         # parameter so ensure that address is resolvable
-        host = socket.gethostname()
         if config('prefer-ipv6'):
             ensure_host_resolvable_v6(host)
 
@@ -186,6 +191,7 @@ class MonContext(context.CephContext):
             'mon_hosts': ' '.join(mon_hosts),
             'hostname': host,
             'old_auth': cmp_pkgrevno('radosgw', "0.51") < 0,
+            'systemd_rgw': systemd_rgw,
             'use_syslog': str(config('use-syslog')).lower(),
             'loglevel': config('loglevel'),
             'port': port,

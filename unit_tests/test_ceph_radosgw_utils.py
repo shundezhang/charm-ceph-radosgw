@@ -28,6 +28,12 @@ TO_PATCH = [
     'get_upstream_version',
     'format_endpoint',
     'https',
+    'relation_ids',
+    'relation_get',
+    'related_units',
+    'socket',
+    'cmp_pkgrevno',
+    'init_is_systemd',
 ]
 
 
@@ -35,6 +41,7 @@ class CephRadosGWUtilTests(CharmTestCase):
     def setUp(self):
         super(CephRadosGWUtilTests, self).setUp(utils, TO_PATCH)
         self.get_upstream_version.return_value = '10.2.2'
+        self.socket.gethostname.return_value = 'testhost'
 
     def test_assess_status(self):
         with patch.object(utils, 'assess_status_func') as asf:
@@ -219,3 +226,68 @@ class CephRadosGWUtilTests(CharmTestCase):
             c = ['openssl', 'x509', '-in', '/foo/bar/ca.pem',
                  '-pubkey']
             mock_check_output.assert_called_with(c)
+
+    def _setup_relation_data(self, data):
+        self.relation_ids.return_value = data.keys()
+        self.related_units.side_effect = (
+            lambda rid: data[rid].keys()
+        )
+        self.relation_get.side_effect = (
+            lambda attr, rid, unit: data[rid][unit].get(attr)
+        )
+
+    def test_systemd_based_radosgw_old_style(self):
+        _relation_data = {
+            'mon:1': {
+                'ceph-mon/0': {
+                    'radosgw_key': 'testkey',
+                },
+                'ceph-mon/1': {
+                    'radosgw_key': 'testkey',
+                },
+                'ceph-mon/2': {
+                    'radosgw_key': 'testkey',
+                },
+            }
+        }
+        self._setup_relation_data(_relation_data)
+        self.assertFalse(utils.systemd_based_radosgw())
+
+    def test_systemd_based_radosgw_new_style(self):
+        _relation_data = {
+            'mon:1': {
+                'ceph-mon/0': {
+                    'rgw.testhost_key': 'testkey',
+                },
+                'ceph-mon/1': {
+                    'rgw.testhost_key': 'testkey',
+                },
+                'ceph-mon/2': {
+                    'rgw.testhost_key': 'testkey',
+                },
+            }
+        }
+        self._setup_relation_data(_relation_data)
+        self.assertTrue(utils.systemd_based_radosgw())
+
+    def test_request_per_unit_key(self):
+        self.init_is_systemd.return_value = False
+        self.cmp_pkgrevno.return_value = -1
+        self.assertFalse(utils.request_per_unit_key())
+        self.init_is_systemd.return_value = True
+        self.cmp_pkgrevno.return_value = 1
+        self.assertTrue(utils.request_per_unit_key())
+        self.init_is_systemd.return_value = False
+        self.cmp_pkgrevno.return_value = 1
+        self.assertFalse(utils.request_per_unit_key())
+
+        self.cmp_pkgrevno.assert_called_with('radosgw', '12.2.0')
+
+    @patch.object(utils, 'systemd_based_radosgw')
+    def test_service_name(self, mock_systemd_based_radosgw):
+        mock_systemd_based_radosgw.return_value = True
+        self.assertEqual(utils.service_name(),
+                         'ceph-radosgw@rgw.testhost')
+        mock_systemd_based_radosgw.return_value = False
+        self.assertEqual(utils.service_name(),
+                         'radosgw')

@@ -32,6 +32,7 @@ TO_PATCH = [
     'config',
     'os',
     'subprocess',
+    'mkdir',
 ]
 
 
@@ -42,6 +43,7 @@ class CephRadosGWCephTests(CharmTestCase):
 
     def test_import_radosgw_key(self):
         self.os.path.exists.return_value = False
+        self.os.path.join.return_value = '/etc/ceph/keyring.rados.gateway'
         ceph.import_radosgw_key('mykey')
         cmd = [
             'ceph-authtool',
@@ -50,7 +52,11 @@ class CephRadosGWCephTests(CharmTestCase):
             '--name=client.radosgw.gateway',
             '--add-key=mykey'
         ]
-        self.subprocess.check_call.assert_called_with(cmd)
+        self.subprocess.check_call.assert_has_calls([
+            call(cmd),
+            call(['chown', 'root:root',
+                  '/etc/ceph/keyring.rados.gateway'])
+        ])
 
     @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
            '.add_op_create_pool')

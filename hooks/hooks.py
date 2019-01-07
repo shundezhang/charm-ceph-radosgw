@@ -17,6 +17,7 @@
 import os
 import subprocess
 import sys
+import socket
 
 import ceph
 
@@ -45,6 +46,9 @@ from charmhelpers.core.host import (
     cmp_pkgrevno,
     is_container,
     service_reload,
+    service_restart,
+    service_stop,
+    service,
 )
 from charmhelpers.contrib.network.ip import (
     get_relation_ip,
@@ -84,6 +88,10 @@ from utils import (
     disable_unused_apache_sites,
     pause_unit_helper,
     resume_unit_helper,
+    restart_map,
+    service_name,
+    systemd_based_radosgw,
+    request_per_unit_key,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 from charmhelpers.contrib.hardening.harden import harden
@@ -137,79 +145,89 @@ def install():
 
 
 @hooks.hook('config-changed')
-@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw'],
-                    '/etc/haproxy/haproxy.cfg': ['haproxy']})
 @harden()
 def config_changed():
-    # if we are paused, delay doing any config changed hooks.
-    # It is forced on the resume.
-    if is_unit_paused_set():
-        log("Unit is pause or upgrading. Skipping config_changed", "WARN")
-        return
+    @restart_on_change(restart_map())
+    def _config_changed():
+        # if we are paused, delay doing any config changed hooks.
+        # It is forced on the resume.
+        if is_unit_paused_set():
+            log("Unit is pause or upgrading. Skipping config_changed", "WARN")
+            return
 
-    install_packages()
-    disable_unused_apache_sites()
+        install_packages()
+        disable_unused_apache_sites()
 
-    if config('prefer-ipv6'):
-        status_set('maintenance', 'configuring ipv6')
-        setup_ipv6()
+        if config('prefer-ipv6'):
+            status_set('maintenance', 'configuring ipv6')
+            setup_ipv6()
 
-    for r_id in relation_ids('identity-service'):
-        identity_changed(relid=r_id)
+        for r_id in relation_ids('identity-service'):
+            identity_changed(relid=r_id)
 
-    for r_id in relation_ids('cluster'):
-        cluster_joined(rid=r_id)
+        for r_id in relation_ids('cluster'):
+            cluster_joined(rid=r_id)
 
-    # NOTE(jamespage): Re-exec mon relation for any changes to
-    #                  enable ceph pool permissions restrictions
-    for r_id in relation_ids('mon'):
-        for unit in related_units(r_id):
-            mon_relation(r_id, unit)
+        # NOTE(jamespage): Re-exec mon relation for any changes to
+        #                  enable ceph pool permissions restrictions
+        for r_id in relation_ids('mon'):
+            for unit in related_units(r_id):
+                mon_relation(r_id, unit)
 
-    CONFIGS.write_all()
-    configure_https()
+        CONFIGS.write_all()
+        configure_https()
 
-    update_nrpe_config()
+        update_nrpe_config()
+
+        open_port(port=config('port'))
+    _config_changed()
 
 
 @hooks.hook('mon-relation-departed',
             'mon-relation-changed')
-@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def mon_relation(rid=None, unit=None):
-    rq = ceph.get_create_rgw_pools_rq(
-        prefix=config('pool-prefix'))
-    if is_request_complete(rq, relation='mon'):
-        log('Broker request complete', level=DEBUG)
-        CONFIGS.write_all()
-        key = relation_get(attribute='radosgw_key',
-                           rid=rid, unit=unit)
-        if key:
-            ceph.import_radosgw_key(key)
-            if not is_unit_paused_set():
-                restart()  # TODO figure out a better way todo this
-    else:
-        send_request_if_needed(rq, relation='mon')
+    @restart_on_change(restart_map())
+    def _mon_relation():
+        key_name = 'rgw.{}'.format(socket.gethostname())
+        if request_per_unit_key():
+            relation_set(relation_id=rid,
+                         key_name=key_name)
+        rq = ceph.get_create_rgw_pools_rq(
+            prefix=config('pool-prefix'))
+        if is_request_complete(rq, relation='mon'):
+            log('Broker request complete', level=DEBUG)
+            CONFIGS.write_all()
+            # New style per unit keys
+            key = relation_get(attribute='{}_key'.format(key_name),
+                               rid=rid, unit=unit)
+            if not key:
+                # Fallback to old style global key
+                key = relation_get(attribute='radosgw_key',
+                                   rid=rid, unit=unit)
+                key_name = None
+
+            if key:
+                new_keyring = ceph.import_radosgw_key(key,
+                                                      name=key_name)
+                # NOTE(jamespage):
+                # Deal with switch from radosgw init script to
+                # systemd named units for radosgw instances by
+                # stopping and disabling the radosgw unit
+                if systemd_based_radosgw():
+                    service_stop('radosgw')
+                    service('disable', 'radosgw')
+                if not is_unit_paused_set() and new_keyring:
+                    service('enable', service_name())
+                    service_restart(service_name())
+        else:
+            send_request_if_needed(rq, relation='mon')
+    _mon_relation()
 
 
 @hooks.hook('gateway-relation-joined')
 def gateway_relation():
     relation_set(hostname=get_relation_ip('gateway-relation'),
                  port=config('port'))
-
-
-def start():
-    subprocess.call(['service', 'radosgw', 'start'])
-    open_port(port=config('port'))
-
-
-def stop():
-    subprocess.call(['service', 'radosgw', 'stop'])
-    open_port(port=config('port'))
-
-
-def restart():
-    subprocess.call(['service', 'radosgw', 'restart'])
-    open_port(port=config('port'))
 
 
 @hooks.hook('identity-service-relation-joined')
@@ -233,38 +251,42 @@ def identity_joined(relid=None):
 
 
 @hooks.hook('identity-service-relation-changed')
-@restart_on_change({'/etc/ceph/ceph.conf': ['radosgw']})
 def identity_changed(relid=None):
-    identity_joined(relid)
-    CONFIGS.write_all()
-    if not is_unit_paused_set():
-        restart()
-    configure_https()
+    @restart_on_change(restart_map())
+    def _identity_changed():
+        identity_joined(relid)
+        CONFIGS.write_all()
+        configure_https()
+    _identity_changed()
 
 
 @hooks.hook('cluster-relation-joined')
-@restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
 def cluster_joined(rid=None):
-    settings = {}
+    @restart_on_change(restart_map())
+    def _cluster_joined():
+        settings = {}
 
-    for addr_type in ADDRESS_TYPES:
-        address = get_relation_ip(
-            addr_type,
-            cidr_network=config('os-{}-network'.format(addr_type)))
-        if address:
-            settings['{}-address'.format(addr_type)] = address
+        for addr_type in ADDRESS_TYPES:
+            address = get_relation_ip(
+                addr_type,
+                cidr_network=config('os-{}-network'.format(addr_type)))
+            if address:
+                settings['{}-address'.format(addr_type)] = address
 
-    settings['private-address'] = get_relation_ip('cluster')
+        settings['private-address'] = get_relation_ip('cluster')
 
-    relation_set(relation_id=rid, relation_settings=settings)
+        relation_set(relation_id=rid, relation_settings=settings)
+    _cluster_joined()
 
 
 @hooks.hook('cluster-relation-changed')
-@restart_on_change({'/etc/haproxy/haproxy.cfg': ['haproxy']})
 def cluster_changed():
-    CONFIGS.write_all()
-    for r_id in relation_ids('identity-service'):
-        identity_joined(relid=r_id)
+    @restart_on_change(restart_map())
+    def _cluster_changed():
+        CONFIGS.write_all()
+        for r_id in relation_ids('identity-service'):
+            identity_joined(relid=r_id)
+    _cluster_changed()
 
 
 @hooks.hook('ha-relation-joined')
