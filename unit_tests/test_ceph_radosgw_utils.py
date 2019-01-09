@@ -31,6 +31,8 @@ TO_PATCH = [
     'socket',
     'cmp_pkgrevno',
     'init_is_systemd',
+    'unitdata',
+    'config',
 ]
 
 
@@ -39,6 +41,7 @@ class CephRadosGWUtilTests(CharmTestCase):
         super(CephRadosGWUtilTests, self).setUp(utils, TO_PATCH)
         self.get_upstream_version.return_value = '10.2.2'
         self.socket.gethostname.return_value = 'testhost'
+        self.config.side_effect = self.test_config.get
 
     def test_assess_status(self):
         with patch.object(utils, 'assess_status_func') as asf:
@@ -136,6 +139,105 @@ class CephRadosGWUtilTests(CharmTestCase):
         self._setup_relation_data(_relation_data)
         self.assertTrue(utils.systemd_based_radosgw())
 
+    @patch.object(utils.os.path, 'exists')
+    def test_ready_for_service(self, mock_exists):
+        mock_exists.return_value = True
+        _relation_data = {
+            'mon:1': {
+                'ceph-mon/0': {
+                    'rgw.testhost_key': 'testkey',
+                },
+                'ceph-mon/1': {
+                    'rgw.testhost_key': 'testkey',
+                },
+                'ceph-mon/2': {
+                    'rgw.testhost_key': 'testkey',
+                },
+            }
+        }
+        self._setup_relation_data(_relation_data)
+        self.assertTrue(utils.ready_for_service())
+        mock_exists.assert_called_with(
+            '/etc/ceph/ceph.client.rgw.testhost.keyring'
+        )
+
+    @patch.object(utils.os.path, 'exists')
+    def test_ready_for_service_legacy(self, mock_exists):
+        mock_exists.return_value = True
+        _relation_data = {
+            'mon:1': {
+                'ceph-mon/0': {
+                    'radosgw_key': 'testkey',
+                },
+                'ceph-mon/1': {
+                    'radosgw_key': 'testkey',
+                },
+                'ceph-mon/2': {
+                    'radosgw_key': 'testkey',
+                },
+            }
+        }
+        self._setup_relation_data(_relation_data)
+        self.assertTrue(utils.ready_for_service())
+        mock_exists.assert_called_with(
+            '/etc/ceph/keyring.rados.gateway'
+        )
+
+    @patch.object(utils.os.path, 'exists')
+    def test_ready_for_service_legacy_skip(self, mock_exists):
+        mock_exists.return_value = True
+        _relation_data = {
+            'mon:1': {
+                'ceph-mon/0': {
+                    'radosgw_key': 'testkey',
+                },
+                'ceph-mon/1': {
+                    'radosgw_key': 'testkey',
+                },
+                'ceph-mon/2': {
+                    'radosgw_key': 'testkey',
+                },
+            }
+        }
+        self._setup_relation_data(_relation_data)
+        self.assertFalse(utils.ready_for_service(legacy=False))
+
+    def test_not_ready_for_service(self):
+        _relation_data = {
+            'mon:1': {
+                'ceph-mon/0': {
+                },
+                'ceph-mon/1': {
+                },
+                'ceph-mon/2': {
+                },
+            }
+        }
+        self._setup_relation_data(_relation_data)
+        self.assertFalse(utils.ready_for_service())
+
+    @patch.object(utils.os.path, 'exists')
+    def test_ready_for_service_no_keyring(self, mock_exists):
+        mock_exists.return_value = False
+        _relation_data = {
+            'mon:1': {
+                'ceph-mon/0': {
+                    'rgw.testhost_key': 'testkey',
+                },
+                'ceph-mon/1': {
+                    'rgw.testhost_key': 'testkey',
+                },
+                'ceph-mon/2': {
+                    'rgw.testhost_key': 'testkey',
+                },
+            }
+        }
+        self._setup_relation_data(_relation_data)
+        self.assertFalse(utils.ready_for_service())
+        mock_exists.assert_called_with(
+            '/etc/ceph/ceph.client.rgw.testhost.keyring'
+        )
+
     def test_request_per_unit_key(self):
         self.init_is_systemd.return_value = False
         self.cmp_pkgrevno.return_value = -1
@@ -157,3 +259,44 @@ class CephRadosGWUtilTests(CharmTestCase):
         mock_systemd_based_radosgw.return_value = False
         self.assertEqual(utils.service_name(),
                          'radosgw')
+
+    def test_restart_nonce_changed_new(self):
+        _db_data = {}
+        mock_db = MagicMock()
+        mock_db.get.side_effect = lambda key: _db_data.get(key)
+        self.unitdata.kv.return_value = mock_db
+        self.assertTrue(utils.restart_nonce_changed('foobar'))
+        mock_db.set.assert_called_once_with('restart_nonce',
+                                            'foobar')
+        mock_db.flush.assert_called_once_with()
+
+    def test_restart_nonce_changed_existing(self):
+        _db_data = {
+            'restart_nonce': 'foobar'
+        }
+        mock_db = MagicMock()
+        mock_db.get.side_effect = lambda key: _db_data.get(key)
+        self.unitdata.kv.return_value = mock_db
+        self.assertFalse(utils.restart_nonce_changed('foobar'))
+        mock_db.set.assert_not_called()
+        mock_db.flush.assert_not_called()
+
+    def test_restart_nonce_changed_changed(self):
+        _db_data = {
+            'restart_nonce': 'foobar'
+        }
+        mock_db = MagicMock()
+        mock_db.get.side_effect = lambda key: _db_data.get(key)
+        self.unitdata.kv.return_value = mock_db
+        self.assertTrue(utils.restart_nonce_changed('soofar'))
+        mock_db.set.assert_called_once_with('restart_nonce',
+                                            'soofar')
+        mock_db.flush.assert_called_once_with()
+
+    def test_multisite_deployment(self):
+        self.test_config.set('zone', 'testzone')
+        self.test_config.set('zonegroup', 'testzonegroup')
+        self.test_config.set('realm', 'testrealm')
+        self.assertTrue(utils.multisite_deployment())
+        self.test_config.set('realm', None)
+        self.assertFalse(utils.multisite_deployment())

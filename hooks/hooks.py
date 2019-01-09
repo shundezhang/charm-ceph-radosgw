@@ -18,11 +18,13 @@ import os
 import subprocess
 import sys
 import socket
+import uuid
 
 sys.path.append('lib')
 
 import ceph_rgw as ceph
 import ceph.utils as ceph_utils
+import multisite
 
 from charmhelpers.core.hookenv import (
     relation_get,
@@ -35,6 +37,9 @@ from charmhelpers.core.hookenv import (
     DEBUG,
     Hooks, UnregisteredHookError,
     status_set,
+    is_leader,
+    leader_set,
+    leader_get,
 )
 from charmhelpers.fetch import (
     apt_update,
@@ -86,6 +91,9 @@ from utils import (
     service_name,
     systemd_based_radosgw,
     request_per_unit_key,
+    ready_for_service,
+    restart_nonce_changed,
+    multisite_deployment,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 from charmhelpers.contrib.hardening.harden import harden
@@ -108,6 +116,8 @@ PACKAGES = [
 APACHE_PACKAGES = [
     'libapache2-mod-fastcgi',
 ]
+
+MULTISITE_SYSTEM_USER = 'multisite-sync'
 
 
 def upgrade_available():
@@ -200,6 +210,8 @@ def config_changed():
         for r_id in relation_ids('certificates'):
             certs_joined(r_id)
 
+        process_multisite_relations()
+
         CONFIGS.write_all()
         configure_https()
 
@@ -218,8 +230,9 @@ def mon_relation(rid=None, unit=None):
         if request_per_unit_key():
             relation_set(relation_id=rid,
                          key_name=key_name)
+        # NOTE: prefer zone name if in use over pool-prefix.
         rq = ceph.get_create_rgw_pools_rq(
-            prefix=config('pool-prefix'))
+            prefix=config('zone') or config('pool-prefix'))
         if is_request_complete(rq, relation='mon'):
             log('Broker request complete', level=DEBUG)
             CONFIGS.write_all()
@@ -242,9 +255,20 @@ def mon_relation(rid=None, unit=None):
                 if systemd_based_radosgw():
                     service_stop('radosgw')
                     service('disable', 'radosgw')
-                if not is_unit_paused_set() and new_keyring:
-                    service('enable', service_name())
+
+                service('enable', service_name())
+                # NOTE(jamespage):
+                # Multi-site deployments need to defer restart as the
+                # zone is not created until the master relation is
+                # joined; restarting here will cause a restart burst
+                # in systemd and stop the process restarting once
+                # zone configuration is complete.
+                if (not is_unit_paused_set() and
+                        new_keyring and
+                        not multisite_deployment()):
                     service_restart(service_name())
+
+            process_multisite_relations()
         else:
             send_request_if_needed(rq, relation='mon')
     _mon_relation()
@@ -408,6 +432,174 @@ def certs_changed(relation_id=None, unit=None):
         process_certificates('ceph-radosgw', relation_id, unit)
         configure_https()
     _certs_changed()
+
+
+@hooks.hook('master-relation-joined')
+def master_relation_joined(relation_id=None):
+    if not ready_for_service(legacy=False):
+        log('unit not ready, deferring multisite configuration')
+        return
+
+    internal_url = '{}:{}'.format(
+        canonical_url(CONFIGS, INTERNAL),
+        config('port')
+    )
+    endpoints = [internal_url]
+    realm = config('realm')
+    zonegroup = config('zonegroup')
+    zone = config('zone')
+    access_key = leader_get('access_key')
+    secret = leader_get('secret')
+
+    if not all((realm, zonegroup, zone)):
+        return
+
+    relation_set(relation_id=relation_id,
+                 realm=realm,
+                 zonegroup=zonegroup,
+                 url=endpoints[0],
+                 access_key=access_key,
+                 secret=secret)
+
+    if not is_leader():
+        return
+
+    if not leader_get('restart_nonce'):
+        # NOTE(jamespage):
+        # This is an ugly kludge to force creation of the required data
+        # items in the .rgw.root pool prior to the radosgw process being
+        # started; radosgw-admin does not currently have a way of doing
+        # this operation but a period update will force it to be created.
+        multisite.update_period(fatal=False)
+
+    mutation = False
+
+    if realm not in multisite.list_realms():
+        multisite.create_realm(realm, default=True)
+        mutation = True
+
+    if zonegroup not in multisite.list_zonegroups():
+        multisite.create_zonegroup(zonegroup,
+                                   endpoints=endpoints,
+                                   default=True, master=True,
+                                   realm=realm)
+        mutation = True
+
+    if zone not in multisite.list_zones():
+        multisite.create_zone(zone,
+                              endpoints=endpoints,
+                              default=True, master=True,
+                              zonegroup=zonegroup)
+        mutation = True
+
+    if MULTISITE_SYSTEM_USER not in multisite.list_users():
+        access_key, secret = multisite.create_system_user(
+            MULTISITE_SYSTEM_USER
+        )
+        multisite.modify_zone(zone,
+                              access_key=access_key,
+                              secret=secret)
+        leader_set(access_key=access_key,
+                   secret=secret)
+        mutation = True
+
+    if mutation:
+        multisite.update_period()
+        service_restart(service_name())
+        leader_set(restart_nonce=str(uuid.uuid4()))
+
+    relation_set(relation_id=relation_id,
+                 access_key=access_key,
+                 secret=secret)
+
+
+@hooks.hook('slave-relation-changed')
+def slave_relation_changed(relation_id=None, unit=None):
+    if not is_leader():
+        return
+    if not ready_for_service(legacy=False):
+        log('unit not ready, deferring multisite configuration')
+        return
+
+    master_data = relation_get(rid=relation_id, unit=unit)
+    if not all((master_data.get('realm'),
+                master_data.get('zonegroup'),
+                master_data.get('access_key'),
+                master_data.get('secret'),
+                master_data.get('url'))):
+        log("Defer processing until master RGW has provided required data")
+        return
+
+    internal_url = '{}:{}'.format(
+        canonical_url(CONFIGS, INTERNAL),
+        config('port')
+    )
+    endpoints = [internal_url]
+
+    realm = config('realm')
+    zonegroup = config('zonegroup')
+    zone = config('zone')
+
+    if (realm, zonegroup) != (master_data['realm'],
+                              master_data['zonegroup']):
+        log("Mismatched configuration so stop multi-site configuration now")
+        return
+
+    if not leader_get('restart_nonce'):
+        # NOTE(jamespage):
+        # This is an ugly kludge to force creation of the required data
+        # items in the .rgw.root pool prior to the radosgw process being
+        # started; radosgw-admin does not currently have a way of doing
+        # this operation but a period update will force it to be created.
+        multisite.update_period(fatal=False)
+
+    mutation = False
+
+    if realm not in multisite.list_realms():
+        multisite.pull_realm(url=master_data['url'],
+                             access_key=master_data['access_key'],
+                             secret=master_data['secret'])
+        multisite.pull_period(url=master_data['url'],
+                              access_key=master_data['access_key'],
+                              secret=master_data['secret'])
+        multisite.set_default_realm(realm)
+        mutation = True
+
+    if zone not in multisite.list_zones():
+        multisite.create_zone(zone,
+                              endpoints=endpoints,
+                              default=False, master=False,
+                              zonegroup=zonegroup,
+                              access_key=master_data['access_key'],
+                              secret=master_data['secret'])
+        mutation = True
+
+    if mutation:
+        multisite.update_period()
+        service_restart(service_name())
+        leader_set(restart_nonce=str(uuid.uuid4()))
+
+
+@hooks.hook('leader-settings-changed')
+def leader_settings_changed():
+    # NOTE: leader unit will only ever set leader storage
+    #       data when multi-site realm, zonegroup, zone or user
+    #       data has been created/changed - trigger restarts
+    #       of rgw services.
+    if restart_nonce_changed(leader_get('restart_nonce')):
+        service_restart(service_name())
+    if not is_leader():
+        for r_id in relation_ids('master'):
+            master_relation_joined(r_id)
+
+
+def process_multisite_relations():
+    """Re-trigger any pending master/slave relations"""
+    for r_id in relation_ids('master'):
+        master_relation_joined(r_id)
+    for r_id in relation_ids('slave'):
+        for unit in related_units(r_id):
+            slave_relation_changed(r_id, unit)
 
 
 if __name__ == '__main__':

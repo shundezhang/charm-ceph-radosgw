@@ -23,7 +23,8 @@ from charmhelpers.core.hookenv import (
 )
 
 from charmhelpers.core.host import (
-    mkdir
+    mkdir,
+    symlink,
 )
 from charmhelpers.contrib.storage.linux.ceph import (
     CephBrokerRq,
@@ -39,9 +40,12 @@ def import_radosgw_key(key, name=None):
         keyring_path = os.path.join(CEPH_RADOSGW_DIR,
                                     'ceph-{}'.format(name),
                                     'keyring')
+        link_path = os.path.join(CEPH_DIR,
+                                 'ceph.client.{}.keyring'.format(name))
         owner = group = 'ceph'
     else:
         keyring_path = os.path.join(CEPH_DIR, _radosgw_keyring)
+        link_path = None
         owner = group = 'root'
 
     if not os.path.exists(keyring_path):
@@ -63,6 +67,11 @@ def import_radosgw_key(key, name=None):
             keyring_path
         ]
         subprocess.check_call(cmd)
+        # NOTE: add a link to the keyring in /var/lib/ceph
+        # to /etc/ceph so we can use it for radosgw-admin
+        # operations for multi-site configuration
+        if link_path:
+            symlink(keyring_path, link_path)
         return True
 
     return False

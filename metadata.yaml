@@ -31,12 +31,16 @@ requires:
     scope: container
   certificates:
     interface: tls-certificates
+  slave:
+    interface: radosgw-multisite
 provides:
   nrpe-external-master:
     interface: nrpe-external-master
     scope: container
   gateway:
     interface: http
+  master:
+    interface: radosgw-multisite
 peers:
   cluster:
     interface: swift-ha

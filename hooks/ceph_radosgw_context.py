@@ -212,6 +212,9 @@ class MonContext(context.CephContext):
         ctxt.update(user_provided)
 
         if self.context_complete(ctxt):
+            # Multi-site Zone configuration is optional,
+            # so add after assessment
+            ctxt['rgw_zone'] = config('zone')
             return ctxt
 
         return {}

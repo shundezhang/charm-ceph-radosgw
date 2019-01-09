@@ -76,3 +76,67 @@ class MainTestCase(CharmTestCase):
         with mock.patch.dict(actions.ACTIONS, {"foo": dummy_action}):
             actions.main(["foo"])
         self.assertEqual(dummy_calls, ["uh oh"])
+
+
+class MultisiteActionsTestCase(CharmTestCase):
+
+    TO_PATCH = [
+        'action_fail',
+        'action_set',
+        'multisite',
+        'config',
+    ]
+
+    def setUp(self):
+        super(MultisiteActionsTestCase, self).setUp(actions,
+                                                    self.TO_PATCH)
+        self.config.side_effect = self.test_config.get
+
+    def test_promote(self):
+        self.test_config.set('zone', 'testzone')
+        actions.promote([])
+        self.multisite.modify_zone.assert_called_once_with(
+            'testzone',
+            default=True,
+            master=True,
+        )
+        self.multisite.update_period.assert_called_once_with()
+
+    def test_promote_unconfigured(self):
+        actions.promote([])
+        self.action_fail.assert_called_once()
+
+    def test_readonly(self):
+        self.test_config.set('zone', 'testzone')
+        actions.readonly([])
+        self.multisite.modify_zone.assert_called_once_with(
+            'testzone',
+            readonly=True,
+        )
+        self.multisite.update_period.assert_called_once_with()
+
+    def test_readonly_unconfigured(self):
+        actions.readonly([])
+        self.action_fail.assert_called_once()
+
+    def test_readwrite(self):
+        self.test_config.set('zone', 'testzone')
+        actions.readwrite([])
+        self.multisite.modify_zone.assert_called_once_with(
+            'testzone',
+            readonly=False,
+        )
+        self.multisite.update_period.assert_called_once_with()
+
+    def test_readwrite_unconfigured(self):
+        actions.readwrite([])
+        self.action_fail.assert_called_once()
+
+    def test_tidydefaults(self):
+        self.test_config.set('zone', 'testzone')
+        actions.tidydefaults([])
+        self.multisite.tidy_defaults.assert_called_once_with()
+
+    def test_tidydefaults_unconfigured(self):
+        actions.tidydefaults([])
+        self.action_fail.assert_called_once()

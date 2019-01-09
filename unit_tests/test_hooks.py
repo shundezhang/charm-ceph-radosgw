@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from mock import (
-    patch, call, MagicMock
+    patch, call, MagicMock, ANY
 )
 
 from test_utils import (
@@ -64,6 +64,7 @@ TO_PATCH = [
     'filter_installed_packages',
     'filter_missing_packages',
     'ceph_utils',
+    'multisite_deployment',
 ]
 
 
@@ -81,6 +82,7 @@ class CephRadosGWTests(CharmTestCase):
         self.systemd_based_radosgw.return_value = False
         self.filter_installed_packages.side_effect = lambda pkgs: pkgs
         self.filter_missing_packages.side_effect = lambda pkgs: pkgs
+        self.multisite_deployment.return_value = False
 
     def test_upgrade_available(self):
         _vers = {
@@ -367,3 +369,305 @@ class CephRadosGWTests(CharmTestCase):
             'vault/0'
         )
         mock_configure_https.assert_called_once_with()
+
+
+class MiscMultisiteTests(CharmTestCase):
+
+    TO_PATCH = [
+        'restart_nonce_changed',
+        'relation_ids',
+        'related_units',
+        'leader_get',
+        'is_leader',
+        'master_relation_joined',
+        'slave_relation_changed',
+        'service_restart',
+        'service_name',
+    ]
+
+    _relation_ids = {
+        'master': ['master:1'],
+        'slave': ['slave:1'],
+    }
+
+    _related_units = {
+        'master:1': ['rgw/0', 'rgw/1'],
+        'slave:1': ['rgw-s/0', 'rgw-s/1'],
+    }
+
+    def setUp(self):
+        super(MiscMultisiteTests, self).setUp(ceph_hooks,
+                                              self.TO_PATCH)
+        self.relation_ids.side_effect = (
+            lambda endpoint: self._relation_ids.get(endpoint) or []
+        )
+        self.related_units.side_effect = (
+            lambda rid: self._related_units.get(rid) or []
+        )
+        self.service_name.return_value = 'rgw@hostname'
+
+    def test_leader_settings_changed(self):
+        self.restart_nonce_changed.return_value = True
+        self.is_leader.return_value = False
+        ceph_hooks.leader_settings_changed()
+        self.service_restart.assert_called_once_with('rgw@hostname')
+        self.master_relation_joined.assert_called_once_with('master:1')
+
+    def test_process_multisite_relations(self):
+        ceph_hooks.process_multisite_relations()
+        self.master_relation_joined.assert_called_once_with('master:1')
+        self.slave_relation_changed.assert_has_calls([
+            call('slave:1', 'rgw-s/0'),
+            call('slave:1', 'rgw-s/1'),
+        ])
+
+
+class CephRadosMultisiteTests(CharmTestCase):
+
+    TO_PATCH = [
+        'ready_for_service',
+        'canonical_url',
+        'relation_set',
+        'relation_get',
+        'leader_get',
+        'config',
+        'is_leader',
+        'multisite',
+        'leader_set',
+        'service_restart',
+        'service_name',
+        'log',
+        'multisite_deployment',
+        'systemd_based_radosgw',
+    ]
+
+    def setUp(self):
+        super(CephRadosMultisiteTests, self).setUp(ceph_hooks,
+                                                   self.TO_PATCH)
+        self.config.side_effect = self.test_config.get
+        self.ready_for_service.return_value = True
+        self.canonical_url.return_value = 'http://rgw'
+        self.service_name.return_value = 'rgw@hostname'
+        self.multisite_deployment.return_value = True
+        self.systemd_based_radosgw.return_value = True
+
+
+class MasterMultisiteTests(CephRadosMultisiteTests):
+
+    _complete_config = {
+        'realm': 'testrealm',
+        'zonegroup': 'testzonegroup',
+        'zone': 'testzone',
+    }
+
+    _leader_data = {
+        'access_key': 'mykey',
+        'secret': 'mysecret',
+    }
+
+    _leader_data_done = {
+        'access_key': 'mykey',
+        'secret': 'mysecret',
+        'restart_nonce': 'foobar',
+    }
+
+    def test_master_relation_joined_missing_config(self):
+        ceph_hooks.master_relation_joined('master:1')
+        self.config.assert_has_calls([
+            call('realm'),
+            call('zonegroup'),
+            call('zone'),
+        ])
+        self.relation_set.assert_not_called()
+
+    def test_master_relation_joined_create_everything(self):
+        for k, v in self._complete_config.items():
+            self.test_config.set(k, v)
+        self.is_leader.return_value = True
+        self.leader_get.side_effect = lambda attr: self._leader_data.get(attr)
+        self.multisite.list_realms.return_value = []
+        self.multisite.list_zonegroups.return_value = []
+        self.multisite.list_zones.return_value = []
+        self.multisite.list_users.return_value = []
+        self.multisite.create_system_user.return_value = (
+            'mykey', 'mysecret',
+        )
+        ceph_hooks.master_relation_joined('master:1')
+        self.config.assert_has_calls([
+            call('realm'),
+            call('zonegroup'),
+            call('zone'),
+        ])
+        self.multisite.create_realm.assert_called_once_with(
+            'testrealm',
+            default=True,
+        )
+        self.multisite.create_zonegroup.assert_called_once_with(
+            'testzonegroup',
+            endpoints=['http://rgw:80'],
+            default=True,
+            master=True,
+            realm='testrealm',
+        )
+        self.multisite.create_zone.assert_called_once_with(
+            'testzone',
+            endpoints=['http://rgw:80'],
+            default=True,
+            master=True,
+            zonegroup='testzonegroup',
+        )
+        self.multisite.create_system_user.assert_called_once_with(
+            ceph_hooks.MULTISITE_SYSTEM_USER
+        )
+        self.multisite.modify_zone.assert_called_once_with(
+            'testzone',
+            access_key='mykey',
+            secret='mysecret',
+        )
+        self.multisite.update_period.assert_has_calls([
+            call(fatal=False),
+            call(),
+        ])
+        self.service_restart.assert_called_once_with('rgw@hostname')
+        self.leader_set.assert_has_calls([
+            call(access_key='mykey',
+                 secret='mysecret'),
+            call(restart_nonce=ANY),
+        ])
+        self.relation_set.assert_called_with(
+            relation_id='master:1',
+            access_key='mykey',
+            secret='mysecret',
+        )
+
+    def test_master_relation_joined_create_nothing(self):
+        for k, v in self._complete_config.items():
+            self.test_config.set(k, v)
+        self.is_leader.return_value = True
+        self.leader_get.side_effect = (
+            lambda attr: self._leader_data_done.get(attr)
+        )
+        self.multisite.list_realms.return_value = ['testrealm']
+        self.multisite.list_zonegroups.return_value = ['testzonegroup']
+        self.multisite.list_zones.return_value = ['testzone']
+        self.multisite.list_users.return_value = [
+            ceph_hooks.MULTISITE_SYSTEM_USER
+        ]
+        ceph_hooks.master_relation_joined('master:1')
+        self.multisite.create_realm.assert_not_called()
+        self.multisite.create_zonegroup.assert_not_called()
+        self.multisite.create_zone.assert_not_called()
+        self.multisite.create_system_user.assert_not_called()
+        self.multisite.update_period.assert_not_called()
+        self.service_restart.assert_not_called()
+        self.leader_set.assert_not_called()
+
+    def test_master_relation_joined_not_leader(self):
+        for k, v in self._complete_config.items():
+            self.test_config.set(k, v)
+        self.is_leader.return_value = False
+        self.leader_get.side_effect = lambda attr: self._leader_data.get(attr)
+        ceph_hooks.master_relation_joined('master:1')
+        self.relation_set.assert_called_once_with(
+            relation_id='master:1',
+            realm='testrealm',
+            zonegroup='testzonegroup',
+            url='http://rgw:80',
+            access_key='mykey',
+            secret='mysecret',
+        )
+        self.multisite.list_realms.assert_not_called()
+
+
+class SlaveMultisiteTests(CephRadosMultisiteTests):
+
+    _complete_config = {
+        'realm': 'testrealm',
+        'zonegroup': 'testzonegroup',
+        'zone': 'testzone2',
+    }
+
+    _test_relation = {
+        'realm': 'testrealm',
+        'zonegroup': 'testzonegroup',
+        'access_key': 'anotherkey',
+        'secret': 'anothersecret',
+        'url': 'http://master:80'
+    }
+
+    _test_bad_relation = {
+        'realm': 'anotherrealm',
+        'zonegroup': 'anotherzg',
+        'access_key': 'anotherkey',
+        'secret': 'anothersecret',
+        'url': 'http://master:80'
+    }
+
+    def test_slave_relation_changed(self):
+        for k, v in self._complete_config.items():
+            self.test_config.set(k, v)
+        self.is_leader.return_value = True
+        self.leader_get.return_value = None
+        self.relation_get.return_value = self._test_relation
+        self.multisite.list_realms.return_value = []
+        self.multisite.list_zones.return_value = []
+        ceph_hooks.slave_relation_changed('slave:1', 'rgw/0')
+        self.config.assert_has_calls([
+            call('realm'),
+            call('zonegroup'),
+            call('zone'),
+        ])
+        self.multisite.pull_realm.assert_called_once_with(
+            url=self._test_relation['url'],
+            access_key=self._test_relation['access_key'],
+            secret=self._test_relation['secret'],
+        )
+        self.multisite.pull_period.assert_called_once_with(
+            url=self._test_relation['url'],
+            access_key=self._test_relation['access_key'],
+            secret=self._test_relation['secret'],
+        )
+        self.multisite.set_default_realm.assert_called_once_with(
+            'testrealm'
+        )
+        self.multisite.create_zone.assert_called_once_with(
+            'testzone2',
+            endpoints=['http://rgw:80'],
+            default=False,
+            master=False,
+            zonegroup='testzonegroup',
+            access_key=self._test_relation['access_key'],
+            secret=self._test_relation['secret'],
+        )
+        self.multisite.update_period.assert_has_calls([
+            call(fatal=False),
+            call(),
+        ])
+        self.service_restart.assert_called_once()
+        self.leader_set.assert_called_once_with(restart_nonce=ANY)
+
+    def test_slave_relation_changed_incomplete_relation(self):
+        for k, v in self._complete_config.items():
+            self.test_config.set(k, v)
+        self.is_leader.return_value = True
+        self.relation_get.return_value = {}
+        ceph_hooks.slave_relation_changed('slave:1', 'rgw/0')
+        self.config.assert_not_called()
+
+    def test_slave_relation_changed_mismatching_config(self):
+        for k, v in self._complete_config.items():
+            self.test_config.set(k, v)
+        self.is_leader.return_value = True
+        self.relation_get.return_value = self._test_bad_relation
+        ceph_hooks.slave_relation_changed('slave:1', 'rgw/0')
+        self.config.assert_has_calls([
+            call('realm'),
+            call('zonegroup'),
+            call('zone'),
+        ])
+        self.multisite.list_realms.assert_not_called()
+
+    def test_slave_relation_changed_not_leader(self):
+        self.is_leader.return_value = False
+        ceph_hooks.slave_relation_changed('slave:1', 'rgw/0')
+        self.relation_get.assert_not_called()

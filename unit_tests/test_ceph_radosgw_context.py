@@ -324,7 +324,8 @@ class MonContextTest(CharmTestCase):
             'loglevel': 1,
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
-            'ipv6': False
+            'ipv6': False,
+            'rgw_zone': None,
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -368,7 +369,8 @@ class MonContextTest(CharmTestCase):
             'loglevel': 1,
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
-            'ipv6': False
+            'ipv6': False,
+            'rgw_zone': None,
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -421,7 +423,8 @@ class MonContextTest(CharmTestCase):
             'loglevel': 1,
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
-            'ipv6': False
+            'ipv6': False,
+            'rgw_zone': None,
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -456,7 +459,8 @@ class MonContextTest(CharmTestCase):
             'loglevel': 1,
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
-            'ipv6': False
+            'ipv6': False,
+            'rgw_zone': None,
         }
         self.assertEqual(expect, mon_ctxt())
 

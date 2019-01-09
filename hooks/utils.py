@@ -26,6 +26,8 @@ from charmhelpers.core.hookenv import (
     relation_ids,
     related_units,
     application_version_set,
+    config,
+    leader_get,
 )
 from charmhelpers.contrib.openstack import (
     context,
@@ -54,6 +56,7 @@ from charmhelpers.fetch import (
     filter_installed_packages,
     get_upstream_version,
 )
+from charmhelpers.core import unitdata
 
 # The interface is said to be satisfied if anyone of the interfaces in the
 # list has a complete context.
@@ -64,7 +67,8 @@ CEPHRG_HA_RES = 'grp_cephrg_vips'
 TEMPLATES_DIR = 'templates'
 TEMPLATES = 'templates/'
 HAPROXY_CONF = '/etc/haproxy/haproxy.cfg'
-CEPH_CONF = '/etc/ceph/ceph.conf'
+CEPH_DIR = '/etc/ceph'
+CEPH_CONF = '{}/ceph.conf'.format(CEPH_DIR)
 
 VERSION_PACKAGE = 'radosgw'
 
@@ -177,6 +181,41 @@ def check_optional_relations(configs):
             return ('blocked',
                     'hacluster missing configuration: '
                     'vip, vip_iface, vip_cidr')
+    # NOTE: misc multi-site relation and config checks
+    multisite_config = (config('realm'),
+                        config('zonegroup'),
+                        config('zone'))
+    if relation_ids('master') or relation_ids('slave'):
+        if not all(multisite_config):
+            return ('blocked',
+                    'multi-site configuration incomplete '
+                    '(realm={realm}, zonegroup={zonegroup}'
+                    ', zone={zone})'.format(**config()))
+    if (all(multisite_config) and not
+            (relation_ids('master') or relation_ids('slave'))):
+        return ('blocked',
+                'multi-site configuration but master/slave '
+                'relation missing')
+    if (all(multisite_config) and relation_ids('slave')):
+        multisite_ready = False
+        for rid in relation_ids('slave'):
+            for unit in related_units(rid):
+                if relation_get('url', unit=unit, rid=rid):
+                    multisite_ready = True
+                    continue
+        if not multisite_ready:
+            return ('waiting',
+                    'multi-site master relation incomplete')
+    master_configured = (
+        leader_get('access_key'),
+        leader_get('secret'),
+        leader_get('restart_nonce'),
+    )
+    if (all(multisite_config) and
+            relation_ids('master') and
+            not all(master_configured)):
+        return ('waiting',
+                'waiting for configuration of master zone')
     # return 'unknown' as the lowest priority to not clobber an existing
     # status.
     return 'unknown', ''
@@ -317,8 +356,77 @@ def request_per_unit_key():
 
 
 def service_name():
-    """Determine the name of the RADOS Gateway service"""
+    """Determine the name of the RADOS Gateway service
+
+    :return: service name to use
+    :rtype: str
+    """
     if systemd_based_radosgw():
         return 'ceph-radosgw@rgw.{}'.format(socket.gethostname())
     else:
         return 'radosgw'
+
+
+def ready_for_service(legacy=True):
+    """
+    Determine when local unit is ready to service requests determined
+    by presentation of required cephx keys on the mon relation and
+    presence of the associated keyring in /etc/ceph.
+
+    :param legacy: whether to check for legacy key support
+    :type legacy: boolean
+    :return: whether unit is ready
+    :rtype: boolean
+    """
+    name = 'rgw.{}'.format(socket.gethostname())
+    for rid in relation_ids('mon'):
+        for unit in related_units(rid):
+            if (relation_get('{}_key'.format(name),
+                             rid=rid, unit=unit) and
+                    os.path.exists(
+                        os.path.join(
+                            CEPH_DIR,
+                            'ceph.client.{}.keyring'.format(name)
+                        ))):
+                return True
+            if (legacy and
+                    relation_get('radosgw_key',
+                                 rid=rid, unit=unit) and
+                    os.path.exists(
+                        os.path.join(
+                            CEPH_DIR,
+                            'keyring.rados.gateway'
+                        ))):
+                return True
+    return False
+
+
+def restart_nonce_changed(nonce):
+    """
+    Determine whether the restart nonce provided has changed
+    since this function was last invoked.
+
+    :param nonce: value to confirm has changed against the
+                  remembered value for restart_nonce.
+    :type nonce: str
+    :return: whether nonce has changed value
+    :rtype: boolean
+    """
+    db = unitdata.kv()
+    nonce_key = 'restart_nonce'
+    if nonce != db.get(nonce_key):
+        db.set(nonce_key, nonce)
+        db.flush()
+        return True
+    return False
+
+
+def multisite_deployment():
+    """Determine if deployment is multi-site
+
+    :returns: whether multi-site deployment is configured
+    :rtype: boolean
+    """
+    return all((config('zone'),
+                config('zonegroup'),
+                config('realm')))

@@ -292,3 +292,22 @@ options:
     description: |
       SSL CA to use with the certificate and key provided - this is only
       required if you are providing a privately signed ssl_cert and ssl_key.
+  # Multi Site Options
+  realm:
+    type: string
+    default:
+    description: |
+      Name of RADOS Gateway Realm to create for multi-site replication. Setting
+      this option will enable support for multi-site replication, at which
+      point the zonegroup and zone options must also be provided.
+  zonegroup:
+    type: string
+    default:
+    description: |
+      Name of RADOS Gateway Zone Group to create for multi-site replication.
+  zone:
+    type: string
+    default:
+    description: |
+      Name of RADOS Gateway Zone to create for multi-site replication. This
+      option must be specific to the local site e.g. us-west or us-east.
