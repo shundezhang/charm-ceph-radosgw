@@ -427,7 +427,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             expected['client.radosgw.gateway']['rgw keystone admin token'] = (
                 'ubuntutesting')
 
-        for section, pairs in expected.iteritems():
+        for section, pairs in expected.items():
             ret = u.validate_config_data(unit, conf, section, pairs)
             if ret:
                 message = "ceph config error: {}".format(ret)
@@ -444,7 +444,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                 'volume_driver': 'cinder.volume.drivers.rbd.RBDDriver'
             }
         }
-        for section, pairs in expected.iteritems():
+        for section, pairs in expected.items():
             ret = u.validate_config_data(unit, conf, section, pairs)
             if ret:
                 message = "cinder (rbd) config error: {}".format(ret)
@@ -474,7 +474,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
             section = 'DEFAULT'
 
         expected = {section: config}
-        for section, pairs in expected.iteritems():
+        for section, pairs in expected.items():
             ret = u.validate_config_data(unit, conf, section, pairs)
             if ret:
                 message = "glance (rbd) config error: {}".format(ret)
@@ -491,7 +491,7 @@ class CephRadosGwBasicDeployment(OpenStackAmuletDeployment):
                 'rbd_secret_uuid': u.not_null
             }
         }
-        for section, pairs in expected.iteritems():
+        for section, pairs in expected.items():
             ret = u.validate_config_data(unit, conf, section, pairs)
             if ret:
                 message = "nova (rbd) config error: {}".format(ret)

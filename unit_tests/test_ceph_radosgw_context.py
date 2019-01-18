@@ -38,6 +38,7 @@ class HAProxyContextTests(CharmTestCase):
         super(HAProxyContextTests, self).setUp(context, TO_PATCH)
         self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
+        self.cmp_pkgrevno.return_value = 1
 
     @patch('charmhelpers.contrib.openstack.context.get_relation_ip')
     @patch('charmhelpers.contrib.openstack.context.mkdir')
@@ -71,6 +72,7 @@ class IdentityServiceContextTest(CharmTestCase):
         self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
         self.maxDiff = None
+        self.cmp_pkgrevno.return_value = 1
 
     @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
     @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
@@ -295,6 +297,7 @@ class MonContextTest(CharmTestCase):
         super(MonContextTest, self).setUp(context, TO_PATCH)
         self.config.side_effect = self.test_config.get
         self.unit_public_ip.return_value = '10.255.255.255'
+        self.cmp_pkgrevno.return_value = 1
 
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')

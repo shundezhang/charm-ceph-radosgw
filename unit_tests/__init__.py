@@ -14,5 +14,7 @@
 
 import sys
 
-sys.path.append('actions/')
-sys.path.append('hooks/')
+sys.path.append('actions')
+sys.path.append('hooks')
+sys.path.append('lib')
+sys.path.append('unit_tests')

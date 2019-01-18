@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python3
 #
 # Copyright 2016 Canonical Ltd
 #
@@ -136,8 +136,7 @@ def install():
         os.makedirs('/etc/ceph')
 
 
-@hooks.hook('upgrade-charm',
-            'config-changed')
+@hooks.hook('config-changed')
 @restart_on_change({'/etc/ceph/ceph.conf': ['radosgw'],
                     '/etc/haproxy/haproxy.cfg': ['haproxy']})
 @harden()

@@ -67,6 +67,7 @@ class CephRadosGWTests(CharmTestCase):
         self.test_config.set('source', 'distro')
         self.test_config.set('key', 'secretkey')
         self.test_config.set('use-syslog', False)
+        self.cmp_pkgrevno.return_value = 0
 
     def test_install_packages(self):
         ceph_hooks.install_packages()

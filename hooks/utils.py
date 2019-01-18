@@ -172,7 +172,7 @@ def register_configs(release='icehouse'):
         CONFIGS[CEPH_CONF]['contexts'].append(
             ceph_radosgw_context.IdentityServiceContext()
         )
-    for cfg, rscs in CONFIGS.iteritems():
+    for cfg, rscs in CONFIGS.items():
         configs.register(cfg, rscs['contexts'])
     return configs
 
