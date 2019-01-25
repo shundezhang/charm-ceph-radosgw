@@ -38,8 +38,6 @@ TO_PATCH = [
     'cmp_pkgrevno',
     'execd_preinstall',
     'enable_pocket',
-    'get_iface_for_address',
-    'get_netmask_for_address',
     'log',
     'open_port',
     'os',
@@ -50,8 +48,7 @@ TO_PATCH = [
     'status_set',
     'subprocess',
     'sys',
-    'get_hacluster_config',
-    'update_dns_ha_resource_params',
+    'generate_ha_relation_data',
     'get_relation_ip',
     'disable_unused_apache_sites',
     'service_reload',
@@ -261,67 +258,15 @@ class CephRadosGWTests(CharmTestCase):
         self.CONFIGS.write_all.assert_called_with()
         _id_joined.assert_called_with(relid='rid')
 
-    def test_ha_relation_joined_vip(self):
-        self.test_config.set('ha-bindiface', 'eth8')
-        self.test_config.set('ha-mcastport', '5000')
-        self.test_config.set('vip', '10.0.0.10')
-        self.get_hacluster_config.return_value = {
-            'vip': '10.0.0.10',
-            'ha-bindiface': 'eth8',
-            'ha-mcastport': '5000',
+    def test_ha_relation_joined(self):
+        self.generate_ha_relation_data.return_value = {
+            'test': 'data'
         }
-        self.get_iface_for_address.return_value = 'eth7'
-        self.get_netmask_for_address.return_value = '255.255.0.0'
-        ceph_hooks.ha_relation_joined()
-        eth_params = ('params ip="10.0.0.10" cidr_netmask="255.255.0.0" '
-                      'nic="eth7"')
-        resources = {'res_cephrg_haproxy': 'lsb:haproxy',
-                     'res_cephrg_eth7_vip': 'ocf:heartbeat:IPaddr2'}
-        resource_params = {'res_cephrg_haproxy': 'op monitor interval="5s"',
-                           'res_cephrg_eth7_vip': eth_params}
+        ceph_hooks.ha_relation_joined(relation_id='ha:1')
         self.relation_set.assert_called_with(
-            relation_id=None,
-            init_services={'res_cephrg_haproxy': 'haproxy'},
-            corosync_bindiface='eth8',
-            corosync_mcastport='5000',
-            resource_params=resource_params,
-            resources=resources,
-            clones={'cl_cephrg_haproxy': 'res_cephrg_haproxy'})
-
-    def test_ha_joined_dns_ha(self):
-        def _fake_update(resources, resource_params, relation_id=None):
-            resources.update({'res_cephrg_public_hostname': 'ocf:maas:dns'})
-            resource_params.update({'res_cephrg_public_hostname':
-                                    'params fqdn="keystone.maas" '
-                                    'ip_address="10.0.0.1"'})
-
-        self.test_config.set('dns-ha', True)
-        self.get_hacluster_config.return_value = {
-            'vip': None,
-            'ha-bindiface': 'em0',
-            'ha-mcastport': '8080',
-            'os-admin-hostname': None,
-            'os-internal-hostname': None,
-            'os-public-hostname': 'keystone.maas',
-        }
-        args = {
-            'relation_id': None,
-            'corosync_bindiface': 'em0',
-            'corosync_mcastport': '8080',
-            'init_services': {'res_cephrg_haproxy': 'haproxy'},
-            'resources': {'res_cephrg_public_hostname': 'ocf:maas:dns',
-                          'res_cephrg_haproxy': 'lsb:haproxy'},
-            'resource_params': {
-                'res_cephrg_public_hostname': 'params fqdn="keystone.maas" '
-                                              'ip_address="10.0.0.1"',
-                'res_cephrg_haproxy': 'op monitor interval="5s"'},
-            'clones': {'cl_cephrg_haproxy': 'res_cephrg_haproxy'}
-        }
-        self.update_dns_ha_resource_params.side_effect = _fake_update
-
-        ceph_hooks.ha_relation_joined()
-        self.assertTrue(self.update_dns_ha_resource_params.called)
-        self.relation_set.assert_called_with(**args)
+            relation_id='ha:1',
+            test='data'
+        )
 
     def test_ha_relation_changed(self):
         _id_joined = self.patch('identity_joined')
