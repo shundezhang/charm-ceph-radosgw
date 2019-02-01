@@ -152,10 +152,14 @@ def resource_map():
     """
     resource_map = deepcopy(BASE_RESOURCE_MAP)
 
-    if os.path.exists('/etc/apache2/conf-available'):
+    if not https():
         resource_map.pop(APACHE_SITE_CONF)
-    else:
         resource_map.pop(APACHE_SITE_24_CONF)
+    else:
+        if os.path.exists('/etc/apache2/conf-available'):
+            resource_map.pop(APACHE_SITE_CONF)
+        else:
+            resource_map.pop(APACHE_SITE_24_CONF)
 
     return resource_map
 
@@ -175,6 +179,12 @@ def register_configs(release='icehouse'):
     for cfg, rscs in CONFIGS.iteritems():
         configs.register(cfg, rscs['contexts'])
     return configs
+
+
+def restart_map():
+    return OrderedDict([(cfg, v['services'])
+                        for cfg, v in resource_map().items()
+                        if v['services']])
 
 
 def services():

@@ -84,9 +84,15 @@ from utils import (
     disable_unused_apache_sites,
     pause_unit_helper,
     resume_unit_helper,
+    restart_map,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 from charmhelpers.contrib.hardening.harden import harden
+
+from charmhelpers.contrib.openstack.cert_utils import (
+    get_certificate_request,
+    process_certificates,
+)
 
 hooks = Hooks()
 CONFIGS = register_configs()
@@ -166,6 +172,10 @@ def config_changed():
     for r_id in relation_ids('mon'):
         for unit in related_units(r_id):
             mon_relation(r_id, unit)
+
+    # Refire certificates relations for VIP changes
+    for r_id in relation_ids('certificates'):
+        certs_joined(r_id)
 
     CONFIGS.write_all()
     configure_https()
@@ -266,6 +276,9 @@ def cluster_changed():
     CONFIGS.write_all()
     for r_id in relation_ids('identity-service'):
         identity_joined(relid=r_id)
+    for r_id in relation_ids('certificates'):
+        for unit in related_units(r_id):
+            certs_changed(r_id, unit)
 
 
 @hooks.hook('ha-relation-joined')
@@ -405,6 +418,22 @@ def post_series_upgrade():
     log("Running complete series upgrade hook", "INFO")
     series_upgrade_complete(
         resume_unit_helper, CONFIGS)
+
+
+@hooks.hook('certificates-relation-joined')
+def certs_joined(relation_id=None):
+    relation_set(
+        relation_id=relation_id,
+        relation_settings=get_certificate_request())
+
+
+@hooks.hook('certificates-relation-changed')
+def certs_changed(relation_id=None, unit=None):
+    @restart_on_change(restart_map(), stopstart=True)
+    def _certs_changed():
+        process_certificates('ceph-radosgw', relation_id, unit)
+        configure_https()
+    _certs_changed()
 
 
 if __name__ == '__main__':

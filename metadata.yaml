@@ -29,6 +29,8 @@ requires:
   ha:
     interface: hacluster
     scope: container
+  certificates:
+    interface: tls-certificates
 provides:
   nrpe-external-master:
     interface: nrpe-external-master
