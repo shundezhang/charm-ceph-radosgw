@@ -61,6 +61,8 @@ TO_PATCH = [
     'restart_map',
     'systemd_based_radosgw',
     'request_per_unit_key',
+    'get_certificate_request',
+    'process_certificates',
 ]
 
 
@@ -91,13 +93,19 @@ class CephRadosGWTests(CharmTestCase):
         self.enable_pocket.assert_called_with('multiverse')
         self.os.makedirs.called_with('/var/lib/ceph/nss')
 
+    @patch.object(ceph_hooks, 'certs_joined')
     @patch.object(ceph_hooks, 'update_nrpe_config')
-    def test_config_changed(self, update_nrpe_config):
+    def test_config_changed(self, update_nrpe_config, mock_certs_joined):
         _install_packages = self.patch('install_packages')
+        _relations = {
+            'certificates': ['certificates:1']
+        }
+        self.relation_ids.side_effect = lambda name: _relations.get(name, [])
         ceph_hooks.config_changed()
         self.assertTrue(_install_packages.called)
         self.CONFIGS.write_all.assert_called_with()
         update_nrpe_config.assert_called_with()
+        mock_certs_joined.assert_called_once_with('certificates:1')
 
     @patch.object(ceph_hooks, 'is_request_complete',
                   lambda *args, **kwargs: True)
@@ -251,12 +259,22 @@ class CephRadosGWTests(CharmTestCase):
                       'internal-address': '10.0.1.1',
                       'private-address': '10.0.3.1'})])
 
-    def test_cluster_changed(self):
+    @patch.object(ceph_hooks, 'certs_changed')
+    def test_cluster_changed(self, mock_certs_changed):
         _id_joined = self.patch('identity_joined')
-        self.relation_ids.return_value = ['rid']
+        _relations = {
+            'identity-service': ['rid'],
+            'certificates': ['certificates:1'],
+        }
+        self.relation_ids.side_effect = lambda name: _relations.get(name)
+        self.related_units.return_value = ['vault/0', 'vault/1']
         ceph_hooks.cluster_changed()
         self.CONFIGS.write_all.assert_called_with()
         _id_joined.assert_called_with(relid='rid')
+        mock_certs_changed.assert_has_calls([
+            call('certificates:1', 'vault/0'),
+            call('certificates:1', 'vault/1')
+        ])
 
     def test_ha_relation_joined(self):
         self.generate_ha_relation_data.return_value = {
@@ -274,3 +292,22 @@ class CephRadosGWTests(CharmTestCase):
         self.relation_ids.return_value = ['rid']
         ceph_hooks.ha_relation_changed()
         _id_joined.assert_called_with(relid='rid')
+
+    def test_certs_joined(self):
+        self.get_certificate_request.return_value = {'foo': 'baa'}
+        ceph_hooks.certs_joined('certificates:1')
+        self.relation_set.assert_called_once_with(
+            relation_id='certificates:1',
+            relation_settings={'foo': 'baa'}
+        )
+        self.get_certificate_request.assert_called_once_with()
+
+    @patch.object(ceph_hooks, 'configure_https')
+    def test_certs_changed(self, mock_configure_https):
+        ceph_hooks.certs_changed('certificates:1', 'vault/0')
+        self.process_certificates.assert_called_once_with(
+            'ceph-radosgw',
+            'certificates:1',
+            'vault/0'
+        )
+        mock_configure_https.assert_called_once_with()
