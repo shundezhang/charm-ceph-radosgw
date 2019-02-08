@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 # Re-install dependencies to deal with py2->py3 switch for charm
 
 ./hooks/install_deps

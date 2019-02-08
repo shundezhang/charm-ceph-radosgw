@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -e
 # Install required dependencies for charm runtime
 
 declare -a DEPS=('apt' 'netaddr' 'netifaces' 'yaml' 'jinja2' 'dnspython')
