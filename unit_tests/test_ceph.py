@@ -23,7 +23,7 @@ mock_apt.apt_pkg = MagicMock()
 sys.modules['apt'] = mock_apt
 sys.modules['apt_pkg'] = mock_apt.apt_pkg
 
-import ceph  # noqa
+import ceph_rgw as ceph  # noqa
 import utils  # noqa
 
 from test_utils import CharmTestCase  # noqa

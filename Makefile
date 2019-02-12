@@ -16,9 +16,12 @@ bin/charm_helpers_sync.py:
 	@mkdir -p bin
 	@curl -o bin/charm_helpers_sync.py https://raw.githubusercontent.com/juju/charm-helpers/master/tools/charm_helpers_sync/charm_helpers_sync.py
 
+bin/git_sync.py:
+	@mkdir -p bin
+	@wget -O bin/git_sync.py https://raw.githubusercontent.com/CanonicalLtd/git-sync/master/git_sync.py
+
 sync: bin/charm_helpers_sync.py
 	@$(PYTHON) bin/charm_helpers_sync.py -c charm-helpers-hooks.yaml
 
-publish: lint test
-	bzr push lp:charms/ceph-radosgw
-	bzr push lp:charms/trusty/ceph-radosgw
+ceph-sync:  bin/git_sync.py
+	$(PYTHON) bin/git_sync.py -d lib -s https://github.com/openstack/charms.ceph.git

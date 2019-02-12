@@ -13,7 +13,7 @@
 # limitations under the License.
 
 from mock import (
-    patch, call
+    patch, call, MagicMock
 )
 
 from test_utils import (
@@ -63,6 +63,9 @@ TO_PATCH = [
     'request_per_unit_key',
     'get_certificate_request',
     'process_certificates',
+    'filter_installed_packages',
+    'filter_missing_packages',
+    'ceph_utils',
 ]
 
 
@@ -78,12 +81,69 @@ class CephRadosGWTests(CharmTestCase):
         self.service_name.return_value = 'radosgw'
         self.request_per_unit_key.return_value = False
         self.systemd_based_radosgw.return_value = False
+        self.filter_installed_packages.side_effect = lambda pkgs: pkgs
+        self.filter_missing_packages.side_effect = lambda pkgs: pkgs
 
-    def test_install_packages(self):
+    def test_upgrade_available(self):
+        _vers = {
+            'distro': 'luminous',
+            'cloud:bionic-rocky': 'mimic',
+        }
+        mock_config = MagicMock()
+        self.test_config.set('source', 'cloud:bionic-rocky')
+        mock_config.get.side_effect = self.test_config.get
+        mock_config.previous.return_value = 'distro'
+        self.config.side_effect = None
+        self.config.return_value = mock_config
+        self.ceph_utils.UPGRADE_PATHS = {
+            'luminous': 'mimic',
+        }
+        self.ceph_utils.resolve_ceph_version.side_effect = (
+            lambda v: _vers.get(v)
+        )
+        self.assertTrue(ceph_hooks.upgrade_available())
+
+    @patch.object(ceph_hooks, 'upgrade_available')
+    def test_install_packages(self, upgrade_available):
+        mock_config = MagicMock()
+        mock_config.get.side_effect = self.test_config.get
+        mock_config.changed.return_value = True
+        self.config.side_effect = None
+        self.config.return_value = mock_config
+        upgrade_available.return_value = False
         ceph_hooks.install_packages()
         self.add_source.assert_called_with('distro', 'secretkey')
-        self.assertTrue(self.apt_update.called)
-        self.apt_purge.assert_called_with(['libapache2-mod-fastcgi'])
+        self.apt_update.assert_called_with(fatal=True)
+        self.apt_purge.assert_called_with(ceph_hooks.APACHE_PACKAGES)
+        self.apt_install.assert_called_with(ceph_hooks.PACKAGES,
+                                            fatal=True)
+        mock_config.changed.assert_called_with('source')
+        self.filter_installed_packages.assert_called_with(
+            ceph_hooks.PACKAGES
+        )
+        self.filter_missing_packages.assert_called_with(
+            ceph_hooks.APACHE_PACKAGES
+        )
+
+    @patch.object(ceph_hooks, 'upgrade_available')
+    def test_install_packages_upgrades(self, upgrade_available):
+        mock_config = MagicMock()
+        mock_config.get.side_effect = self.test_config.get
+        mock_config.changed.return_value = True
+        self.config.side_effect = None
+        self.config.return_value = mock_config
+        upgrade_available.return_value = True
+        ceph_hooks.install_packages()
+        self.add_source.assert_called_with('distro', 'secretkey')
+        self.apt_update.assert_called_with(fatal=True)
+        self.apt_purge.assert_called_with(ceph_hooks.APACHE_PACKAGES)
+        self.apt_install.assert_called_with(ceph_hooks.PACKAGES,
+                                            fatal=True)
+        mock_config.changed.assert_called_with('source')
+        self.filter_installed_packages.assert_not_called()
+        self.filter_missing_packages.assert_called_with(
+            ceph_hooks.APACHE_PACKAGES
+        )
 
     def test_install(self):
         _install_packages = self.patch('install_packages')

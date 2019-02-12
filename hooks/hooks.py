@@ -19,7 +19,10 @@ import subprocess
 import sys
 import socket
 
-import ceph
+sys.path.append('lib')
+
+import ceph_rgw as ceph
+import ceph.utils as ceph_utils
 
 from charmhelpers.core.hookenv import (
     relation_get,
@@ -39,6 +42,7 @@ from charmhelpers.fetch import (
     apt_purge,
     add_source,
     filter_installed_packages,
+    filter_missing_packages,
 )
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import (
@@ -115,16 +119,45 @@ APACHE_PACKAGES = [
 ]
 
 
+def upgrade_available():
+    """Check for upgrade for ceph
+
+    :returns: whether an upgrade is available
+    :rtype: boolean
+    """
+    c = config()
+    old_version = ceph_utils.resolve_ceph_version(c.previous('source') or
+                                                  'distro')
+    new_version = ceph_utils.resolve_ceph_version(c.get('source'))
+    if (old_version in ceph_utils.UPGRADE_PATHS and
+            new_version == ceph_utils.UPGRADE_PATHS[old_version]):
+        return True
+    return False
+
+
 def install_packages():
-    add_source(config('source'), config('key'))
-    apt_update(fatal=True)
+    c = config()
+    if c.changed('source') or c.changed('key'):
+        add_source(c.get('source'), c.get('key'))
+        apt_update(fatal=True)
+
     if is_container():
         PACKAGES.remove('ntp')
-    pkgs = filter_installed_packages(PACKAGES)
+
+    # NOTE: just use full package list if we're in an upgrade
+    #       config-changed execution
+    pkgs = (
+        PACKAGES if upgrade_available() else
+        filter_installed_packages(PACKAGES)
+    )
     if pkgs:
         status_set('maintenance', 'Installing radosgw packages')
-        apt_install(PACKAGES, fatal=True)
-    apt_purge(APACHE_PACKAGES)
+        apt_install(pkgs, fatal=True)
+
+    pkgs = filter_missing_packages(APACHE_PACKAGES)
+    if pkgs:
+        apt_purge(pkgs)
+
     disable_unused_apache_sites()
 
 
@@ -153,7 +186,6 @@ def config_changed():
             return
 
         install_packages()
-        disable_unused_apache_sites()
 
         if config('prefer-ipv6'):
             status_set('maintenance', 'configuring ipv6')
