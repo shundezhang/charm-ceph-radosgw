@@ -98,7 +98,6 @@ class IdentityServiceContext(context.IdentityServiceContext):
         ctxt['auth_type'] = 'keystone'
         ctxt['user_roles'] = config('operator-roles')
         ctxt['cache_size'] = config('cache-size')
-        ctxt['revocation_check_interval'] = config('revocation-check-interval')
         if self.context_complete(ctxt):
             return ctxt
         return {}
@@ -203,12 +202,6 @@ class MonContext(context.CephContext):
             # not available externally). ~tribaal
             'unit_public_ip': unit_public_ip(),
         }
-
-        certs_path = '/var/lib/ceph/nss'
-        paths = [os.path.join(certs_path, 'ca.pem'),
-                 os.path.join(certs_path, 'signing_certificate.pem')]
-        if all([os.path.isfile(p) for p in paths]):
-            ctxt['cms'] = True
 
         # NOTE(dosaboy): these sections must correspond to what is supported in
         #                the config template.

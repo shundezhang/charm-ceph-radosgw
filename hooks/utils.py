@@ -13,10 +13,8 @@
 # limitations under the License.
 
 import os
-import re
 import socket
 import subprocess
-import sys
 
 from collections import OrderedDict
 from copy import deepcopy
@@ -24,18 +22,10 @@ from copy import deepcopy
 import ceph_radosgw_context
 
 from charmhelpers.core.hookenv import (
-    log,
-    DEBUG,
-    ERROR,
-    INFO,
     relation_get,
     relation_ids,
     related_units,
     application_version_set,
-)
-from charmhelpers.contrib.network.ip import (
-    format_ipv6_addr,
-    is_ipv6,
 )
 from charmhelpers.contrib.openstack import (
     context,
@@ -46,9 +36,6 @@ from charmhelpers.contrib.openstack.utils import (
     pause_unit,
     resume_unit,
 )
-from charmhelpers.contrib.openstack.keystone import (
-    format_endpoint,
-)
 from charmhelpers.contrib.hahelpers.cluster import (
     get_hacluster_config,
     https,
@@ -56,7 +43,6 @@ from charmhelpers.contrib.hahelpers.cluster import (
 from charmhelpers.core.host import (
     cmp_pkgrevno,
     lsb_release,
-    mkdir,
     CompareHostReleases,
     init_is_systemd,
 )
@@ -68,36 +54,6 @@ from charmhelpers.fetch import (
     filter_installed_packages,
     get_upstream_version,
 )
-
-# NOTE: some packages are installed by the charm so may not be available
-#       yet. Calls that depend on them should be aware of this (and use the
-#       defer_if_unavailable() decorator).
-try:
-    import keystoneclient
-    from keystoneclient.v2_0 import client
-    from keystoneclient.v3 import client as client_v3
-    try:
-        # Kilo and newer
-        from keystoneclient.exceptions import (
-            ConnectionRefused,
-            Forbidden,
-            InternalServerError,
-        )
-    except ImportError:
-        # Juno and older
-        from keystoneclient.exceptions import (
-            ConnectionError as ConnectionRefused,
-            Forbidden,
-            InternalServerError,
-        )
-except ImportError:
-    keystoneclient = None
-
-# This is installed as a dep of python-keystoneclient
-try:
-    import requests
-except ImportError:
-    requests = None
 
 # The interface is said to be satisfied if anyone of the interfaces in the
 # list has a complete context.
@@ -137,14 +93,6 @@ BASE_RESOURCE_MAP = OrderedDict([
         'services': ['apache2'],
     }),
 ])
-
-
-class KSCertSetupException(BaseException):
-    """Keystone SSL Certificate Setup Exception.
-
-    This exception should be raised if any part of cert setup fails.
-    """
-    pass
 
 
 def resource_map():
@@ -196,18 +144,6 @@ def services():
     for v in resource_map().values():
         _services.extend(v.get('services', []))
     return list(set(_services))
-
-
-def enable_pocket(pocket):
-    apt_sources = "/etc/apt/sources.list"
-    with open(apt_sources, "r") as sources:
-        lines = sources.readlines()
-    with open(apt_sources, "w") as sources:
-        for line in lines:
-            if pocket in line:
-                sources.write(re.sub('^# deb', 'deb', line))
-            else:
-                sources.write(line)
 
 
 def get_optional_interfaces():
@@ -345,213 +281,6 @@ def get_pkg_version(name):
     pkg = apt_cache()[name]
     version = apt_pkg.upstream_version(pkg.current_ver.ver_str)
     return version
-
-
-def defer_if_unavailable(modules):
-    """If a function depends on a package/module that is installed by the charm
-    but may not yet have been installed, it can be deferred using this
-    decorator.
-
-    :param modules: list of modules that must be importable.
-    """
-    def _inner1_defer_if_unavailable(f):
-        def _inner2_defer_if_unavailable(*args, **kwargs):
-            for m in modules:
-                if m not in sys.modules:
-                    log("Module '{}' does not appear to be available "
-                        "yet - deferring call to '{}' until it "
-                        "is.".format(m, f.__name__), level=INFO)
-                    return
-
-            return f(*args, **kwargs)
-
-        return _inner2_defer_if_unavailable
-
-    return _inner1_defer_if_unavailable
-
-
-@defer_if_unavailable(['keystoneclient'])
-def get_ks_cert(ksclient, auth_endpoint, cert_type):
-    """Get certificate from keystone.
-
-    :param ksclient: Keystone client
-    :param auth_endpoint: Keystone auth endpoint url
-    :param certs_path: Path to local certs store
-    :returns: certificate
-    """
-    if ksclient.version == 'v3':
-        if cert_type == 'signing':
-            cert_type = 'certificates'
-        request = ("{}OS-SIMPLE-CERT/{}"
-                   "".format(auth_endpoint, cert_type))
-    else:
-        request = "{}/certificates/{}".format(auth_endpoint, cert_type)
-
-    try:
-        try:
-            # Kilo and newer
-            if cert_type == 'ca':
-                cert = ksclient.certificates.get_ca_certificate()
-            elif cert_type in ['signing', 'certificates']:
-                cert = ksclient.certificates.get_signing_certificate()
-            else:
-                raise KSCertSetupException("Invalid cert type "
-                                           "'{}'".format(cert_type))
-        except AttributeError:
-            # Keystone v3 or Juno and older
-            response = requests.request('GET', request)
-            if response.status_code == requests.codes.ok:
-                cert = response.text
-            else:
-                raise KSCertSetupException("Unable to retrieve certificate")
-    except (ConnectionRefused, requests.exceptions.ConnectionError,
-            Forbidden, InternalServerError):
-        raise KSCertSetupException("Error connecting to keystone")
-
-    return cert
-
-
-@defer_if_unavailable(['keystoneclient'])
-def get_ks_ca_cert(ksclient, auth_endpoint, certs_path):
-    """"Get and store keystone CA certificate.
-
-    :param ksclient: Keystone client
-    :param auth_endpoint: Keystone auth endpoint url
-    :param certs_path: Path to local certs store
-    :returns: None
-    """
-
-    ca_cert = get_ks_cert(ksclient, auth_endpoint, 'ca')
-    if ca_cert:
-        try:
-            # Cert should not contain unicode chars.
-            str(ca_cert)
-        except UnicodeEncodeError:
-            raise KSCertSetupException("Did not get a valid ca cert from "
-                                       "keystone - cert setup incomplete")
-
-        log("Updating ca cert from keystone", level=DEBUG)
-        ca = os.path.join(certs_path, 'ca.pem')
-        with open(ca, 'w') as fd:
-            fd.write(ca_cert)
-
-        out = subprocess.check_output(['openssl', 'x509', '-in', ca,
-                                       '-pubkey'])
-        p = subprocess.Popen(['certutil', '-d', certs_path, '-A', '-n', 'ca',
-                              '-t', 'TCu,Cu,Tuw'], stdin=subprocess.PIPE)
-        p.communicate(out)
-    else:
-        raise KSCertSetupException("No ca cert available from keystone")
-
-
-@defer_if_unavailable(['keystoneclient'])
-def get_ks_signing_cert(ksclient, auth_endpoint, certs_path):
-    """"Get and store keystone signing certificate.
-
-    :param ksclient: Keystone client
-    :param auth_endpoint: Keystone auth endpoint url
-    :param certs_path: Path to local certs store
-    :returns: None
-    """
-    signing_cert = get_ks_cert(ksclient, auth_endpoint, 'signing')
-    if signing_cert:
-        try:
-            # Cert should not contain unicode chars.
-            str(signing_cert)
-        except UnicodeEncodeError:
-            raise KSCertSetupException("Invalid signing cert from keystone")
-
-        log("Updating signing cert from keystone", level=DEBUG)
-        signing_cert_path = os.path.join(certs_path, 'signing_certificate.pem')
-        with open(signing_cert_path, 'w') as fd:
-            fd.write(signing_cert)
-
-        out = subprocess.check_output(['openssl', 'x509', '-in',
-                                       signing_cert_path, '-pubkey'])
-        p = subprocess.Popen(['certutil', '-A', '-d', certs_path, '-n',
-                              'signing_cert', '-t', 'P,P,P'],
-                             stdin=subprocess.PIPE)
-        p.communicate(out)
-    else:
-        raise KSCertSetupException("No signing cert available from keystone")
-
-
-@defer_if_unavailable(['keystoneclient'])
-def setup_keystone_certs(CONFIGS):
-    """
-    Get CA and signing certs from Keystone used to decrypt revoked token list.
-
-    :param unit: context unit id
-    :param rid: context relation id
-    :returns: None
-    """
-    certs_path = '/var/lib/ceph/nss'
-    if not os.path.exists(certs_path):
-        mkdir(certs_path)
-
-    # Do not continue until identity-relation is complete
-    if 'identity-service' not in CONFIGS.complete_contexts():
-        log("Missing relation settings - deferring cert setup",
-            level=DEBUG)
-        return
-
-    ksclient = get_keystone_client_from_relation()
-    if not ksclient:
-        log("Failed to get keystoneclient", level=ERROR)
-        return
-
-    auth_endpoint = ksclient.auth_endpoint
-
-    try:
-        get_ks_ca_cert(ksclient, auth_endpoint, certs_path)
-        get_ks_signing_cert(ksclient, auth_endpoint, certs_path)
-    except KSCertSetupException as e:
-        log("Keystone certs setup incomplete - {}".format(e), level=INFO)
-
-
-# TODO: Move to charmhelpers
-# TODO: Make it session aware
-def get_keystone_client_from_relation(relation_type='identity-service'):
-    """ Get keystone client from relation data
-
-    :param relation_type: Relation to keystone
-    :returns: Keystone client
-    """
-    required = ['admin_token', 'auth_host', 'auth_port', 'api_version']
-    settings = {}
-
-    rdata = {}
-    for relid in relation_ids(relation_type):
-        for unit in related_units(relid):
-            rdata = relation_get(unit=unit, rid=relid) or {}
-            if set(required).issubset(set(rdata.keys())):
-                settings = {key: rdata.get(key) for key in required}
-                break
-
-    if not settings:
-        log("Required settings not yet provided by any identity-service "
-            "relation units", INFO)
-        return None
-
-    auth_protocol = rdata.get('auth_protocol', 'http')
-    if is_ipv6(settings.get('auth_host')):
-        settings['auth_host'] = format_ipv6_addr(settings.get('auth_host'))
-
-    api_version = rdata.get('api_version')
-    auth_endpoint = format_endpoint(auth_protocol,
-                                    settings['auth_host'],
-                                    settings['auth_port'],
-                                    settings['api_version'])
-
-    if api_version and '3' in api_version:
-        ksclient = client_v3.Client(token=settings['admin_token'],
-                                    endpoint=auth_endpoint)
-    else:
-        ksclient = client.Client(token=settings['admin_token'],
-                                 endpoint=auth_endpoint)
-    # Add simple way to retrieve keystone auth endpoint
-    ksclient.auth_endpoint = auth_endpoint
-    return ksclient
 
 
 def disable_unused_apache_sites():

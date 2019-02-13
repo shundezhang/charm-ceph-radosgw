@@ -135,10 +135,6 @@ options:
     type: int
     default: 500
     description: Number of keystone tokens to hold in local cache.
-  revocation-check-interval:
-    type: int
-    default: 600
-    description: Interval between revocation checks to keystone.
   # HA config
   use-syslog:
     type: boolean

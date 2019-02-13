@@ -85,7 +85,6 @@ class IdentityServiceContextTest(CharmTestCase):
                       _format_ipv6_addr, jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
-        self.test_config.set('revocation-check-interval', '7500000')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']
@@ -122,7 +121,6 @@ class IdentityServiceContextTest(CharmTestCase):
             'auth_protocol': 'http',
             'auth_type': 'keystone',
             'cache_size': '42',
-            'revocation_check_interval': '7500000',
             'service_host': '127.0.0.4',
             'service_port': 9876,
             'service_protocol': 'http',
@@ -143,7 +141,6 @@ class IdentityServiceContextTest(CharmTestCase):
             jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
-        self.test_config.set('revocation-check-interval', '7500000')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']
@@ -178,7 +175,6 @@ class IdentityServiceContextTest(CharmTestCase):
             'auth_protocol': 'http',
             'auth_type': 'keystone',
             'cache_size': '42',
-            'revocation_check_interval': '7500000',
             'service_host': '127.0.0.4',
             'service_port': 9876,
             'service_protocol': 'http',
@@ -199,7 +195,6 @@ class IdentityServiceContextTest(CharmTestCase):
             jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
-        self.test_config.set('revocation-check-interval', '7500000')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']
@@ -239,7 +234,6 @@ class IdentityServiceContextTest(CharmTestCase):
             'auth_protocol': 'http',
             'auth_type': 'keystone',
             'cache_size': '42',
-            'revocation_check_interval': '7500000',
             'service_host': '127.0.0.4',
             'service_port': 9876,
             'service_protocol': 'http',
@@ -262,7 +256,6 @@ class IdentityServiceContextTest(CharmTestCase):
                                      _ctxt_comp, _format_ipv6_addr):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
-        self.test_config.set('revocation-check-interval', '7500000')
         self.test_relation.set({})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']

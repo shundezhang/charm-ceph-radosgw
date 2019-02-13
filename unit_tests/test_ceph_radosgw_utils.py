@@ -13,9 +13,7 @@
 # limitations under the License.
 
 from mock import (
-    call,
     patch,
-    mock_open,
     MagicMock,
 )
 
@@ -26,7 +24,6 @@ from test_utils import CharmTestCase
 TO_PATCH = [
     'application_version_set',
     'get_upstream_version',
-    'format_endpoint',
     'https',
     'relation_ids',
     'relation_get',
@@ -95,137 +92,6 @@ class CephRadosGWUtilTests(CharmTestCase):
             asf.assert_called_once_with('some-config')
             # ports=None whilst port checks are disabled.
             f.assert_called_once_with('assessor', services='s1', ports=None)
-
-    @patch.object(utils, 'get_keystone_client_from_relation')
-    @patch.object(utils, 'is_ipv6', lambda addr: False)
-    @patch.object(utils, 'get_ks_signing_cert')
-    @patch.object(utils, 'get_ks_ca_cert')
-    @patch.object(utils, 'mkdir')
-    def test_setup_keystone_certs(self, mock_mkdir,
-                                  mock_get_ks_ca_cert,
-                                  mock_get_ks_signing_cert,
-                                  mock_get_keystone_client):
-        auth_host = 'foo/bar'
-        auth_port = 80
-        auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
-        mock_ksclient = MagicMock()
-        mock_ksclient.auth_endpoint = auth_url
-        mock_get_keystone_client.return_value = mock_ksclient
-
-        configs = MagicMock()
-        configs.complete_contexts.return_value = ['identity-service']
-
-        utils.setup_keystone_certs(configs)
-        mock_get_ks_signing_cert.assert_has_calls([call(mock_ksclient,
-                                                        auth_url,
-                                                        '/var/lib/ceph/nss')])
-        mock_get_ks_ca_cert.assert_has_calls([call(mock_ksclient, auth_url,
-                                                   '/var/lib/ceph/nss')])
-
-    @patch.object(utils, 'client_v3')
-    @patch.object(utils, 'client')
-    @patch.object(utils, 'related_units')
-    @patch.object(utils, 'relation_ids')
-    @patch.object(utils, 'is_ipv6', lambda addr: False)
-    @patch.object(utils, 'relation_get')
-    def test_get_ks_client_from_relation(self, mock_relation_get,
-                                         mock_relation_ids,
-                                         mock_related_units,
-                                         mock_client,
-                                         mock_client_v3):
-        auth_host = 'foo/bar'
-        auth_port = 80
-        admin_token = '666'
-        auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
-        self.format_endpoint.return_value = auth_url
-        mock_relation_ids.return_value = ['identity-service:5']
-        mock_related_units.return_value = ['keystone/1']
-        rel_data = {'auth_host': auth_host,
-                    'auth_port': auth_port,
-                    'admin_token': admin_token,
-                    'api_version': '2'}
-
-        mock_relation_get.return_value = rel_data
-        utils.get_keystone_client_from_relation()
-        mock_client.Client.assert_called_with(endpoint=auth_url,
-                                              token=admin_token)
-
-        auth_url = 'http://%s:%s/v3' % (auth_host, auth_port)
-        self.format_endpoint.return_value = auth_url
-        rel_data['api_version'] = '3'
-        mock_relation_get.return_value = rel_data
-        utils.get_keystone_client_from_relation()
-        mock_client_v3.Client.assert_called_with(endpoint=auth_url,
-                                                 token=admin_token)
-
-    @patch.object(utils, 'client_v3')
-    @patch.object(utils, 'client')
-    @patch.object(utils, 'related_units')
-    @patch.object(utils, 'relation_ids')
-    @patch.object(utils, 'is_ipv6', lambda addr: False)
-    @patch.object(utils, 'relation_get')
-    def test_get_ks_client_from_relation_not_available(self, mock_relation_get,
-                                                       mock_relation_ids,
-                                                       mock_related_units,
-                                                       mock_client,
-                                                       mock_client_v3):
-        mock_relation_ids.return_value = ['identity-service:5']
-        mock_related_units.return_value = ['keystone/1']
-        rel_data = {'auth_port': '5000',
-                    'admin_token': 'foo',
-                    'api_version': '2'}
-
-        mock_relation_get.return_value = rel_data
-        ksclient = utils.get_keystone_client_from_relation()
-        self.assertIsNone(ksclient)
-
-    @patch.object(utils, 'get_ks_cert')
-    @patch.object(utils.subprocess, 'Popen')
-    @patch.object(utils.subprocess, 'check_output')
-    def test_get_ks_signing_cert(self, mock_check_output, mock_Popen,
-                                 mock_get_ks_cert):
-        auth_host = 'foo/bar'
-        auth_port = 80
-        admin_token = '666'
-        auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
-
-        m = mock_open()
-        with patch.object(utils, 'open', m, create=True):
-
-            mock_get_ks_cert.return_value = 'signing_cert_data'
-            utils.get_ks_signing_cert(admin_token, auth_url, '/foo/bar')
-
-            mock_get_ks_cert.return_value = None
-            with self.assertRaises(utils.KSCertSetupException):
-                utils.get_ks_signing_cert(admin_token, auth_url, '/foo/bar')
-
-            c = ['openssl', 'x509', '-in',
-                 '/foo/bar/signing_certificate.pem',
-                 '-pubkey']
-            mock_check_output.assert_called_with(c)
-
-    @patch.object(utils, 'get_ks_cert')
-    @patch.object(utils.subprocess, 'Popen')
-    @patch.object(utils.subprocess, 'check_output')
-    def test_get_ks_ca_cert(self, mock_check_output, mock_Popen,
-                            mock_get_ks_cert):
-        auth_host = 'foo/bar'
-        auth_port = 80
-        admin_token = '666'
-        auth_url = 'http://%s:%s/v2.0' % (auth_host, auth_port)
-
-        m = mock_open()
-        with patch.object(utils, 'open', m, create=True):
-            mock_get_ks_cert.return_value = 'ca_cert_data'
-            utils.get_ks_ca_cert(admin_token, auth_url, '/foo/bar')
-
-            mock_get_ks_cert.return_value = None
-            with self.assertRaises(utils.KSCertSetupException):
-                utils.get_ks_ca_cert(admin_token, auth_url, '/foo/bar')
-
-            c = ['openssl', 'x509', '-in', '/foo/bar/ca.pem',
-                 '-pubkey']
-            mock_check_output.assert_called_with(c)
 
     def _setup_relation_data(self, data):
         self.relation_ids.return_value = data.keys()

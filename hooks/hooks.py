@@ -75,12 +75,10 @@ from charmhelpers.contrib.openstack.ha.utils import (
     generate_ha_relation_data,
 )
 from utils import (
-    enable_pocket,
     register_configs,
     setup_ipv6,
     services,
     assess_status,
-    setup_keystone_certs,
     disable_unused_apache_sites,
     pause_unit_helper,
     resume_unit_helper,
@@ -99,17 +97,10 @@ from charmhelpers.contrib.openstack.cert_utils import (
 
 hooks = Hooks()
 CONFIGS = register_configs()
-NSS_DIR = '/var/lib/ceph/nss'
-
 
 PACKAGES = [
     'haproxy',
-    'libnss3-tools',
     'ntp',
-    'python-keystoneclient',
-    'python-six',  # Ensures correct version is installed for precise
-                   # since python-keystoneclient does not pull in icehouse
-                   # version
     'radosgw',
     'apache2'
 ]
@@ -166,10 +157,7 @@ def install_packages():
 def install():
     status_set('maintenance', 'Executing pre-install')
     execd_preinstall()
-    enable_pocket('multiverse')
     install_packages()
-    if not os.path.exists(NSS_DIR):
-        os.makedirs(NSS_DIR)
     if not os.path.exists('/etc/ceph'):
         os.makedirs('/etc/ceph')
 
@@ -384,8 +372,6 @@ def configure_https():
     # first then checking reload status (see LP #1433114).
     if not is_unit_paused_set():
         service_reload('apache2', restart_on_failure=True)
-
-    setup_keystone_certs(CONFIGS)
 
 
 @hooks.hook('update-status')

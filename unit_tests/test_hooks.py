@@ -37,7 +37,6 @@ TO_PATCH = [
     'config',
     'cmp_pkgrevno',
     'execd_preinstall',
-    'enable_pocket',
     'log',
     'open_port',
     'os',
@@ -55,7 +54,6 @@ TO_PATCH = [
     'service_stop',
     'service_restart',
     'service',
-    'setup_keystone_certs',
     'service_name',
     'socket',
     'restart_map',
@@ -150,8 +148,6 @@ class CephRadosGWTests(CharmTestCase):
         ceph_hooks.install()
         self.assertTrue(self.execd_preinstall.called)
         self.assertTrue(_install_packages.called)
-        self.enable_pocket.assert_called_with('multiverse')
-        self.os.makedirs.called_with('/var/lib/ceph/nss')
 
     @patch.object(ceph_hooks, 'certs_joined')
     @patch.object(ceph_hooks, 'update_nrpe_config')
