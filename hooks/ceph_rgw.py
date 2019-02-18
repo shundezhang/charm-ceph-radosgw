@@ -16,8 +16,6 @@
 import os
 import subprocess
 
-from utils import get_pkg_version
-
 from charmhelpers.core.hookenv import (
     config,
 )
@@ -93,7 +91,7 @@ def get_create_rgw_pools_rq(prefix=None):
         # Per the Ceph PG Calculator, all of the lightweight pools get 0.10%
         # of the data by default and only the .rgw.buckets.* get higher values
         weights = {
-            '.rgw.buckets.index': 1.00,
+            '.rgw.buckets.index': 3.00,
             '.rgw.buckets.extra': 1.00
         }
         w = weights.get(pool, 0.10)
@@ -112,18 +110,13 @@ def get_create_rgw_pools_rq(prefix=None):
     rq = CephBrokerRq()
     replicas = config('ceph-osd-replication-count')
 
-    # Jewel and above automatically always prefix pool names with zone when
-    # creating them (see LP: 1573549).
-    if prefix is None:
-        vc = apt_pkg.version_compare(get_pkg_version('radosgw'), '10.0.0')
-        if vc >= 0:
-            prefix = 'default'
-        else:
-            prefix = ''
+    prefix = prefix or 'default'
 
-    # Buckets likely to contain the most data and therefore requiring the most
-    # PGs
-    heavy = ['.rgw.buckets']
+    # Buckets likely to contain the most data and therefore
+    # requiring the most PGs
+    heavy = [
+        '.rgw.buckets.data'
+    ]
     bucket_weight = config('rgw-buckets-pool-weight')
     for pool in heavy:
         pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
@@ -132,27 +125,26 @@ def get_create_rgw_pools_rq(prefix=None):
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
     # others since they are not expected to contain as much data
-    light = ['.rgw',
-             '.rgw.root',
-             '.rgw.control',
-             '.rgw.gc',
-             '.rgw.buckets.index',
-             '.rgw.buckets.extra',
-             '.log',
-             '.intent-log',
-             '.usage',
-             '.users',
-             '.users.email',
-             '.users.swift',
-             '.users.uid']
+    light = [
+        '.rgw.control',
+        '.rgw.data.root',
+        '.rgw.gc',
+        '.rgw.log',
+        '.rgw.intent-log',
+        '.rgw.meta',
+        '.rgw.usage',
+        '.rgw.users.keys',
+        '.rgw.users.email',
+        '.rgw.users.swift',
+        '.rgw.users.uid',
+        '.rgw.buckets.extra',
+        '.rgw.buckets.index',
+    ]
     pg_num = config('rgw-lightweight-pool-pg-num')
     for pool in light:
         _add_light_pool(rq, pool, pg_num, prefix)
 
-    if prefix:
-        light_unprefixed = ['.rgw.root']
-        for pool in light_unprefixed:
-            _add_light_pool(rq, pool, pg_num)
+    _add_light_pool(rq, '.rgw.root', pg_num)
 
     if config('restrict-ceph-pools'):
         rq.add_op_request_access_to_group(name="objects",
