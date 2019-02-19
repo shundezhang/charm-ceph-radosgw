@@ -5,7 +5,7 @@ include:
     - cli
     - osplatform
     - fetch
-    - contrib.python.packages
+    - contrib.python
     - contrib.storage.linux
     - contrib.hahelpers:
         - apache
