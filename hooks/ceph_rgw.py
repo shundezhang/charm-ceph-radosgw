@@ -31,6 +31,7 @@ from charmhelpers.contrib.storage.linux.ceph import (
 CEPH_DIR = '/etc/ceph'
 CEPH_RADOSGW_DIR = '/var/lib/ceph/radosgw'
 _radosgw_keyring = "keyring.rados.gateway"
+CEPH_POOL_APP_NAME = 'rgw'
 
 
 def import_radosgw_key(key, name=None):
@@ -99,10 +100,12 @@ def get_create_rgw_pools_rq(prefix=None):
             pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
         if pg_num > 0:
             rq.add_op_create_pool(name=pool, replica_count=replicas,
-                                  pg_num=pg_num, group='objects')
+                                  pg_num=pg_num, group='objects',
+                                  app_name=CEPH_POOL_APP_NAME)
         else:
             rq.add_op_create_pool(name=pool, replica_count=replicas,
-                                  weight=w, group='objects')
+                                  weight=w, group='objects',
+                                  app_name=CEPH_POOL_APP_NAME)
 
     from apt import apt_pkg
 
@@ -121,7 +124,8 @@ def get_create_rgw_pools_rq(prefix=None):
     for pool in heavy:
         pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
         rq.add_op_create_pool(name=pool, replica_count=replicas,
-                              weight=bucket_weight, group='objects')
+                              weight=bucket_weight, group='objects',
+                              app_name=CEPH_POOL_APP_NAME)
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
     # others since they are not expected to contain as much data
