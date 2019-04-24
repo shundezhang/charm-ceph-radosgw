@@ -671,3 +671,34 @@ class SlaveMultisiteTests(CephRadosMultisiteTests):
         self.is_leader.return_value = False
         ceph_hooks.slave_relation_changed('slave:1', 'rgw/0')
         self.relation_get.assert_not_called()
+
+    @patch.object(ceph_hooks, 'apt_install')
+    @patch.object(ceph_hooks, 'services')
+    @patch.object(ceph_hooks, 'nrpe')
+    def test_update_nrpe_config(self, nrpe, services, apt_install):
+        # Setup Mocks
+        nrpe.get_nagios_hostname.return_value = 'foo'
+        nrpe.get_nagios_unit_name.return_value = 'bar'
+        nrpe_setup = MagicMock()
+        nrpe.NRPE.return_value = nrpe_setup
+        services.return_value = ['baz', 'qux']
+
+        # Call the routine
+        ceph_hooks.update_nrpe_config()
+
+        # Verify calls
+        apt_install.assert_called()
+        nrpe.get_nagios_hostname.assert_called()
+        nrpe.get_nagios_unit_name.assert_called()
+        nrpe.copy_nrpe_checks.assert_called()
+        nrpe.remove_check.assert_not_called()
+        nrpe.add_init_service_checks.assert_called_with(nrpe_setup,
+                                                        ['baz', 'qux'], 'bar')
+        nrpe.add_haproxy_checks.assert_called_with(nrpe_setup, 'bar')
+        nrpe_setup.write.assert_called()
+
+        # Verify that remove_check is called appropriately if we pass
+        # checks_to_remove
+        ceph_hooks.update_nrpe_config(checks_to_remove=['quux', 'quuux'])
+        nrpe_setup.remove_check.assert_has_calls([call(shortname='quux'),
+                                                  call(shortname='quuux')])

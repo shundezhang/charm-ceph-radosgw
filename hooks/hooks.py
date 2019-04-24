@@ -255,6 +255,12 @@ def mon_relation(rid=None, unit=None):
                 if systemd_based_radosgw():
                     service_stop('radosgw')
                     service('disable', 'radosgw')
+                    # Update the nrpe config. If we wait for the below
+                    # to be called elsewhere, there exists a period
+                    # where nagios will report the radosgw service as
+                    # down, and also not be monitoring the per
+                    # host services.
+                    update_nrpe_config(checks_to_remove=['radosgw'])
 
                 service('enable', service_name())
                 # NOTE(jamespage):
@@ -362,13 +368,28 @@ def ha_relation_changed():
 
 @hooks.hook('nrpe-external-master-relation-joined',
             'nrpe-external-master-relation-changed')
-def update_nrpe_config():
+def update_nrpe_config(checks_to_remove=None):
+    """
+    Update the checks for the nagios plugin.
+
+    :param checks_to_remove: list of short names of nrpe checks to
+        remove. For example, pass ['radosgw'] to remove the check for
+        the default systemd radosgw service, to make way for per host
+        services.
+    :type checks_to_remove: list
+
+    """
     # python-dbus is used by check_upstart_job
     apt_install('python-dbus')
     hostname = nrpe.get_nagios_hostname()
     current_unit = nrpe.get_nagios_unit_name()
     nrpe_setup = nrpe.NRPE(hostname=hostname)
     nrpe.copy_nrpe_checks()
+    if checks_to_remove is not None:
+        log("Removing the following nrpe checks: {}".format(checks_to_remove),
+            level=DEBUG)
+        for svc in checks_to_remove:
+            nrpe_setup.remove_check(shortname=svc)
     nrpe.add_init_service_checks(nrpe_setup, services(), current_unit)
     nrpe.add_haproxy_checks(nrpe_setup, current_unit)
     nrpe_setup.write()
