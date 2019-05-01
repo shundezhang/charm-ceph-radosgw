@@ -15,4 +15,4 @@ smoke_bundles:
 dev_bundles:
   - cosmic-rocky
 tests:
-  - zaza.charm_tests.ceph.tests.CephRGWTest
+  - zaza.openstack.charm_tests.ceph.tests.CephRGWTest
