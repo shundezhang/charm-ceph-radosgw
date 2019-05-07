@@ -75,6 +75,8 @@ class IdentityServiceContextTest(CharmTestCase):
         self.maxDiff = None
         self.cmp_pkgrevno.return_value = 1
 
+    @patch.object(charmhelpers.contrib.openstack.context,
+                  'filter_installed_packages', return_value=['absent-pkg'])
     @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
     @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
@@ -82,7 +84,8 @@ class IdentityServiceContextTest(CharmTestCase):
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
     @patch.object(charmhelpers.contrib.openstack.context, 'log')
     def test_ids_ctxt(self, _log, _rids, _runits, _rget, _ctxt_comp,
-                      _format_ipv6_addr, jewel_installed=False):
+                      _format_ipv6_addr, _filter_installed_packages,
+                      jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
@@ -130,6 +133,8 @@ class IdentityServiceContextTest(CharmTestCase):
             expect['auth_keystone_v3_supported'] = True
         self.assertEqual(expect, ids_ctxt())
 
+    @patch.object(charmhelpers.contrib.openstack.context,
+                  'filter_installed_packages', return_value=['absent-pkg'])
     @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
     @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
@@ -138,7 +143,7 @@ class IdentityServiceContextTest(CharmTestCase):
     @patch.object(charmhelpers.contrib.openstack.context, 'log')
     def test_ids_ctxt_missing_admin_domain_id(
             self, _log, _rids, _runits, _rget, _ctxt_comp, _format_ipv6_addr,
-            jewel_installed=False):
+            _filter_installed_packages, jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
@@ -184,6 +189,8 @@ class IdentityServiceContextTest(CharmTestCase):
             expect['auth_keystone_v3_supported'] = True
         self.assertEqual(expect, ids_ctxt())
 
+    @patch.object(charmhelpers.contrib.openstack.context,
+                  'filter_installed_packages', return_value=['absent-pkg'])
     @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
     @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
@@ -192,7 +199,7 @@ class IdentityServiceContextTest(CharmTestCase):
     @patch.object(charmhelpers.contrib.openstack.context, 'log')
     def test_ids_ctxt_v3(
             self, _log, _rids, _runits, _rget, _ctxt_comp, _format_ipv6_addr,
-            jewel_installed=False):
+            _filter_installed_packages, jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
@@ -246,6 +253,8 @@ class IdentityServiceContextTest(CharmTestCase):
     def test_ids_ctxt_jewel(self):
         self.test_ids_ctxt(jewel_installed=True)
 
+    @patch.object(charmhelpers.contrib.openstack.context,
+                  'filter_installed_packages', return_value=['absent-pkg'])
     @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
     @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
@@ -253,7 +262,8 @@ class IdentityServiceContextTest(CharmTestCase):
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
     @patch.object(charmhelpers.contrib.openstack.context, 'log')
     def test_ids_ctxt_no_admin_token(self, _log, _rids, _runits, _rget,
-                                     _ctxt_comp, _format_ipv6_addr):
+                                     _ctxt_comp, _format_ipv6_addr,
+                                     _filter_installed_packages):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('cache-size', '42')
         self.test_relation.set({})
@@ -277,9 +287,11 @@ class IdentityServiceContextTest(CharmTestCase):
         ids_ctxt = context.IdentityServiceContext()
         self.assertEqual({}, ids_ctxt())
 
+    @patch.object(charmhelpers.contrib.openstack.context,
+                  'filter_installed_packages', return_value=['absent-pkg'])
     @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
     @patch.object(charmhelpers.contrib.openstack.context, 'log')
-    def test_ids_ctxt_no_rels(self, _log, _rids):
+    def test_ids_ctxt_no_rels(self, _log, _rids, _filter_installed_packages):
         _rids.return_value = []
         ids_ctxt = context.IdentityServiceContext()
         self.assertEqual(ids_ctxt(), None)
