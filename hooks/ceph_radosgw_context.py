@@ -152,6 +152,7 @@ class MonContext(context.CephContext):
 
         for rid in relation_ids('mon'):
             for unit in related_units(rid):
+                fsid = relation_get('fsid', rid=rid, unit=unit)
                 _auth = relation_get('auth', rid=rid, unit=unit)
                 if _auth:
                     auths.append(_auth)
@@ -201,6 +202,7 @@ class MonContext(context.CephContext):
             # (since it defaults to the port the service runs on, and that is
             # not available externally). ~tribaal
             'unit_public_ip': unit_public_ip(),
+            'fsid': fsid,
         }
 
         # NOTE(dosaboy): these sections must correspond to what is supported in

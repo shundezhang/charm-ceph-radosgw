@@ -320,6 +320,8 @@ class MonContextTest(CharmTestCase):
                 return 'cephx'
             elif attr == 'rgw.testhost_key':
                 return 'testkey'
+            elif attr == 'fsid':
+                return 'testfsid'
 
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
@@ -338,6 +340,7 @@ class MonContextTest(CharmTestCase):
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
             'rgw_zone': None,
+            'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -365,6 +368,8 @@ class MonContextTest(CharmTestCase):
                 return 'cephx'
             elif attr == 'rgw.testhost_key':
                 return 'testkey'
+            elif attr == 'fsid':
+                return 'testfsid'
 
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
@@ -383,6 +388,7 @@ class MonContextTest(CharmTestCase):
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
             'rgw_zone': None,
+            'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -419,6 +425,8 @@ class MonContextTest(CharmTestCase):
                 return auths.pop()
             elif attr == 'rgw.testhost_key':
                 return 'testkey'
+            elif attr == 'fsid':
+                return 'testfsid'
 
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
@@ -437,6 +445,7 @@ class MonContextTest(CharmTestCase):
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
             'rgw_zone': None,
+            'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -455,6 +464,8 @@ class MonContextTest(CharmTestCase):
                 return auths.pop()
             elif attr == 'rgw.testhost_key':
                 return 'testkey'
+            elif attr == 'fsid':
+                return 'testfsid'
 
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
@@ -473,6 +484,7 @@ class MonContextTest(CharmTestCase):
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
             'rgw_zone': None,
+            'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
 
