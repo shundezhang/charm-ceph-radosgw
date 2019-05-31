@@ -149,6 +149,7 @@ class MonContext(context.CephContext):
 
         mon_hosts = []
         auths = []
+        fsid = None
 
         for rid in relation_ids('mon'):
             for unit in related_units(rid):
