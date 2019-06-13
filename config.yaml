@@ -121,10 +121,16 @@ options:
   # Keystone integration
   operator-roles:
     type: string
-    default: "Member,Admin"
+    default: "Member"
     description: |
       Comma-separated list of Swift operator roles; used when integrating with
       OpenStack Keystone.
+  admin-roles:
+    type: string
+    default: "Admin"
+    description: |
+      Comma-separated list of Swift admin roles; used when integrating with
+      OpenStack Keystone. Admin roles can set the user quota amount.
   region:
     type: string
     default: RegionOne

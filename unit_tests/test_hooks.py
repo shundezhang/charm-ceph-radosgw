@@ -244,21 +244,31 @@ class CephRadosGWTests(CharmTestCase):
     @patch('charmhelpers.contrib.openstack.ip.resolve_address')
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined(self, _config, _resolve_address):
-        self.related_units = ['unit/0']
-        self.cmp_pkgrevno.return_value = 1
-        _resolve_address.return_value = 'myserv'
-        _config.side_effect = self.test_config.get
-        self.test_config.set('region', 'region1')
-        self.test_config.set('operator-roles', 'admin')
-        ceph_hooks.identity_joined(relid='rid')
-        self.relation_set.assert_called_with(
-            service='swift',
-            region='region1',
-            public_url='http://myserv:80/swift/v1',
-            internal_url='http://myserv:80/swift/v1',
-            requested_roles='admin',
-            relation_id='rid',
-            admin_url='http://myserv:80/swift')
+
+        def _test_identify_joined(expected):
+            self.related_units = ['unit/0']
+            self.cmp_pkgrevno.return_value = 1
+            _resolve_address.return_value = 'myserv'
+            _config.side_effect = self.test_config.get
+            self.test_config.set('region', 'region1')
+            ceph_hooks.identity_joined(relid='rid')
+            self.relation_set.assert_called_with(
+                service='swift',
+                region='region1',
+                public_url='http://myserv:80/swift/v1',
+                internal_url='http://myserv:80/swift/v1',
+                requested_roles=expected,
+                relation_id='rid',
+                admin_url='http://myserv:80/swift')
+
+        inputs = [{'operator': 'foo', 'admin': 'bar', 'expected': 'foo,bar'},
+                  {'operator': 'foo', 'expected': 'foo'},
+                  {'admin': 'bar', 'expected': 'bar'},
+                  {'expected': ''}]
+        for input in inputs:
+            self.test_config.set('operator-roles', input.get('operator', ''))
+            self.test_config.set('admin-roles', input.get('admin', ''))
+            _test_identify_joined(input['expected'])
 
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')

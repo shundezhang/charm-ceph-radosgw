@@ -85,8 +85,12 @@ class IdentityServiceContextTest(CharmTestCase):
     @patch.object(charmhelpers.contrib.openstack.context, 'log')
     def test_ids_ctxt(self, _log, _rids, _runits, _rget, _ctxt_comp,
                       _format_ipv6_addr, _filter_installed_packages,
-                      jewel_installed=False):
+                      jewel_installed=False, cmp_pkgrevno_side_effects=None):
+        self.cmp_pkgrevno.side_effect = (cmp_pkgrevno_side_effects
+                                         if cmp_pkgrevno_side_effects
+                                         else [-1, -1])
         self.test_config.set('operator-roles', 'Babel')
+        self.test_config.set('admin-roles', 'Dart')
         self.test_config.set('cache-size', '42')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
@@ -95,9 +99,6 @@ class IdentityServiceContextTest(CharmTestCase):
         _rids.return_value = 'rid1'
         _runits.return_value = 'runit'
         _ctxt_comp.return_value = True
-        self.cmp_pkgrevno.return_value = -1
-        if jewel_installed:
-            self.cmp_pkgrevno.return_value = 0
         id_data = {
             'service_port': 9876,
             'service_host': '127.0.0.4',
@@ -127,8 +128,12 @@ class IdentityServiceContextTest(CharmTestCase):
             'service_host': '127.0.0.4',
             'service_port': 9876,
             'service_protocol': 'http',
-            'user_roles': 'Babel',
         }
+        if cmp_pkgrevno_side_effects and cmp_pkgrevno_side_effects[1] >= 0:
+            expect['user_roles'] = 'Babel'
+            expect['admin_roles'] = 'Dart'
+        else:
+            expect['user_roles'] = 'Babel,Dart'
         if jewel_installed:
             expect['auth_keystone_v3_supported'] = True
         self.assertEqual(expect, ids_ctxt())
@@ -145,6 +150,7 @@ class IdentityServiceContextTest(CharmTestCase):
             self, _log, _rids, _runits, _rget, _ctxt_comp, _format_ipv6_addr,
             _filter_installed_packages, jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
+        self.test_config.set('admin-roles', 'Dart')
         self.test_config.set('cache-size', '42')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
@@ -183,7 +189,7 @@ class IdentityServiceContextTest(CharmTestCase):
             'service_host': '127.0.0.4',
             'service_port': 9876,
             'service_protocol': 'http',
-            'user_roles': 'Babel',
+            'user_roles': 'Babel,Dart',
         }
         if jewel_installed:
             expect['auth_keystone_v3_supported'] = True
@@ -201,6 +207,7 @@ class IdentityServiceContextTest(CharmTestCase):
             self, _log, _rids, _runits, _rget, _ctxt_comp, _format_ipv6_addr,
             _filter_installed_packages, jewel_installed=False):
         self.test_config.set('operator-roles', 'Babel')
+        self.test_config.set('admin-roles', 'Dart')
         self.test_config.set('cache-size', '42')
         self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
@@ -244,14 +251,19 @@ class IdentityServiceContextTest(CharmTestCase):
             'service_host': '127.0.0.4',
             'service_port': 9876,
             'service_protocol': 'http',
-            'user_roles': 'Babel',
+            'user_roles': 'Babel,Dart',
         }
         if jewel_installed:
             expect['auth_keystone_v3_supported'] = True
         self.assertEqual(expect, ids_ctxt())
 
     def test_ids_ctxt_jewel(self):
-        self.test_ids_ctxt(jewel_installed=True)
+        self.test_ids_ctxt(jewel_installed=True,
+                           cmp_pkgrevno_side_effects=[0, -1])
+
+    def test_ids_ctxt_luminous(self):
+        self.test_ids_ctxt(jewel_installed=True,
+                           cmp_pkgrevno_side_effects=[1, 0])
 
     @patch.object(charmhelpers.contrib.openstack.context,
                   'filter_installed_packages', return_value=['absent-pkg'])

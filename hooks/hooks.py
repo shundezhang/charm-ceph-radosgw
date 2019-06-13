@@ -298,11 +298,15 @@ def identity_joined(relid=None):
         (canonical_url(CONFIGS, INTERNAL), port)
     public_url = '%s:%s/swift/v1' % \
         (canonical_url(CONFIGS, PUBLIC), port)
+    roles = [x for x in [config('operator-roles'), config('admin-roles')] if x]
+    requested_roles = ''
+    if roles:
+        requested_roles = ','.join(roles) if len(roles) > 1 else roles[0]
     relation_set(service='swift',
                  region=config('region'),
                  public_url=public_url, internal_url=internal_url,
                  admin_url=admin_url,
-                 requested_roles=config('operator-roles'),
+                 requested_roles=requested_roles,
                  relation_id=relid)
 
 

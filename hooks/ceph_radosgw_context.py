@@ -96,7 +96,13 @@ class IdentityServiceContext(context.IdentityServiceContext):
             ctxt.pop('admin_domain_id')
 
         ctxt['auth_type'] = 'keystone'
-        ctxt['user_roles'] = config('operator-roles')
+        if cmp_pkgrevno('radosgw', "11.0.0") >= 0:
+            ctxt['user_roles'] = config('operator-roles')
+            ctxt['admin_roles'] = config('admin-roles')
+        else:
+            ctxt['user_roles'] = config('operator-roles')
+            if config('admin-roles'):
+                ctxt['user_roles'] += (',' + config('admin-roles'))
         ctxt['cache_size'] = config('cache-size')
         if self.context_complete(ctxt):
             return ctxt
