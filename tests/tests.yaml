@@ -7,12 +7,12 @@ gate_bundles:
   - xenial-pike
   - xenial-queens
   - bionic-queens
-  - bionic-queens-multisite
   - bionic-rocky
-  - bionic-rocky-multisite
 smoke_bundles:
   - bionic-rocky
 dev_bundles:
   - cosmic-rocky
+  - bionic-queens-multisite
+  - bionic-rocky-multisite
 tests:
   - zaza.openstack.charm_tests.ceph.tests.CephRGWTest
