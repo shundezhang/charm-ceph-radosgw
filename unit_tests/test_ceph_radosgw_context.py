@@ -248,8 +248,10 @@ class IdentityServiceContextTest(CharmTestCase):
             'auth_protocol': 'http',
             'auth_type': 'keystone',
             'cache_size': '42',
+            'service_domain_id': '8e50f28a556911e8aaeed33789425d23',
             'service_host': '127.0.0.4',
             'service_port': 9876,
+            'service_project_id': '2852107b8f8f473aaf0d769c7bbcf86b',
             'service_protocol': 'http',
             'user_roles': 'Babel,Dart',
         }
