@@ -1,17 +1,16 @@
 charm_name: ceph-radosgw
 gate_bundles:
-  - trusty-mitaka
-  - xenial-mitaka
-  - xenial-ocata
-  - xenial-pike
-  - xenial-queens
-  - bionic-queens
-  - bionic-rocky
   - bionic-stein
+  - bionic-rocky
+  - bionic-queens
+  - xenial-queens
+  - xenial-pike
+  - xenial-ocata
+  - xenial-mitaka
+  - trusty-mitaka
 smoke_bundles:
   - bionic-stein
 dev_bundles:
-  - cosmic-rocky
   - bionic-queens-multisite
   - bionic-rocky-multisite
 tests:
