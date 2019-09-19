@@ -317,3 +317,18 @@ options:
     description: |
       Name of RADOS Gateway Zone to create for multi-site replication. This
       option must be specific to the local site e.g. us-west or us-east.
+  namespace-tenants:
+    type: boolean
+    default: False
+    description: |
+      Enable tenant namespacing. If tenant namespacing is enabled, keystone
+      tenants will be implicitly added to a matching tenant in radosgw, in
+      addition to updating the catalog URL to allow radosgw to support
+      publicly-readable containers and temporary URLS. This namespacing
+      also allows multiple tenants to create buckets with the same names,
+      as the bucket names are namespaced into the tenant namespaces in the
+      RADOS gateway.
+
+      This configuration option will not be enabled on a charm upgrade, and
+      cannot be toggled on in an existing installation as it will remove
+      tenant access to existing buckets.

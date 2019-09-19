@@ -31,6 +31,7 @@ TO_PATCH = [
     'unit_public_ip',
     'determine_api_port',
     'cmp_pkgrevno',
+    'leader_get',
 ]
 
 
@@ -74,6 +75,7 @@ class IdentityServiceContextTest(CharmTestCase):
         self.config.side_effect = self.test_config.get
         self.maxDiff = None
         self.cmp_pkgrevno.return_value = 1
+        self.leader_get.return_value = False
 
     @patch.object(charmhelpers.contrib.openstack.context,
                   'filter_installed_packages', return_value=['absent-pkg'])
@@ -124,6 +126,74 @@ class IdentityServiceContextTest(CharmTestCase):
             'auth_port': 5432,
             'auth_protocol': 'http',
             'auth_type': 'keystone',
+            'namespace_tenants': False,
+            'cache_size': '42',
+            'service_host': '127.0.0.4',
+            'service_port': 9876,
+            'service_protocol': 'http',
+        }
+        if cmp_pkgrevno_side_effects and cmp_pkgrevno_side_effects[1] >= 0:
+            expect['user_roles'] = 'Babel'
+            expect['admin_roles'] = 'Dart'
+        else:
+            expect['user_roles'] = 'Babel,Dart'
+        if jewel_installed:
+            expect['auth_keystone_v3_supported'] = True
+        self.assertEqual(expect, ids_ctxt())
+
+    @patch.object(charmhelpers.contrib.openstack.context,
+                  'filter_installed_packages', return_value=['absent-pkg'])
+    @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
+    @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
+    @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
+    @patch.object(charmhelpers.contrib.openstack.context, 'related_units')
+    @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
+    @patch.object(charmhelpers.contrib.openstack.context, 'log')
+    def test_ids_ctxt_with_namespace(self, _log, _rids, _runits, _rget,
+                                     _ctxt_comp, _format_ipv6_addr,
+                                     _filter_installed_packages,
+                                     jewel_installed=False,
+                                     cmp_pkgrevno_side_effects=None):
+        self.cmp_pkgrevno.side_effect = (cmp_pkgrevno_side_effects
+                                         if cmp_pkgrevno_side_effects
+                                         else [-1, -1])
+        self.test_config.set('operator-roles', 'Babel')
+        self.test_config.set('admin-roles', 'Dart')
+        self.test_config.set('cache-size', '42')
+        self.test_relation.set({'admin_token': 'ubuntutesting'})
+        self.relation_ids.return_value = ['identity-service:5']
+        self.related_units.return_value = ['keystone/0']
+        _format_ipv6_addr.return_value = False
+        _rids.return_value = 'rid1'
+        _runits.return_value = 'runit'
+        _ctxt_comp.return_value = True
+        self.leader_get.return_value = True
+        id_data = {
+            'service_port': 9876,
+            'service_host': '127.0.0.4',
+            'service_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
+            'service_domain_id': '8e50f28a556911e8aaeed33789425d23',
+            'auth_host': '127.0.0.5',
+            'auth_port': 5432,
+            'service_tenant': 'ten',
+            'service_username': 'admin',
+            'service_password': 'adminpass',
+        }
+        _rget.return_value = id_data
+        ids_ctxt = context.IdentityServiceContext()
+        expect = {
+            'admin_domain_id': '8e50f28a556911e8aaeed33789425d23',
+            'admin_password': 'adminpass',
+            'admin_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
+            'admin_tenant_name': 'ten',
+            'admin_token': 'ubuntutesting',
+            'admin_user': 'admin',
+            'api_version': '2.0',
+            'auth_host': '127.0.0.5',
+            'auth_port': 5432,
+            'auth_protocol': 'http',
+            'auth_type': 'keystone',
+            'namespace_tenants': True,
             'cache_size': '42',
             'service_host': '127.0.0.4',
             'service_port': 9876,
@@ -185,6 +255,7 @@ class IdentityServiceContextTest(CharmTestCase):
             'auth_port': 5432,
             'auth_protocol': 'http',
             'auth_type': 'keystone',
+            'namespace_tenants': False,
             'cache_size': '42',
             'service_host': '127.0.0.4',
             'service_port': 9876,
@@ -247,6 +318,7 @@ class IdentityServiceContextTest(CharmTestCase):
             'auth_port': 5432,
             'auth_protocol': 'http',
             'auth_type': 'keystone',
+            'namespace_tenants': False,
             'cache_size': '42',
             'service_domain_id': '8e50f28a556911e8aaeed33789425d23',
             'service_host': '127.0.0.4',

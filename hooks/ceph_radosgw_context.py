@@ -33,6 +33,7 @@ from charmhelpers.core.hookenv import (
     relation_get,
     relation_ids,
     unit_public_ip,
+    leader_get,
 )
 from charmhelpers.contrib.network.ip import (
     format_ipv6_addr,
@@ -104,6 +105,7 @@ class IdentityServiceContext(context.IdentityServiceContext):
             if config('admin-roles'):
                 ctxt['user_roles'] += (',' + config('admin-roles'))
         ctxt['cache_size'] = config('cache-size')
+        ctxt['namespace_tenants'] = leader_get('namespace_tenants')
         if self.context_complete(ctxt):
             return ctxt
         return {}

@@ -228,3 +228,24 @@ a zone that is currently read-only can be switched to read/write mode by either
 promoting it to be the current master or by using the 'readwrite' action:
 
     juju run-action -m us-east --wait rgw-us-east/0 readwrite
+
+Tenant Namespacing
+------------------
+
+By default, Ceph Rados Gateway puts all tenant buckets into the same global
+namespace, disallowing multiple tenants to have buckets with the same name.
+Tenant namespacing can be enabled in this charm by deploying with configuration
+like:
+
+    ceph-radosgw:
+      charm: cs:ceph-radosgw
+      num_units: 1
+      options:
+        namespace-tenants: True
+
+Enabling tenant namespacing will place all tenant buckets into their own
+namespace under their tenant id, as well as adding the tenant's ID parameter to
+the Keystone endpoint registration to allow seamless integration with OpenStack.
+Tenant namespacing cannot be toggled on in an existing installation as it will
+remove tenant access to existing buckets. Toggling this option on an already
+deployed Rados Gateway will have no effect.
