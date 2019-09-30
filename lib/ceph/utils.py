@@ -40,6 +40,7 @@ from charmhelpers.core.host import (
     service_start,
     service_stop,
     CompareHostReleases,
+    write_file,
 )
 from charmhelpers.core.hookenv import (
     cached,
@@ -82,7 +83,7 @@ QUORUM = [LEADER, PEON]
 
 PACKAGES = ['ceph', 'gdisk', 'btrfs-tools',
             'radosgw', 'xfsprogs',
-            'lvm2', 'parted']
+            'lvm2', 'parted', 'smartmontools']
 
 CEPH_KEY_MANAGER = 'ceph'
 VAULT_KEY_MANAGER = 'vault'
@@ -928,11 +929,13 @@ def is_osd_disk(dev):
 def start_osds(devices):
     # Scan for ceph block devices
     rescan_osd_devices()
-    if cmp_pkgrevno('ceph', "0.56.6") >= 0:
-        # Use ceph-disk activate for directory based OSD's
-        for dev_or_path in devices:
-            if os.path.exists(dev_or_path) and os.path.isdir(dev_or_path):
-                subprocess.check_call(['ceph-disk', 'activate', dev_or_path])
+    if (cmp_pkgrevno('ceph', '0.56.6') >= 0 and
+            cmp_pkgrevno('ceph', '14.2.0') < 0):
+            # Use ceph-disk activate for directory based OSD's
+            for dev_or_path in devices:
+                if os.path.exists(dev_or_path) and os.path.isdir(dev_or_path):
+                    subprocess.check_call(
+                        ['ceph-disk', 'activate', dev_or_path])
 
 
 def udevadm_settle():
@@ -950,48 +953,17 @@ def rescan_osd_devices():
 
     udevadm_settle()
 
-
-_bootstrap_keyring = "/var/lib/ceph/bootstrap-osd/ceph.keyring"
-_upgrade_keyring = "/var/lib/ceph/osd/ceph.client.osd-upgrade.keyring"
+_client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
 
 
 def is_bootstrapped():
-    return os.path.exists(_bootstrap_keyring)
+    return os.path.exists(
+        '/var/lib/ceph/mon/ceph-{}/done'.format(socket.gethostname()))
 
 
 def wait_for_bootstrap():
     while not is_bootstrapped():
         time.sleep(3)
-
-
-def import_osd_bootstrap_key(key):
-    if not os.path.exists(_bootstrap_keyring):
-        cmd = [
-            "sudo",
-            "-u",
-            ceph_user(),
-            'ceph-authtool',
-            _bootstrap_keyring,
-            '--create-keyring',
-            '--name=client.bootstrap-osd',
-            '--add-key={}'.format(key)
-        ]
-        subprocess.check_call(cmd)
-
-
-def import_osd_upgrade_key(key):
-    if not os.path.exists(_upgrade_keyring):
-        cmd = [
-            "sudo",
-            "-u",
-            ceph_user(),
-            'ceph-authtool',
-            _upgrade_keyring,
-            '--create-keyring',
-            '--name=client.osd-upgrade',
-            '--add-key={}'.format(key)
-        ]
-        subprocess.check_call(cmd)
 
 
 def generate_monitor_secret():
@@ -1132,6 +1104,15 @@ osd_upgrade_caps = collections.OrderedDict([
              ])
 ])
 
+rbd_mirror_caps = collections.OrderedDict([
+    ('mon', ['profile rbd']),
+    ('osd', ['profile rbd']),
+])
+
+
+def get_rbd_mirror_key(name):
+    return get_named_key(name=name, caps=rbd_mirror_caps)
+
 
 def create_named_keyring(entity, name, caps=None):
     caps = caps or _default_caps
@@ -1250,7 +1231,23 @@ def systemd():
     return CompareHostReleases(lsb_release()['DISTRIB_CODENAME']) >= 'vivid'
 
 
+def use_bluestore():
+    """Determine whether bluestore should be used for OSD's
+
+    :returns: whether bluestore disk format should be used
+    :rtype: bool"""
+    if cmp_pkgrevno('ceph', '12.2.0') < 0:
+        return False
+    return config('bluestore')
+
+
 def bootstrap_monitor_cluster(secret):
+    """Bootstrap local ceph mon into the ceph cluster
+
+    :param secret: cephx secret to use for monitor authentication
+    :type secret: str
+    :raises: Exception if ceph mon cannot be bootstrapped
+    """
     hostname = socket.gethostname()
     path = '/var/lib/ceph/mon/ceph-{}'.format(hostname)
     done = '{}/done'.format(path)
@@ -1271,21 +1268,35 @@ def bootstrap_monitor_cluster(secret):
               perms=0o755)
         # end changes for Ceph >= 0.61.3
         try:
-            add_keyring_to_ceph(keyring,
-                                secret,
-                                hostname,
-                                path,
-                                done,
-                                init_marker)
-
+            _create_monitor(keyring,
+                            secret,
+                            hostname,
+                            path,
+                            done,
+                            init_marker)
+            _create_keyrings()
         except:
             raise
         finally:
             os.unlink(keyring)
 
 
-@retry_on_exception(3, base_delay=5)
-def add_keyring_to_ceph(keyring, secret, hostname, path, done, init_marker):
+def _create_monitor(keyring, secret, hostname, path, done, init_marker):
+    """Create monitor filesystem and enable and start ceph-mon process
+
+    :param keyring: path to temporary keyring on disk
+    :type keyring: str
+    :param secret: cephx secret to use for monitor authentication
+    :type: secret: str
+    :param hostname: hostname of the local unit
+    :type hostname: str
+    :param path: full path to ceph mon directory
+    :type path: str
+    :param done: full path to 'done' marker for ceph mon
+    :type done: str
+    :param init_marker: full path to 'init' marker for ceph mon
+    :type init_marker: str
+    """
     subprocess.check_call(['ceph-authtool', keyring,
                            '--create-keyring', '--name=mon.',
                            '--add-key={}'.format(secret),
@@ -1301,39 +1312,72 @@ def add_keyring_to_ceph(keyring, secret, hostname, path, done, init_marker):
         pass
 
     if systemd():
-        subprocess.check_call(['systemctl', 'enable', 'ceph-mon'])
-        service_restart('ceph-mon')
+        if cmp_pkgrevno('ceph', '14.0.0') >= 0:
+            systemd_unit = 'ceph-mon@{}'.format(socket.gethostname())
+        else:
+            systemd_unit = 'ceph-mon'
+        subprocess.check_call(['systemctl', 'enable', systemd_unit])
+        service_restart(systemd_unit)
     else:
         service_restart('ceph-mon-all')
 
-    # NOTE(jamespage): Later ceph releases require explicit
-    #                  call to ceph-create-keys to setup the
-    #                  admin keys for the cluster; this command
-    #                  will wait for quorum in the cluster before
-    #                  returning.
-    # NOTE(fnordahl): Explicitly run `ceph-crate-keys` for older
-    #                 ceph releases too.  This improves bootstrap
-    #                 resilience as the charm will wait for
-    #                 presence of peer units before attempting
-    #                 to bootstrap.  Note that charms deploying
-    #                 ceph-mon service should disable running of
-    #                 `ceph-create-keys` service in init system.
-    cmd = ['ceph-create-keys', '--id', hostname]
-    if cmp_pkgrevno('ceph', '12.0.0') >= 0:
-        # NOTE(fnordahl): The default timeout in ceph-create-keys of 600
-        #                 seconds is not adequate.  Increase timeout when
-        #                 timeout parameter available.  For older releases
-        #                 we rely on retry_on_exception decorator.
-        #                 LP#1719436
-        cmd.extend(['--timeout', '1800'])
-    subprocess.check_call(cmd)
-    _client_admin_keyring = '/etc/ceph/ceph.client.admin.keyring'
-    osstat = os.stat(_client_admin_keyring)
-    if not osstat.st_size:
-        # NOTE(fnordahl): Retry will fail as long as this file exists.
-        #                 LP#1719436
-        os.remove(_client_admin_keyring)
-        raise Exception
+
+@retry_on_exception(3, base_delay=5)
+def _create_keyrings():
+    """Create keyrings for operation of ceph-mon units
+
+    :raises: Exception if keyrings cannot be created
+    """
+    if cmp_pkgrevno('ceph', '14.0.0') >= 0:
+        # NOTE(jamespage): At Nautilus, keys are created by the
+        #                  monitors automatically and just need
+        #                  exporting.
+        output = str(subprocess.check_output(
+            [
+                'sudo',
+                '-u', ceph_user(),
+                'ceph',
+                '--name', 'mon.',
+                '--keyring',
+                '/var/lib/ceph/mon/ceph-{}/keyring'.format(
+                    socket.gethostname()
+                ),
+                'auth', 'get', 'client.admin',
+            ]).decode('UTF-8')).strip()
+        if not output:
+            # NOTE: key not yet created, raise exception and retry
+            raise Exception
+        write_file(_client_admin_keyring, output,
+                   owner=ceph_user(), group=ceph_user(),
+                   perms=0o400)
+    else:
+        # NOTE(jamespage): Later ceph releases require explicit
+        #                  call to ceph-create-keys to setup the
+        #                  admin keys for the cluster; this command
+        #                  will wait for quorum in the cluster before
+        #                  returning.
+        # NOTE(fnordahl): Explicitly run `ceph-create-keys` for older
+        #                 ceph releases too.  This improves bootstrap
+        #                 resilience as the charm will wait for
+        #                 presence of peer units before attempting
+        #                 to bootstrap.  Note that charms deploying
+        #                 ceph-mon service should disable running of
+        #                 `ceph-create-keys` service in init system.
+        cmd = ['ceph-create-keys', '--id', socket.gethostname()]
+        if cmp_pkgrevno('ceph', '12.0.0') >= 0:
+            # NOTE(fnordahl): The default timeout in ceph-create-keys of 600
+            #                 seconds is not adequate.  Increase timeout when
+            #                 timeout parameter available.  For older releases
+            #                 we rely on retry_on_exception decorator.
+            #                 LP#1719436
+            cmd.extend(['--timeout', '1800'])
+        subprocess.check_call(cmd)
+        osstat = os.stat(_client_admin_keyring)
+        if not osstat.st_size:
+            # NOTE(fnordahl): Retry will fail as long as this file exists.
+            #                 LP#1719436
+            os.remove(_client_admin_keyring)
+            raise Exception
 
 
 def update_monfs():
@@ -1418,6 +1462,10 @@ def osdize(dev, osd_format, osd_journal, ignore_errors=False, encrypt=False,
                    ignore_errors, encrypt,
                    bluestore, key_manager)
     else:
+        if cmp_pkgrevno('ceph', '14.0.0') >= 0:
+            log("Directory backed OSDs can not be created on Nautilus",
+                level=WARNING)
+            return
         osdize_dir(dev, encrypt, bluestore)
 
 
@@ -1546,7 +1594,7 @@ def _ceph_disk(dev, osd_format, osd_journal, encrypt=False, bluestore=False):
         cmd.append(osd_format)
 
     # NOTE(jamespage): enable experimental bluestore support
-    if cmp_pkgrevno('ceph', '10.2.0') >= 0 and bluestore:
+    if use_bluestore():
         cmd.append('--bluestore')
         wal = get_devices('bluestore-wal')
         if wal:
@@ -1683,7 +1731,10 @@ def is_active_bluestore_device(dev):
         return False
 
     vg_name = lvm.list_lvm_volume_group(dev)
-    lv_name = lvm.list_logical_volumes('vg_name={}'.format(vg_name))[0]
+    try:
+        lv_name = lvm.list_logical_volumes('vg_name={}'.format(vg_name))[0]
+    except IndexError:
+        return False
 
     block_symlinks = glob.glob('/var/lib/ceph/osd/ceph-*/block')
     for block_candidate in block_symlinks:
@@ -1900,9 +1951,10 @@ def osdize_dir(path, encrypt=False, bluestore=False):
             ' skipping'.format(path))
         return
 
-    if os.path.exists(os.path.join(path, 'upstart')):
-        log('Path {} is already configured as an OSD - bailing'.format(path))
-        return
+    for t in ['upstart', 'systemd']:
+        if os.path.exists(os.path.join(path, t)):
+            log('Path {} is already used as an OSD dir - bailing'.format(path))
+            return
 
     if cmp_pkgrevno('ceph', "0.56.6") < 0:
         log('Unable to use directories for OSDs with ceph < 0.56.6',
@@ -2511,24 +2563,161 @@ def update_owner(path, recurse_dirs=True):
         secs=elapsed_time.total_seconds(), path=path), DEBUG)
 
 
-def list_pools(service):
+def list_pools(client='admin'):
     """This will list the current pools that Ceph has
 
-    :param service: String service id to run under
-    :returns: list. Returns a list of the ceph pools.
-    :raises: CalledProcessError if the subprocess fails to run.
+    :param client: (Optional) client id for ceph key to use
+                   Defaults to ``admin``
+    :type cilent: str
+    :returns: Returns a list of available pools.
+    :rtype: list
+    :raises: subprocess.CalledProcessError if the subprocess fails to run.
     """
     try:
         pool_list = []
-        pools = str(subprocess
-                    .check_output(['rados', '--id', service, 'lspools'])
-                    .decode('UTF-8'))
+        pools = subprocess.check_output(['rados', '--id', client, 'lspools'],
+                                        universal_newlines=True,
+                                        stderr=subprocess.STDOUT)
         for pool in pools.splitlines():
             pool_list.append(pool)
         return pool_list
     except subprocess.CalledProcessError as err:
         log("rados lspools failed with error: {}".format(err.output))
         raise
+
+
+def get_pool_param(pool, param, client='admin'):
+    """Get parameter from pool.
+
+    :param pool: Name of pool to get variable from
+    :type pool: str
+    :param param: Name of variable to get
+    :type param: str
+    :param client: (Optional) client id for ceph key to use
+                   Defaults to ``admin``
+    :type cilent: str
+    :returns: Value of variable on pool or None
+    :rtype: str or None
+    :raises: subprocess.CalledProcessError
+    """
+    try:
+        output = subprocess.check_output(
+            ['ceph', '--id', client, 'osd', 'pool', 'get', pool, param],
+            universal_newlines=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as cp:
+        if cp.returncode == 2 and 'ENOENT: option' in cp.output:
+            return None
+        raise
+    if ':' in output:
+        return output.split(':')[1].lstrip().rstrip()
+
+
+def get_pool_erasure_profile(pool, client='admin'):
+    """Get erasure code profile for pool.
+
+    :param pool: Name of pool to get variable from
+    :type pool: str
+    :param client: (Optional) client id for ceph key to use
+                   Defaults to ``admin``
+    :type cilent: str
+    :returns: Erasure code profile of pool or None
+    :rtype: str or None
+    :raises: subprocess.CalledProcessError
+    """
+    try:
+        return get_pool_param(pool, 'erasure_code_profile', client=client)
+    except subprocess.CalledProcessError as cp:
+        if cp.returncode == 13 and 'EACCES: pool' in cp.output:
+            # Not a Erasure coded pool
+            return None
+        raise
+
+
+def get_pool_quota(pool, client='admin'):
+    """Get pool quota.
+
+    :param pool: Name of pool to get variable from
+    :type pool: str
+    :param client: (Optional) client id for ceph key to use
+                   Defaults to ``admin``
+    :type cilent: str
+    :returns: Dictionary with quota variables
+    :rtype: dict
+    :raises: subprocess.CalledProcessError
+    """
+    output = subprocess.check_output(
+        ['ceph', '--id', client, 'osd', 'pool', 'get-quota', pool],
+        universal_newlines=True, stderr=subprocess.STDOUT)
+    rc = re.compile(r'\s+max\s+(\S+)\s*:\s+(\d+)')
+    result = {}
+    for line in output.splitlines():
+        m = rc.match(line)
+        if m:
+            result.update({'max_{}'.format(m.group(1)): m.group(2)})
+    return result
+
+
+def get_pool_applications(pool='', client='admin'):
+    """Get pool applications.
+
+    :param pool: (Optional) Name of pool to get applications for
+                 Defaults to get for all pools
+    :type pool: str
+    :param client: (Optional) client id for ceph key to use
+                   Defaults to ``admin``
+    :type cilent: str
+    :returns: Dictionary with pool name as key
+    :rtype: dict
+    :raises: subprocess.CalledProcessError
+    """
+
+    cmd = ['ceph', '--id', client, 'osd', 'pool', 'application', 'get']
+    if pool:
+        cmd.append(pool)
+    try:
+        output = subprocess.check_output(cmd,
+                                         universal_newlines=True,
+                                         stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as cp:
+        if cp.returncode == 2 and 'ENOENT' in cp.output:
+            return {}
+        raise
+    return json.loads(output)
+
+
+def list_pools_detail():
+    """Get detailed information about pools.
+
+    Structure:
+    {'pool_name_1': {'applications': {'application': {}},
+                     'parameters': {'pg_num': '42', 'size': '42'},
+                     'quota': {'max_bytes': '1000',
+                               'max_objects': '10'},
+                     },
+     'pool_name_2': ...
+     }
+
+    :returns: Dictionary with detailed pool information.
+    :rtype: dict
+    :raises: subproces.CalledProcessError
+    """
+    get_params = ['pg_num', 'size']
+    result = {}
+    applications = get_pool_applications()
+    for pool in list_pools():
+        result[pool] = {
+            'applications': applications.get(pool, {}),
+            'parameters': {},
+            'quota': get_pool_quota(pool),
+        }
+        for param in get_params:
+            result[pool]['parameters'].update({
+                param: get_pool_param(pool, param)})
+        erasure_profile = get_pool_erasure_profile(pool)
+        if erasure_profile:
+            result[pool]['parameters'].update({
+                'erasure_code_profile': erasure_profile})
+    return result
 
 
 def dirs_need_ownership_update(service):
@@ -2554,6 +2743,14 @@ def dirs_need_ownership_update(service):
         if (curr_owner == expected_owner) and (curr_group == expected_group):
             continue
 
+        # NOTE(lathiat): when config_changed runs on reboot, the OSD might not
+        # yet be mounted or started, and the underlying directory the OSD is
+        # mounted to is expected to be owned by root. So skip the check. This
+        # may also happen for OSD directories for OSDs that were removed.
+        if (service == 'osd' and
+                not os.path.exists(os.path.join(child, 'magic'))):
+            continue
+
         log('Directory "%s" needs its ownership updated' % child, DEBUG)
         return True
 
@@ -2566,6 +2763,7 @@ UPGRADE_PATHS = collections.OrderedDict([
     ('hammer', 'jewel'),
     ('jewel', 'luminous'),
     ('luminous', 'mimic'),
+    ('mimic', 'nautilus'),
 ])
 
 # Map UCA codenames to ceph codenames
@@ -2581,6 +2779,7 @@ UCA_CODENAME_MAP = {
     'queens': 'luminous',
     'rocky': 'mimic',
     'stein': 'mimic',
+    'train': 'nautilus',
 }
 
 
