@@ -318,7 +318,9 @@ def _pause_resume_helper(f, configs):
 def get_pkg_version(name):
     from apt import apt_pkg
     pkg = apt_cache()[name]
-    version = apt_pkg.upstream_version(pkg.current_ver.ver_str)
+    version = None
+    if pkg.current_ver:
+        version = apt_pkg.upstream_version(pkg.current_ver.ver_str)
     return version
 
 
