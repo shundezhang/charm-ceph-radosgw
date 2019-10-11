@@ -145,11 +145,28 @@ class CephRadosGWTests(CharmTestCase):
             ceph_hooks.APACHE_PACKAGES
         )
 
-    def test_install(self):
+    @patch.object(ceph_hooks, 'leader_set')
+    @patch.object(ceph_hooks, 'is_leader')
+    def test_install(self, is_leader, leader_set):
         _install_packages = self.patch('install_packages')
+        is_leader.return_value = True
         ceph_hooks.install()
         self.assertTrue(self.execd_preinstall.called)
         self.assertTrue(_install_packages.called)
+        is_leader.assert_called_once()
+        leader_set.assert_called_once_with(namespace_tenants=False)
+
+    @patch.object(ceph_hooks, 'leader_set')
+    @patch.object(ceph_hooks, 'is_leader')
+    def test_install_without_namespacing(self, is_leader, leader_set):
+        _install_packages = self.patch('install_packages')
+        is_leader.return_value = True
+        self.test_config.set('namespace-tenants', True)
+        ceph_hooks.install()
+        self.assertTrue(self.execd_preinstall.called)
+        self.assertTrue(_install_packages.called)
+        is_leader.assert_called_once()
+        leader_set.assert_called_once_with(namespace_tenants=True)
 
     @patch.object(ceph_hooks, 'certs_joined')
     @patch.object(ceph_hooks, 'update_nrpe_config')
@@ -231,19 +248,22 @@ class CephRadosGWTests(CharmTestCase):
         ceph_hooks.gateway_relation()
         self.relation_set.assert_called_with(hostname='10.0.0.1', port=80)
 
+    @patch.object(ceph_hooks, 'leader_get')
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.config')
-    def test_identity_joined_early_version(self, _config):
+    def test_identity_joined_early_version(self, _config, _leader_get):
         self.cmp_pkgrevno.return_value = -1
+        _leader_get.return_value = False
         ceph_hooks.identity_joined()
         self.sys.exit.assert_called_with(1)
 
+    @patch.object(ceph_hooks, 'leader_get')
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.resolve_address')
     @patch('charmhelpers.contrib.openstack.ip.config')
-    def test_identity_joined(self, _config, _resolve_address):
+    def test_identity_joined(self, _config, _resolve_address, _leader_get):
 
         def _test_identify_joined(expected):
             self.related_units = ['unit/0']
@@ -251,6 +271,7 @@ class CephRadosGWTests(CharmTestCase):
             _resolve_address.return_value = 'myserv'
             _config.side_effect = self.test_config.get
             self.test_config.set('region', 'region1')
+            _leader_get.return_value = False
             ceph_hooks.identity_joined(relid='rid')
             self.relation_set.assert_called_with(
                 service='swift',
@@ -270,18 +291,55 @@ class CephRadosGWTests(CharmTestCase):
             self.test_config.set('admin-roles', input.get('admin', ''))
             _test_identify_joined(input['expected'])
 
+    @patch.object(ceph_hooks, 'leader_get')
+    @patch('charmhelpers.contrib.openstack.ip.service_name',
+           lambda *args: 'ceph-radosgw')
+    @patch('charmhelpers.contrib.openstack.ip.resolve_address')
+    @patch('charmhelpers.contrib.openstack.ip.config')
+    def test_identity_joined_namespaced(self, _config,
+                                        _resolve_address, _leader_get):
+        _leader_get.return_value = True
+
+        def _test_identify_joined(expected):
+            self.related_units = ['unit/0']
+            self.cmp_pkgrevno.return_value = 1
+            _resolve_address.return_value = 'myserv'
+            _config.side_effect = self.test_config.get
+            self.test_config.set('region', 'region1')
+            _leader_get.return_value = True
+            ceph_hooks.identity_joined(relid='rid')
+            self.relation_set.assert_called_with(
+                service='swift',
+                region='region1',
+                public_url='http://myserv:80/swift/v1/AUTH_$(project_id)s',
+                internal_url='http://myserv:80/swift/v1/AUTH_$(project_id)s',
+                requested_roles=expected,
+                relation_id='rid',
+                admin_url='http://myserv:80/swift')
+
+        inputs = [{'operator': 'foo', 'admin': 'bar', 'expected': 'foo,bar'},
+                  {'operator': 'foo', 'expected': 'foo'},
+                  {'admin': 'bar', 'expected': 'bar'},
+                  {'expected': ''}]
+        for input in inputs:
+            self.test_config.set('operator-roles', input.get('operator', ''))
+            self.test_config.set('admin-roles', input.get('admin', ''))
+            _test_identify_joined(input['expected'])
+
+    @patch.object(ceph_hooks, 'leader_get')
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')
     @patch('charmhelpers.contrib.openstack.ip.is_clustered')
     @patch('charmhelpers.contrib.openstack.ip.unit_get')
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined_public_name(self, _config, _unit_get,
-                                         _is_clustered):
+                                         _is_clustered, _leader_get):
         self.related_units = ['unit/0']
         _config.side_effect = self.test_config.get
         self.test_config.set('os-public-hostname', 'files.example.com')
         _unit_get.return_value = 'myserv'
         _is_clustered.return_value = False
+        _leader_get.return_value = False
         ceph_hooks.identity_joined(relid='rid')
         self.relation_set.assert_called_with(
             service='swift',

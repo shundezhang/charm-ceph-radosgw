@@ -170,6 +170,14 @@ def install():
     install_packages()
     if not os.path.exists('/etc/ceph'):
         os.makedirs('/etc/ceph')
+    if is_leader():
+        leader_set(namespace_tenants=config('namespace-tenants'))
+
+
+@hooks.hook('upgrade-charm.real')
+def upgrade_charm():
+    if is_leader() and not leader_get('namespace_tenants'):
+        leader_set(namespace_tenants=False)
 
 
 @hooks.hook('config-changed')
@@ -294,10 +302,16 @@ def identity_joined(relid=None):
 
     port = config('port')
     admin_url = '%s:%i/swift' % (canonical_url(CONFIGS, ADMIN), port)
-    internal_url = '%s:%s/swift/v1' % \
-        (canonical_url(CONFIGS, INTERNAL), port)
-    public_url = '%s:%s/swift/v1' % \
-        (canonical_url(CONFIGS, PUBLIC), port)
+    if leader_get('namespace_tenants'):
+        internal_url = '%s:%s/swift/v1/AUTH_$(project_id)s' % \
+            (canonical_url(CONFIGS, INTERNAL), port)
+        public_url = '%s:%s/swift/v1/AUTH_$(project_id)s' % \
+            (canonical_url(CONFIGS, PUBLIC), port)
+    else:
+        internal_url = '%s:%s/swift/v1' % \
+            (canonical_url(CONFIGS, INTERNAL), port)
+        public_url = '%s:%s/swift/v1' % \
+            (canonical_url(CONFIGS, PUBLIC), port)
     roles = [x for x in [config('operator-roles'), config('admin-roles')] if x]
     requested_roles = ''
     if roles:

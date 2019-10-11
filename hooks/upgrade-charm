@@ -7,3 +7,5 @@ find . -name '__pycache__' -prune -exec rm -rf "{}" \;
 
 # Re-install dependencies to deal with py2->py3 switch for charm
 ./hooks/install_deps
+
+./hooks/upgrade-charm.real
