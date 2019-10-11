@@ -176,7 +176,7 @@ def install():
 
 @hooks.hook('upgrade-charm.real')
 def upgrade_charm():
-    if is_leader() and not leader_get('namespace_tenants'):
+    if is_leader() and not leader_get('namespace_tenants') == 'True':
         leader_set(namespace_tenants=False)
 
 
@@ -302,7 +302,7 @@ def identity_joined(relid=None):
 
     port = config('port')
     admin_url = '%s:%i/swift' % (canonical_url(CONFIGS, ADMIN), port)
-    if leader_get('namespace_tenants'):
+    if leader_get('namespace_tenants') == 'True':
         internal_url = '%s:%s/swift/v1/AUTH_$(project_id)s' % \
             (canonical_url(CONFIGS, INTERNAL), port)
         public_url = '%s:%s/swift/v1/AUTH_$(project_id)s' % \

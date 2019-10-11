@@ -254,7 +254,7 @@ class CephRadosGWTests(CharmTestCase):
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined_early_version(self, _config, _leader_get):
         self.cmp_pkgrevno.return_value = -1
-        _leader_get.return_value = False
+        _leader_get.return_value = 'False'
         ceph_hooks.identity_joined()
         self.sys.exit.assert_called_with(1)
 
@@ -271,7 +271,7 @@ class CephRadosGWTests(CharmTestCase):
             _resolve_address.return_value = 'myserv'
             _config.side_effect = self.test_config.get
             self.test_config.set('region', 'region1')
-            _leader_get.return_value = False
+            _leader_get.return_value = 'False'
             ceph_hooks.identity_joined(relid='rid')
             self.relation_set.assert_called_with(
                 service='swift',
@@ -306,7 +306,7 @@ class CephRadosGWTests(CharmTestCase):
             _resolve_address.return_value = 'myserv'
             _config.side_effect = self.test_config.get
             self.test_config.set('region', 'region1')
-            _leader_get.return_value = True
+            _leader_get.return_value = 'True'
             ceph_hooks.identity_joined(relid='rid')
             self.relation_set.assert_called_with(
                 service='swift',
@@ -339,7 +339,7 @@ class CephRadosGWTests(CharmTestCase):
         self.test_config.set('os-public-hostname', 'files.example.com')
         _unit_get.return_value = 'myserv'
         _is_clustered.return_value = False
-        _leader_get.return_value = False
+        _leader_get.return_value = 'False'
         ceph_hooks.identity_joined(relid='rid')
         self.relation_set.assert_called_with(
             service='swift',

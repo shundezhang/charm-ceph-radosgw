@@ -75,7 +75,7 @@ class IdentityServiceContextTest(CharmTestCase):
         self.config.side_effect = self.test_config.get
         self.maxDiff = None
         self.cmp_pkgrevno.return_value = 1
-        self.leader_get.return_value = False
+        self.leader_get.return_value = 'False'
 
     @patch.object(charmhelpers.contrib.openstack.context,
                   'filter_installed_packages', return_value=['absent-pkg'])
@@ -167,7 +167,7 @@ class IdentityServiceContextTest(CharmTestCase):
         _rids.return_value = 'rid1'
         _runits.return_value = 'runit'
         _ctxt_comp.return_value = True
-        self.leader_get.return_value = True
+        self.leader_get.return_value = 'True'
         id_data = {
             'service_port': 9876,
             'service_host': '127.0.0.4',

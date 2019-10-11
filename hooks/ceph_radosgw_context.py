@@ -105,7 +105,7 @@ class IdentityServiceContext(context.IdentityServiceContext):
             if config('admin-roles'):
                 ctxt['user_roles'] += (',' + config('admin-roles'))
         ctxt['cache_size'] = config('cache-size')
-        ctxt['namespace_tenants'] = leader_get('namespace_tenants')
+        ctxt['namespace_tenants'] = leader_get('namespace_tenants') == 'True'
         if self.context_complete(ctxt):
             return ctxt
         return {}
