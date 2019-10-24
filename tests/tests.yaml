@@ -1,5 +1,7 @@
 charm_name: ceph-radosgw
 gate_bundles:
+  - bionic-train
+  - bionic-train-namespaced
   - bionic-stein
   - bionic-stein-namespaced
   - bionic-rocky
@@ -13,7 +15,7 @@ gate_bundles:
   - xenial-mitaka-namespaced
   - trusty-mitaka
 smoke_bundles:
-  - bionic-stein
+  - bionic-train
 dev_bundles:
   - bionic-queens-multisite
   - bionic-rocky-multisite
