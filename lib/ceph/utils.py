@@ -29,7 +29,6 @@ from datetime import datetime
 
 from charmhelpers.core import hookenv
 from charmhelpers.core import templating
-from charmhelpers.core.decorators import retry_on_exception
 from charmhelpers.core.host import (
     chownr,
     cmp_pkgrevno,
@@ -81,7 +80,12 @@ LEADER = 'leader'
 PEON = 'peon'
 QUORUM = [LEADER, PEON]
 
-PACKAGES = ['ceph', 'gdisk', 'btrfs-tools',
+if CompareHostReleases(lsb_release()['DISTRIB_CODENAME']) >= 'eoan':
+    btrfs_package = 'btrfs-progs'
+else:
+    btrfs_package = 'btrfs-tools'
+
+PACKAGES = ['ceph', 'gdisk', btrfs_package,
             'radosgw', 'xfsprogs',
             'lvm2', 'parted', 'smartmontools']
 
@@ -177,7 +181,7 @@ def unmounted_disks():
     for device in context.list_devices(DEVTYPE='disk'):
         if device['SUBSYSTEM'] == 'block':
             matched = False
-            for block_type in [u'dm', u'loop', u'ram', u'nbd']:
+            for block_type in [u'dm-', u'loop', u'ram', u'nbd']:
                 if block_type in device.device_node:
                     matched = True
             if matched:
@@ -793,10 +797,31 @@ def is_leader():
         return False
 
 
+def manager_available():
+    # if manager daemon isn't on this release, just say it is Fine
+    if cmp_pkgrevno('ceph', '11.0.0') < 0:
+        return True
+    cmd = ["sudo", "-u", "ceph", "ceph", "mgr", "dump", "-f", "json"]
+    try:
+        result = json.loads(subprocess.check_output(cmd).decode('UTF-8'))
+        return result['available']
+    except subprocess.CalledProcessError as e:
+        log("'{}' failed: {}".format(" ".join(cmd), str(e)))
+        return False
+    except Exception:
+        return False
+
+
 def wait_for_quorum():
     while not is_quorum():
         log("Waiting for quorum to be reached")
         time.sleep(3)
+
+
+def wait_for_manager():
+    while not manager_available():
+        log("Waiting for manager to be available")
+        time.sleep(5)
 
 
 def add_bootstrap_hint(peer):
@@ -888,7 +913,12 @@ def is_pristine_disk(dev):
     """
     want_bytes = 2048
 
-    f = open(dev, 'rb')
+    try:
+        f = open(dev, 'rb')
+    except OSError as e:
+        log(e)
+        return False
+
     data = f.read(want_bytes)
     read_bytes = len(data)
     if read_bytes != want_bytes:
@@ -1274,7 +1304,6 @@ def bootstrap_monitor_cluster(secret):
                             path,
                             done,
                             init_marker)
-            _create_keyrings()
         except:
             raise
         finally:
@@ -1322,9 +1351,10 @@ def _create_monitor(keyring, secret, hostname, path, done, init_marker):
         service_restart('ceph-mon-all')
 
 
-@retry_on_exception(3, base_delay=5)
-def _create_keyrings():
+def create_keyrings():
     """Create keyrings for operation of ceph-mon units
+
+    NOTE: The quorum should be done before to execute this function.
 
     :raises: Exception if keyrings cannot be created
     """
@@ -2285,14 +2315,19 @@ def wait_on_previous_node(upgrade_key, service, previous_node, version):
 def get_upgrade_position(osd_sorted_list, match_name):
     """Return the upgrade position for the given osd.
 
-    :param osd_sorted_list: list. Osds sorted
-    :param match_name: str. The osd name to match
-    :returns: int. The position or None if not found
+    :param osd_sorted_list: Osds sorted
+    :type osd_sorted_list: [str]
+    :param match_name: The osd name to match
+    :type match_name: str
+    :returns: The position of the name
+    :rtype: int
+    :raises: ValueError if name is not found
     """
     for index, item in enumerate(osd_sorted_list):
         if item.name == match_name:
             return index
-    return None
+    raise ValueError("osd name '{}' not found in get_upgrade_position list"
+                     .format(match_name))
 
 
 # Edge cases:
