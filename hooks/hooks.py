@@ -23,7 +23,7 @@ import uuid
 sys.path.append('lib')
 
 import ceph_rgw as ceph
-import ceph.utils as ceph_utils
+import charms_ceph.utils as ceph_utils
 import multisite
 
 from charmhelpers.core.hookenv import (
