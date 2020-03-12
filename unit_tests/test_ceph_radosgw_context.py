@@ -94,7 +94,6 @@ class IdentityServiceContextTest(CharmTestCase):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('admin-roles', 'Dart')
         self.test_config.set('cache-size', '42')
-        self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']
         _format_ipv6_addr.return_value = False
@@ -119,7 +118,6 @@ class IdentityServiceContextTest(CharmTestCase):
             'admin_password': 'adminpass',
             'admin_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
             'admin_tenant_name': 'ten',
-            'admin_token': 'ubuntutesting',
             'admin_user': 'admin',
             'api_version': '2.0',
             'auth_host': '127.0.0.5',
@@ -160,7 +158,6 @@ class IdentityServiceContextTest(CharmTestCase):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('admin-roles', 'Dart')
         self.test_config.set('cache-size', '42')
-        self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']
         _format_ipv6_addr.return_value = False
@@ -186,7 +183,6 @@ class IdentityServiceContextTest(CharmTestCase):
             'admin_password': 'adminpass',
             'admin_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
             'admin_tenant_name': 'ten',
-            'admin_token': 'ubuntutesting',
             'admin_user': 'admin',
             'api_version': '2.0',
             'auth_host': '127.0.0.5',
@@ -222,7 +218,6 @@ class IdentityServiceContextTest(CharmTestCase):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('admin-roles', 'Dart')
         self.test_config.set('cache-size', '42')
-        self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']
         _format_ipv6_addr.return_value = False
@@ -248,7 +243,6 @@ class IdentityServiceContextTest(CharmTestCase):
             'admin_password': 'adminpass',
             'admin_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
             'admin_tenant_name': 'ten',
-            'admin_token': 'ubuntutesting',
             'admin_user': 'admin',
             'api_version': '2.0',
             'auth_host': '127.0.0.5',
@@ -280,7 +274,6 @@ class IdentityServiceContextTest(CharmTestCase):
         self.test_config.set('operator-roles', 'Babel')
         self.test_config.set('admin-roles', 'Dart')
         self.test_config.set('cache-size', '42')
-        self.test_relation.set({'admin_token': 'ubuntutesting'})
         self.relation_ids.return_value = ['identity-service:5']
         self.related_units.return_value = ['keystone/0']
         _format_ipv6_addr.return_value = False
@@ -311,7 +304,6 @@ class IdentityServiceContextTest(CharmTestCase):
             'admin_password': 'adminpass',
             'admin_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
             'admin_tenant_name': 'ten',
-            'admin_token': 'ubuntutesting',
             'admin_user': 'admin',
             'api_version': '3',
             'auth_host': '127.0.0.5',
@@ -338,40 +330,6 @@ class IdentityServiceContextTest(CharmTestCase):
     def test_ids_ctxt_luminous(self):
         self.test_ids_ctxt(jewel_installed=True,
                            cmp_pkgrevno_side_effects=[1, 0])
-
-    @patch.object(charmhelpers.contrib.openstack.context,
-                  'filter_installed_packages', return_value=['absent-pkg'])
-    @patch.object(charmhelpers.contrib.openstack.context, 'format_ipv6_addr')
-    @patch.object(charmhelpers.contrib.openstack.context, 'context_complete')
-    @patch.object(charmhelpers.contrib.openstack.context, 'relation_get')
-    @patch.object(charmhelpers.contrib.openstack.context, 'related_units')
-    @patch.object(charmhelpers.contrib.openstack.context, 'relation_ids')
-    @patch.object(charmhelpers.contrib.openstack.context, 'log')
-    def test_ids_ctxt_no_admin_token(self, _log, _rids, _runits, _rget,
-                                     _ctxt_comp, _format_ipv6_addr,
-                                     _filter_installed_packages):
-        self.test_config.set('operator-roles', 'Babel')
-        self.test_config.set('cache-size', '42')
-        self.test_relation.set({})
-        self.relation_ids.return_value = ['identity-service:5']
-        self.related_units.return_value = ['keystone/0']
-        _format_ipv6_addr.return_value = False
-        _rids.return_value = 'rid1'
-        _runits.return_value = 'runit'
-        _ctxt_comp.return_value = True
-        id_data = {
-            'service_port': 9876,
-            'service_host': '127.0.0.4',
-            'service_tenant_id': '2852107b8f8f473aaf0d769c7bbcf86b',
-            'auth_host': '127.0.0.5',
-            'auth_port': 5432,
-            'service_tenant': 'ten',
-            'service_username': 'admin',
-            'service_password': 'adminpass',
-        }
-        _rget.return_value = id_data
-        ids_ctxt = context.IdentityServiceContext()
-        self.assertEqual({}, ids_ctxt())
 
     @patch.object(charmhelpers.contrib.openstack.context,
                   'filter_installed_packages', return_value=['absent-pkg'])

@@ -82,13 +82,6 @@ class IdentityServiceContext(context.IdentityServiceContext):
         if not ctxt:
             return
 
-        ctxt['admin_token'] = None
-        for relid in relation_ids('identity-service'):
-            for unit in related_units(relid):
-                if not ctxt.get('admin_token'):
-                    ctxt['admin_token'] = \
-                        relation_get('admin_token', unit, relid)
-
         if cmp_pkgrevno('radosgw', "10.2.0") >= 0:
             ctxt['auth_keystone_v3_supported'] = True
 
