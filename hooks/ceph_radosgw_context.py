@@ -134,7 +134,7 @@ def ensure_host_resolvable_v6(hostname):
         with open(tmp_hosts, 'a+') as fd:
             lines = fd.readlines()
             for line in lines:
-                key = "^%s\s+" % (host_addr)
+                key = r"^%s\s+" % (host_addr)
                 if re.search(key, line):
                     break
             else:
