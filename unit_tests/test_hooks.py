@@ -273,14 +273,21 @@ class CephRadosGWTests(CharmTestCase):
             self.test_config.set('region', 'region1')
             _leader_get.return_value = 'False'
             ceph_hooks.identity_joined(relid='rid')
-            self.relation_set.assert_called_with(
-                service='swift',
-                region='region1',
-                public_url='http://myserv:80/swift/v1',
-                internal_url='http://myserv:80/swift/v1',
-                requested_roles=expected,
-                relation_id='rid',
-                admin_url='http://myserv:80/swift')
+            self.relation_set.assert_has_calls([
+                call(swift_service='swift',
+                     swift_region='region1',
+                     swift_public_url='http://myserv:80/swift/v1',
+                     swift_internal_url='http://myserv:80/swift/v1',
+                     swift_admin_url='http://myserv:80/swift',
+                     requested_roles=expected,
+                     relation_id='rid'),
+                call(s3_service='s3',
+                     s3_region='region1',
+                     s3_public_url='http://myserv:80/',
+                     s3_internal_url='http://myserv:80/',
+                     s3_admin_url='http://myserv:80/',
+                     relation_id='rid')
+            ])
 
         inputs = [{'operator': 'foo', 'admin': 'bar', 'expected': 'foo,bar'},
                   {'operator': 'foo', 'expected': 'foo'},
@@ -308,14 +315,23 @@ class CephRadosGWTests(CharmTestCase):
             self.test_config.set('region', 'region1')
             _leader_get.return_value = 'True'
             ceph_hooks.identity_joined(relid='rid')
-            self.relation_set.assert_called_with(
-                service='swift',
-                region='region1',
-                public_url='http://myserv:80/swift/v1/AUTH_$(project_id)s',
-                internal_url='http://myserv:80/swift/v1/AUTH_$(project_id)s',
-                requested_roles=expected,
-                relation_id='rid',
-                admin_url='http://myserv:80/swift')
+            self.relation_set.assert_has_calls([
+                call(swift_service='swift',
+                     swift_region='region1',
+                     swift_public_url=(
+                         'http://myserv:80/swift/v1/AUTH_$(project_id)s'),
+                     swift_internal_url=(
+                         'http://myserv:80/swift/v1/AUTH_$(project_id)s'),
+                     swift_admin_url='http://myserv:80/swift',
+                     requested_roles=expected,
+                     relation_id='rid'),
+                call(s3_service='s3',
+                     s3_region='region1',
+                     s3_public_url='http://myserv:80/',
+                     s3_internal_url='http://myserv:80/',
+                     s3_admin_url='http://myserv:80/',
+                     relation_id='rid')
+            ])
 
         inputs = [{'operator': 'foo', 'admin': 'bar', 'expected': 'foo,bar'},
                   {'operator': 'foo', 'expected': 'foo'},
@@ -341,14 +357,21 @@ class CephRadosGWTests(CharmTestCase):
         _is_clustered.return_value = False
         _leader_get.return_value = 'False'
         ceph_hooks.identity_joined(relid='rid')
-        self.relation_set.assert_called_with(
-            service='swift',
-            region='RegionOne',
-            public_url='http://files.example.com:80/swift/v1',
-            internal_url='http://myserv:80/swift/v1',
-            requested_roles='Member,Admin',
-            relation_id='rid',
-            admin_url='http://myserv:80/swift')
+        self.relation_set.assert_has_calls([
+            call(swift_service='swift',
+                 swift_region='RegionOne',
+                 swift_public_url='http://files.example.com:80/swift/v1',
+                 swift_internal_url='http://myserv:80/swift/v1',
+                 swift_admin_url='http://myserv:80/swift',
+                 requested_roles='Member,Admin',
+                 relation_id='rid'),
+            call(s3_service='s3',
+                 s3_region='RegionOne',
+                 s3_public_url='http://files.example.com:80/',
+                 s3_internal_url='http://myserv:80/',
+                 s3_admin_url='http://myserv:80/',
+                 relation_id='rid')
+        ])
 
     @patch.object(ceph_hooks, 'identity_joined')
     def test_identity_changed(self, mock_identity_joined):

@@ -316,12 +316,23 @@ def identity_joined(relid=None):
     requested_roles = ''
     if roles:
         requested_roles = ','.join(roles) if len(roles) > 1 else roles[0]
-    relation_set(service='swift',
-                 region=config('region'),
-                 public_url=public_url, internal_url=internal_url,
-                 admin_url=admin_url,
+    relation_set(swift_service='swift',
+                 swift_region=config('region'),
+                 swift_public_url=public_url,
+                 swift_internal_url=internal_url,
+                 swift_admin_url=admin_url,
                  requested_roles=requested_roles,
                  relation_id=relid)
+    if cmp_pkgrevno('radosgw', '12.2') >= 0:
+        relation_set(s3_service='s3',
+                     s3_region=config('region'),
+                     s3_public_url='{}:{}/'.format(
+                         canonical_url(CONFIGS, PUBLIC), port),
+                     s3_internal_url='{}:{}/'.format(
+                         canonical_url(CONFIGS, INTERNAL), port),
+                     s3_admin_url='{}:{}/'.format(
+                         canonical_url(CONFIGS, ADMIN), port),
+                     relation_id=relid)
 
 
 @hooks.hook('identity-service-relation-changed')

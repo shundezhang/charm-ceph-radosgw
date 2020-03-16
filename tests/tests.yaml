@@ -1,23 +1,26 @@
 charm_name: ceph-radosgw
 gate_bundles:
-  - bionic-train
-  - bionic-train-namespaced
-  - bionic-stein
-  - bionic-stein-namespaced
-  - bionic-rocky
-  - bionic-rocky-namespaced
-  - bionic-queens
-  - bionic-queens-namespaced
-  - xenial-queens
+  - test-s3api: bionic-train
+  - test-s3api: bionic-train-namespaced
+  - test-s3api: bionic-stein
+  - test-s3api: bionic-stein-namespaced
+  - test-s3api: bionic-rocky
+  - test-s3api: bionic-rocky-namespaced
+  - test-s3api: bionic-queens
+  - test-s3api: bionic-queens-namespaced
+  - test-s3api: xenial-queens
   - xenial-pike
   - xenial-ocata
   - xenial-mitaka
   - xenial-mitaka-namespaced
   - trusty-mitaka
 smoke_bundles:
-  - bionic-train
+  - test-s3api: bionic-train
 dev_bundles:
   - bionic-queens-multisite
   - bionic-rocky-multisite
 tests:
   - zaza.openstack.charm_tests.ceph.tests.CephRGWTest
+  - test-s3api:
+    - zaza.openstack.charm_tests.ceph.tests.CephRGWTest
+    - zaza.openstack.charm_tests.swift.tests.S3APITest
