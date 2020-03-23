@@ -20,6 +20,7 @@ machines:
   '8':
   '9':
   '10':
+  '11':
 
 applications:
 
@@ -77,6 +78,15 @@ applications:
     to:
       - '10'
 
+  vault-mysql-router:
+    charm: cs:~openstack-charmers-next/mysql-router
+
+  vault:
+    charm: cs:~openstack-charmers-next/vault
+    num_units: 1
+    to:
+      - '11'
+
 relations:
 
   - - 'keystone:shared-db'
@@ -92,3 +102,15 @@ relations:
 
   - - 'ceph-radosgw:identity-service'
     - 'keystone:identity-service'
+
+  - - 'vault-mysql-router:db-router'
+    - 'mysql-innodb-cluster:db-router'
+
+  - - 'vault:shared-db'
+    - 'vault-mysql-router:shared-db'
+
+  - - 'keystone:certificates'
+    - 'vault:certificates'
+
+  - - 'ceph-radosgw:certificates'
+    - 'vault:certificates'

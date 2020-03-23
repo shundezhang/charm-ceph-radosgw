@@ -100,6 +100,22 @@ BASE_RESOURCE_MAP = OrderedDict([
 ])
 
 
+def listen_port():
+    """Determine port to listen to.
+
+    The value in configuration will be used if specified, otherwise the default
+    will be determined based on presence of TLS configuration.
+
+    :returns: Port number
+    :rtype: int
+    """
+    if https():
+        default_port = 443
+    else:
+        default_port = 80
+    return config('port') or default_port
+
+
 def resource_map():
     """Dynamically generate a map of resources.
 

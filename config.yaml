@@ -55,9 +55,12 @@ options:
       natively supported config in the charm.
   port:
     type: int
-    default: 80
+    default:
     description: |
       The port that the RADOS Gateway will listen on.
+      .
+      The default is 80 when no TLS is configured and 443 when TLS is
+      configured.
   prefer-ipv6:
     type: boolean
     default: False
