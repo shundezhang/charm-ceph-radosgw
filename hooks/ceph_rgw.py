@@ -107,9 +107,6 @@ def get_create_rgw_pools_rq(prefix=None):
                                   weight=w, group='objects',
                                   app_name=CEPH_POOL_APP_NAME)
 
-    from apt import apt_pkg
-
-    apt_pkg.init()
     rq = CephBrokerRq()
     replicas = config('ceph-osd-replication-count')
 

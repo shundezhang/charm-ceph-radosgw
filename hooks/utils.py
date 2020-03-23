@@ -51,6 +51,7 @@ from charmhelpers.core.host import (
 from charmhelpers.fetch import (
     apt_cache,
     apt_install,
+    apt_pkg,
     apt_update,
     add_source,
     filter_installed_packages,
@@ -227,9 +228,6 @@ def setup_ipv6():
         raise Exception("IPv6 is not supported in the charms for Ubuntu "
                         "versions less than Trusty 14.04")
 
-    from apt import apt_pkg
-    apt_pkg.init()
-
     # Need haproxy >= 1.5.3 for ipv6 so for Trusty if we are <= Kilo we need to
     # use trusty-backports otherwise we can use the UCA.
     vc = apt_pkg.version_compare(get_pkg_version('haproxy'), '1.5.3')
@@ -316,7 +314,6 @@ def _pause_resume_helper(f, configs):
 
 
 def get_pkg_version(name):
-    from apt import apt_pkg
     pkg = apt_cache()[name]
     version = None
     if pkg.current_ver:

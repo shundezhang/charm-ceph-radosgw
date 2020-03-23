@@ -12,16 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import sys
-
-from mock import patch, call, MagicMock
-
-# python-apt is not installed as part of test-requirements but is imported by
-# some charmhelpers modules so create a fake import.
-mock_apt = MagicMock()
-mock_apt.apt_pkg = MagicMock()
-sys.modules['apt'] = mock_apt
-sys.modules['apt_pkg'] = mock_apt.apt_pkg
+from mock import patch, call
 
 import ceph_rgw as ceph  # noqa
 import utils  # noqa
@@ -147,7 +138,7 @@ class CephRadosGWCephTests(CharmTestCase):
                                                name='objects',
                                                permission='rwx')
 
-    @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: -1)
+    @patch.object(utils.apt_pkg, 'version_compare', lambda *args: -1)
     @patch.object(utils, 'lsb_release',
                   lambda: {'DISTRIB_CODENAME': 'trusty'})
     @patch.object(utils, 'add_source')
@@ -160,7 +151,7 @@ class CephRadosGWCephTests(CharmTestCase):
         self.assertTrue(mock_apt_update.called)
         self.assertTrue(mock_apt_install.called)
 
-    @patch.object(mock_apt.apt_pkg, 'version_compare', lambda *args: 0)
+    @patch.object(utils.apt_pkg, 'version_compare', lambda *args: 0)
     @patch.object(utils, 'lsb_release',
                   lambda: {'DISTRIB_CODENAME': 'trusty'})
     @patch.object(utils, 'add_source')
