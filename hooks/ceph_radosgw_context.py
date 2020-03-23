@@ -41,13 +41,15 @@ from charmhelpers.contrib.network.ip import (
 )
 from charmhelpers.contrib.storage.linux.ceph import CephConfContext
 
+import utils
+
 
 class ApacheSSLContext(context.ApacheSSLContext):
     interfaces = ['https']
     service_namespace = 'ceph-radosgw'
 
     def __call__(self):
-        self.external_ports = [config('port')]
+        self.external_ports = [utils.listen_port()]
         return super(ApacheSSLContext, self).__call__()
 
 
@@ -55,7 +57,7 @@ class HAProxyContext(context.HAProxyContext):
 
     def __call__(self):
         ctxt = super(HAProxyContext, self).__call__()
-        port = config('port')
+        port = utils.listen_port()
 
         # Apache ports
         a_cephradosgw_api = determine_apache_port(port, singlenode_mode=True)
@@ -183,7 +185,7 @@ class MonContext(context.CephContext):
         if config('prefer-ipv6'):
             ensure_host_resolvable_v6(host)
 
-        port = determine_api_port(config('port'), singlenode_mode=True)
+        port = determine_api_port(utils.listen_port(), singlenode_mode=True)
         if config('prefer-ipv6'):
             port = "[::]:%s" % (port)
 

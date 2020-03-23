@@ -53,10 +53,12 @@ from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import (
     cmp_pkgrevno,
     is_container,
+    service,
+    service_pause,
     service_reload,
     service_restart,
+    service_resume,
     service_stop,
-    service,
 )
 from charmhelpers.contrib.network.ip import (
     get_relation_ip,
@@ -80,20 +82,21 @@ from charmhelpers.contrib.openstack.ha.utils import (
     generate_ha_relation_data,
 )
 from utils import (
-    register_configs,
-    setup_ipv6,
-    services,
     assess_status,
     disable_unused_apache_sites,
-    pause_unit_helper,
-    resume_unit_helper,
-    restart_map,
-    service_name,
-    systemd_based_radosgw,
-    request_per_unit_key,
-    ready_for_service,
-    restart_nonce_changed,
+    listen_port,
     multisite_deployment,
+    pause_unit_helper,
+    ready_for_service,
+    register_configs,
+    request_per_unit_key,
+    restart_map,
+    restart_nonce_changed,
+    resume_unit_helper,
+    service_name,
+    services,
+    setup_ipv6,
+    systemd_based_radosgw,
 )
 from charmhelpers.contrib.charmsupport import nrpe
 from charmhelpers.contrib.hardening.harden import harden
@@ -168,6 +171,10 @@ def install():
     status_set('maintenance', 'Executing pre-install')
     execd_preinstall()
     install_packages()
+    # hold the service down until we have keys from ceph
+    log('Disable service "{}" until we have keys for it.'
+        .format(service_name()), level=DEBUG)
+    service_pause(service_name())
     if not os.path.exists('/etc/ceph'):
         os.makedirs('/etc/ceph')
     if is_leader():
@@ -225,7 +232,7 @@ def config_changed():
 
         update_nrpe_config()
 
-        open_port(port=config('port'))
+        open_port(port=listen_port())
     _config_changed()
 
 
@@ -270,7 +277,6 @@ def mon_relation(rid=None, unit=None):
                     # host services.
                     update_nrpe_config(checks_to_remove=['radosgw'])
 
-                service('enable', service_name())
                 # NOTE(jamespage):
                 # Multi-site deployments need to defer restart as the
                 # zone is not created until the master relation is
@@ -280,7 +286,9 @@ def mon_relation(rid=None, unit=None):
                 if (not is_unit_paused_set() and
                         new_keyring and
                         not multisite_deployment()):
-                    service_restart(service_name())
+                    log('Resume service "{}" as we now have keys for it.'
+                        .format(service_name()), level=DEBUG)
+                    service_resume(service_name())
 
             process_multisite_relations()
         else:
@@ -291,7 +299,7 @@ def mon_relation(rid=None, unit=None):
 @hooks.hook('gateway-relation-joined')
 def gateway_relation():
     relation_set(hostname=get_relation_ip('gateway-relation'),
-                 port=config('port'))
+                 port=listen_port())
 
 
 @hooks.hook('identity-service-relation-joined')
@@ -300,7 +308,7 @@ def identity_joined(relid=None):
         log('Integration with keystone requires ceph >= 0.55')
         sys.exit(1)
 
-    port = config('port')
+    port = listen_port()
     admin_url = '%s:%i/swift' % (canonical_url(CONFIGS, ADMIN), port)
     if leader_get('namespace_tenants') == 'True':
         internal_url = '%s:%s/swift/v1/AUTH_$(project_id)s' % \
@@ -341,7 +349,6 @@ def identity_changed(relid=None):
     def _identity_changed():
         identity_joined(relid)
         CONFIGS.write_all()
-        configure_https()
     _identity_changed()
 
 
@@ -492,7 +499,7 @@ def master_relation_joined(relation_id=None):
 
     internal_url = '{}:{}'.format(
         canonical_url(CONFIGS, INTERNAL),
-        config('port')
+        listen_port(),
     )
     endpoints = [internal_url]
     realm = config('realm')
@@ -582,7 +589,7 @@ def slave_relation_changed(relation_id=None, unit=None):
 
     internal_url = '{}:{}'.format(
         canonical_url(CONFIGS, INTERNAL),
-        config('port')
+        listen_port(),
     )
     endpoints = [internal_url]
 

@@ -37,6 +37,7 @@ TO_PATCH = [
     'config',
     'cmp_pkgrevno',
     'execd_preinstall',
+    'listen_port',
     'log',
     'open_port',
     'os',
@@ -53,6 +54,8 @@ TO_PATCH = [
     'service_reload',
     'service_stop',
     'service_restart',
+    'service_pause',
+    'service_resume',
     'service',
     'service_name',
     'socket',
@@ -155,6 +158,7 @@ class CephRadosGWTests(CharmTestCase):
         self.assertTrue(_install_packages.called)
         is_leader.assert_called_once()
         leader_set.assert_called_once_with(namespace_tenants=False)
+        self.service_pause.assert_called_once_with('radosgw')
 
     @patch.object(ceph_hooks, 'leader_set')
     @patch.object(ceph_hooks, 'is_leader')
@@ -167,6 +171,7 @@ class CephRadosGWTests(CharmTestCase):
         self.assertTrue(_install_packages.called)
         is_leader.assert_called_once()
         leader_set.assert_called_once_with(namespace_tenants=True)
+        self.service_pause.assert_called_once_with('radosgw')
 
     @patch.object(ceph_hooks, 'certs_joined')
     @patch.object(ceph_hooks, 'update_nrpe_config')
@@ -191,8 +196,7 @@ class CephRadosGWTests(CharmTestCase):
         self.socket.gethostname.return_value = 'testinghostname'
         ceph_hooks.mon_relation()
         self.relation_set.assert_not_called()
-        self.service_restart.assert_called_once_with('radosgw')
-        self.service.assert_called_once_with('enable', 'radosgw')
+        self.service_resume.assert_called_once_with('radosgw')
         _ceph.import_radosgw_key.assert_called_with('seckey',
                                                     name='rgw.testinghostname')
         self.CONFIGS.write_all.assert_called_with()
@@ -210,8 +214,7 @@ class CephRadosGWTests(CharmTestCase):
             relation_id=None,
             key_name='rgw.testinghostname'
         )
-        self.service_restart.assert_called_once_with('radosgw')
-        self.service.assert_called_once_with('enable', 'radosgw')
+        self.service_resume.assert_called_once_with('radosgw')
         _ceph.import_radosgw_key.assert_called_with('seckey',
                                                     name='rgw.testinghostname')
         self.CONFIGS.write_all.assert_called_with()
@@ -224,8 +227,7 @@ class CephRadosGWTests(CharmTestCase):
         self.relation_get.return_value = None
         ceph_hooks.mon_relation()
         self.assertFalse(_ceph.import_radosgw_key.called)
-        self.service_restart.assert_not_called()
-        self.service.assert_not_called()
+        self.service_resume.assert_not_called()
         self.CONFIGS.write_all.assert_called_with()
 
     @patch.object(ceph_hooks, 'send_request_if_needed')
@@ -237,14 +239,14 @@ class CephRadosGWTests(CharmTestCase):
         _ceph.import_radosgw_key.return_value = False
         self.relation_get.return_value = 'seckey'
         ceph_hooks.mon_relation()
-        self.service_restart.assert_not_called()
-        self.service.assert_not_called()
+        self.service_resume.assert_not_called()
         self.assertFalse(_ceph.import_radosgw_key.called)
         self.assertFalse(self.CONFIGS.called)
         self.assertTrue(mock_send_request_if_needed.called)
 
     def test_gateway_relation(self):
         self.get_relation_ip.return_value = '10.0.0.1'
+        self.listen_port.return_value = 80
         ceph_hooks.gateway_relation()
         self.relation_set.assert_called_with(hostname='10.0.0.1', port=80)
 
@@ -255,6 +257,7 @@ class CephRadosGWTests(CharmTestCase):
     def test_identity_joined_early_version(self, _config, _leader_get):
         self.cmp_pkgrevno.return_value = -1
         _leader_get.return_value = 'False'
+        self.listen_port.return_value = 80
         ceph_hooks.identity_joined()
         self.sys.exit.assert_called_with(1)
 
@@ -264,6 +267,8 @@ class CephRadosGWTests(CharmTestCase):
     @patch('charmhelpers.contrib.openstack.ip.resolve_address')
     @patch('charmhelpers.contrib.openstack.ip.config')
     def test_identity_joined(self, _config, _resolve_address, _leader_get):
+
+        self.listen_port.return_value = 80
 
         def _test_identify_joined(expected):
             self.related_units = ['unit/0']
@@ -310,6 +315,7 @@ class CephRadosGWTests(CharmTestCase):
         def _test_identify_joined(expected):
             self.related_units = ['unit/0']
             self.cmp_pkgrevno.return_value = 1
+            self.listen_port.return_value = 80
             _resolve_address.return_value = 'myserv'
             _config.side_effect = self.test_config.get
             self.test_config.set('region', 'region1')
@@ -356,6 +362,7 @@ class CephRadosGWTests(CharmTestCase):
         _unit_get.return_value = 'myserv'
         _is_clustered.return_value = False
         _leader_get.return_value = 'False'
+        self.listen_port.return_value = 80
         ceph_hooks.identity_joined(relid='rid')
         self.relation_set.assert_has_calls([
             call(swift_service='swift',
@@ -521,6 +528,7 @@ class CephRadosMultisiteTests(CharmTestCase):
         'relation_set',
         'relation_get',
         'leader_get',
+        'listen_port',
         'config',
         'is_leader',
         'multisite',
@@ -574,6 +582,7 @@ class MasterMultisiteTests(CephRadosMultisiteTests):
     def test_master_relation_joined_create_everything(self):
         for k, v in self._complete_config.items():
             self.test_config.set(k, v)
+        self.listen_port.return_value = 80
         self.is_leader.return_value = True
         self.leader_get.side_effect = lambda attr: self._leader_data.get(attr)
         self.multisite.list_realms.return_value = []
@@ -656,6 +665,7 @@ class MasterMultisiteTests(CephRadosMultisiteTests):
     def test_master_relation_joined_not_leader(self):
         for k, v in self._complete_config.items():
             self.test_config.set(k, v)
+        self.listen_port.return_value = 80
         self.is_leader.return_value = False
         self.leader_get.side_effect = lambda attr: self._leader_data.get(attr)
         ceph_hooks.master_relation_joined('master:1')
@@ -698,6 +708,7 @@ class SlaveMultisiteTests(CephRadosMultisiteTests):
         for k, v in self._complete_config.items():
             self.test_config.set(k, v)
         self.is_leader.return_value = True
+        self.listen_port.return_value = 80
         self.leader_get.return_value = None
         self.relation_get.return_value = self._test_relation
         self.multisite.list_realms.return_value = []

@@ -32,6 +32,7 @@ TO_PATCH = [
     'determine_api_port',
     'cmp_pkgrevno',
     'leader_get',
+    'utils',
 ]
 
 
@@ -59,6 +60,7 @@ class HAProxyContextTests(CharmTestCase):
         _haconfig.side_effect = self.test_config.get
         _harelation_ids.return_value = []
         haproxy_context = context.HAProxyContext()
+        self.utils.listen_port.return_value = 80
         self.determine_api_port.return_value = 70
         expect = {
             'cephradosgw_bind_port': 70,

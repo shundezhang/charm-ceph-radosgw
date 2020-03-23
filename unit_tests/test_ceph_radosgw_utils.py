@@ -300,3 +300,11 @@ class CephRadosGWUtilTests(CharmTestCase):
         self.assertTrue(utils.multisite_deployment())
         self.test_config.set('realm', None)
         self.assertFalse(utils.multisite_deployment())
+
+    def test_listen_port(self):
+        self.https.return_value = False
+        self.assertEquals(80, utils.listen_port())
+        self.https.return_value = True
+        self.assertEquals(443, utils.listen_port())
+        self.test_config.set('port', 42)
+        self.assertEquals(42, utils.listen_port())
