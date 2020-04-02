@@ -119,7 +119,7 @@ def tidydefaults(args):
         )
     except subprocess.CalledProcessError as cpe:
         action_fail('Unable delete default zone and zonegroup'
-                    ': {}'.format(zone, cpe.output))
+                    ': {} - {}'.format(zone, cpe.output))
 
 
 # A dictionary of all the defined actions to callables (which take

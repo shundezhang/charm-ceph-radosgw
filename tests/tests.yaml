@@ -1,5 +1,9 @@
 charm_name: ceph-radosgw
 gate_bundles:
+  - test-s3api: focal-ussuri
+  - test-s3api: focal-ussuri-namespaced
+  - test-s3api: bionic-ussuri
+  - test-s3api: bionic-ussuri-namespaced
   - test-s3api: bionic-train
   - test-s3api: bionic-train-namespaced
   - test-s3api: bionic-stein
@@ -24,3 +28,7 @@ tests:
   - test-s3api:
     - zaza.openstack.charm_tests.ceph.tests.CephRGWTest
     - zaza.openstack.charm_tests.swift.tests.S3APITest
+tests_options:
+  force_deploy:
+    - focal-ussuri
+    - focal-ussuri-namespaced
