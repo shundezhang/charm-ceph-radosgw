@@ -1,5 +1,4 @@
-Overview
-========
+# Overview
 
 Ceph is a distributed storage and network file system designed to provide
 excellent performance, reliability and scalability.
@@ -7,8 +6,7 @@ excellent performance, reliability and scalability.
 This charm deploys the RADOS Gateway, a S3 and Swift compatible HTTP gateway
 for online object storage on-top of a ceph cluster.
 
-Usage
-=====
+## Usage
 
 In order to use this charm, it is assumed that you have already deployed a ceph
 storage cluster using the 'ceph' charm with something like this::
@@ -27,8 +25,7 @@ You can then directly access the RADOS gateway by exposing the service::
 The gateway can be accessed over port 80 (as show in juju status exposed
 ports).
 
-Access
-======
+## Access
 
 Note that you will need to login to one of the service units supporting the
 ceph charm to generate some access credentials::
@@ -39,8 +36,7 @@ ceph charm to generate some access credentials::
 For security reasons the ceph-radosgw charm is not set up with appropriate
 permissions to administer the ceph cluster.
 
-Keystone Integration
-====================
+## Keystone Integration
 
 Ceph >= 0.55 integrates with Openstack Keystone for authentication of Swift requests.
 
@@ -52,42 +48,19 @@ This is enabled by relating the ceph-radosgw service with keystone::
 If you try to relate the radosgw to keystone with an earlier version of ceph the hook
 will error out to let you know.
 
-HA/Clustering
-=============
+## High availability
 
-There are two mutually exclusive high availability options: using virtual
-IP(s) or DNS. In both cases, a relationship to hacluster is required which
-provides the corosync back end HA functionality.
+When more than one unit is deployed with the [hacluster][hacluster-charm]
+application the charm will bring up an HA active/active cluster.
 
-To use virtual IP(s) the clustered nodes must be on the same subnet such that
-the VIP is a valid IP on the subnet for one of the node's interfaces and each
-node has an interface in said subnet. The VIP becomes a highly-available API
-endpoint.
+There are two mutually exclusive high availability options: using virtual IP(s)
+or DNS. In both cases the hacluster subordinate charm is used to provide the
+Corosync and Pacemaker backend HA functionality.
 
-At a minimum, the config option 'vip' must be set in order to use virtual IP
-HA. If multiple networks are being used, a VIP should be provided for each
-network, separated by spaces. Optionally, vip_iface or vip_cidr may be
-specified.
+See [OpenStack high availability][cdg-ha-apps] in the [OpenStack Charms
+Deployment Guide][cdg] for details.
 
-To use DNS high availability there are several prerequisites. However, DNS HA
-does not require the clustered nodes to be on the same subnet.
-Currently the DNS HA feature is only available for MAAS 2.0 or greater
-environments. MAAS 2.0 requires Juju 2.0 or greater. The clustered nodes must
-have static or "reserved" IP addresses registered in MAAS. The DNS hostname(s)
-must be pre-registered in MAAS before use with DNS HA.
-
-At a minimum, the config option 'dns-ha' must be set to true and at least one
-of 'os-public-hostname', 'os-internal-hostname' or 'os-internal-hostname' must
-be set in order to use DNS HA. One or more of the above hostnames may be set.
-
-The charm will throw an exception in the following circumstances:
-If neither 'vip' nor 'dns-ha' is set and the charm is related to hacluster
-If both 'vip' and 'dns-ha' are set as they are mutually exclusive
-If 'dns-ha' is set and none of the os-{admin,internal,public}-hostname(s) are
-set
-
-Network Space support
-=====================
+## Network Space support
 
 This charm supports the use of Juju Network Spaces, allowing the charm to be bound to network space configurations managed directly by Juju.  This is only supported with Juju 2.0 and above.
 
@@ -111,11 +84,9 @@ NOTE: Spaces must be configured in the underlying provider prior to attempting t
 
 NOTE: Existing deployments using os-\*-network configuration options will continue to function; these options are preferred over any network space binding provided if set.
 
-Multi-Site replication
-======================
+## Multi-Site replication
 
-Overview
---------
+### Overview
 
 This charm supports configuration of native replication between Ceph RADOS
 gateway deployments.
@@ -125,8 +96,7 @@ using cross-model relations.
 
 By default either ceph-radosgw deployment will accept write operations.
 
-Deployment
-----------
+### Deployment
 
 NOTE: example bundles for the us-west and us-east models can be found
 in the bundles subdirectory of the ceph-radosgw charm.
@@ -192,8 +162,7 @@ optionally be tidied using the 'tidydefaults' action:
 
 This operation is not reversible.
 
-Failover/Recovery
------------------
+### Failover/Recovery
 
 In the event that the site hosting the zone which is the master for metadata
 (in this example us-east) has an outage, the master metadata zone must be
@@ -213,8 +182,7 @@ has completed using the 'promote' action:
 
     juju run-action -m us-east --wait rgw-us-east/0 promote
 
-Read/write vs Read-only
------------------------
+### Read/write vs Read-only
 
 By default all zones within a deployment will be read/write capable but only
 the master zone can be used to create new containers.
@@ -229,8 +197,7 @@ promoting it to be the current master or by using the 'readwrite' action:
 
     juju run-action -m us-east --wait rgw-us-east/0 readwrite
 
-Tenant Namespacing
-------------------
+### Tenant Namespacing
 
 By default, Ceph Rados Gateway puts all tenant buckets into the same global
 namespace, disallowing multiple tenants to have buckets with the same name.
@@ -249,3 +216,10 @@ the Keystone endpoint registration to allow seamless integration with OpenStack.
 Tenant namespacing cannot be toggled on in an existing installation as it will
 remove tenant access to existing buckets. Toggling this option on an already
 deployed Rados Gateway will have no effect.
+
+<!-- LINKS -->
+
+[hacluster-charm]: https://jaas.ai/hacluster
+[cg]: https://docs.openstack.org/charm-guide
+[cdg]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide
+[cdg-ha-apps]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-ha.html#ha-applications
