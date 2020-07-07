@@ -21,7 +21,10 @@ gate_bundles:
 smoke_bundles:
   - vault: bionic-ussuri
 dev_bundles:
-  - vault: focal-ussuri
+  - vault: groovy-victoria
+  - vault: groovy-victoria-namespaced
+  - vault: focal-victoria
+  - vault: focal-victoria-namespaced
   - bionic-queens-multisite
   - bionic-rocky-multisite
 target_deploy_status:
@@ -38,5 +41,5 @@ tests:
     - zaza.openstack.charm_tests.swift.tests.S3APITest
 tests_options:
   force_deploy:
-    - focal-ussuri
-    - focal-ussuri-namespaced
+    - groovy-victoria
+    - groovy-victoria-namespaced
