@@ -62,7 +62,7 @@ from charmhelpers.core import unitdata
 # The interface is said to be satisfied if anyone of the interfaces in the
 # list has a complete context.
 REQUIRED_INTERFACES = {
-    'mon': ['ceph-radosgw'],
+    'mon': ['mon'],
 }
 CEPHRG_HA_RES = 'grp_cephrg_vips'
 TEMPLATES_DIR = 'templates'

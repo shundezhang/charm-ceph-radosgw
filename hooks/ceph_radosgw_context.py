@@ -141,10 +141,10 @@ def ensure_host_resolvable_v6(hostname):
 
 
 class MonContext(context.CephContext):
-    interfaces = ['ceph-radosgw']
+    interfaces = ['mon']
 
     def __call__(self):
-        if not relation_ids('mon'):
+        if not relation_ids(self.interfaces[0]):
             return {}
 
         host = socket.gethostname()
@@ -154,7 +154,7 @@ class MonContext(context.CephContext):
         auths = []
         fsid = None
 
-        for rid in relation_ids('mon'):
+        for rid in relation_ids(self.interfaces[0]):
             for unit in related_units(rid):
                 fsid = relation_get('fsid', rid=rid, unit=unit)
                 _auth = relation_get('auth', rid=rid, unit=unit)
