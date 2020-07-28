@@ -24,6 +24,7 @@ TO_PATCH = [
     'os',
     'subprocess',
     'mkdir',
+    'service_name',
 ]
 
 
@@ -31,6 +32,7 @@ class CephRadosGWCephTests(CharmTestCase):
     def setUp(self):
         super(CephRadosGWCephTests, self).setUp(ceph, TO_PATCH)
         self.config.side_effect = self.test_config.get
+        self.service_name.return_value = 'ceph-radosgw'
 
     def test_import_radosgw_key(self):
         self.os.path.exists.return_value = False
@@ -103,6 +105,82 @@ class CephRadosGWCephTests(CharmTestCase):
         mock_broker.assert_has_calls([
             call(replica_count=3, weight=19, name='default.rgw.buckets.data',
                  group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.control',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.data.root',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.gc',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.log',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.intent-log',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.meta',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.usage',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.users.keys',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.users.email',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.users.swift',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='default.rgw.users.uid',
+                 group='objects', app_name='rgw'),
+            call(weight=1.00, replica_count=3,
+                 name='default.rgw.buckets.extra',
+                 group='objects', app_name='rgw'),
+            call(weight=3.00, replica_count=3,
+                 name='default.rgw.buckets.index',
+                 group='objects', app_name='rgw'),
+            call(weight=0.10, replica_count=3, name='.rgw.root',
+                 group='objects', app_name='rgw')],
+        )
+        mock_request_access.assert_called_with(key_name='radosgw.gateway',
+                                               name='objects',
+                                               permission='rwx')
+
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_create_erasure_profile')
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_create_erasure_pool')
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_request_access_to_group')
+    @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
+           '.add_op_create_pool')
+    def test_create_rgw_pools_rq_no_prefix_ec(self, mock_broker,
+                                              mock_request_access,
+                                              mock_request_create_ec_pool,
+                                              mock_request_create_ec_profile):
+        self.test_config.set('rgw-lightweight-pool-pg-num', -1)
+        self.test_config.set('ceph-osd-replication-count', 3)
+        self.test_config.set('rgw-buckets-pool-weight', 19)
+        self.test_config.set('restrict-ceph-pools', True)
+        self.test_config.set('pool-type', 'erasure-coded')
+        self.test_config.set('ec-profile-k', 3)
+        self.test_config.set('ec-profile-m', 9)
+        self.test_config.set('ec-profile-technique', 'cauchy_good')
+        ceph.get_create_rgw_pools_rq(prefix=None)
+        mock_request_create_ec_profile.assert_called_once_with(
+            name='ceph-radosgw-profile',
+            k=3, m=9,
+            lrc_locality=None,
+            lrc_crush_locality=None,
+            shec_durability_estimator=None,
+            clay_helper_chunks=None,
+            clay_scalar_mds=None,
+            device_class=None,
+            erasure_type='jerasure',
+            erasure_technique='cauchy_good'
+        )
+        mock_request_create_ec_pool.assert_has_calls([
+            call(name='default.rgw.buckets.data',
+                 erasure_profile='ceph-radosgw-profile',
+                 weight=19,
+                 group="objects",
+                 app_name='rgw')
+        ])
+        mock_broker.assert_has_calls([
             call(weight=0.10, replica_count=3, name='default.rgw.control',
                  group='objects', app_name='rgw'),
             call(weight=0.10, replica_count=3, name='default.rgw.data.root',
