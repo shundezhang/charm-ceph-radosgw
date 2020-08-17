@@ -18,6 +18,7 @@ import subprocess
 
 from charmhelpers.core.hookenv import (
     config,
+    service_name,
 )
 
 from charmhelpers.core.host import (
@@ -111,18 +112,61 @@ def get_create_rgw_pools_rq(prefix=None):
     replicas = config('ceph-osd-replication-count')
 
     prefix = prefix or 'default'
-
     # Buckets likely to contain the most data and therefore
     # requiring the most PGs
     heavy = [
         '.rgw.buckets.data'
     ]
     bucket_weight = config('rgw-buckets-pool-weight')
-    for pool in heavy:
-        pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
-        rq.add_op_create_pool(name=pool, replica_count=replicas,
-                              weight=bucket_weight, group='objects',
-                              app_name=CEPH_POOL_APP_NAME)
+
+    if config('pool-type') == 'erasure-coded':
+        # General EC plugin config
+        plugin = config('ec-profile-plugin')
+        technique = config('ec-profile-technique')
+        device_class = config('ec-profile-device-class')
+        bdm_k = config('ec-profile-k')
+        bdm_m = config('ec-profile-m')
+        # LRC plugin config
+        bdm_l = config('ec-profile-locality')
+        crush_locality = config('ec-profile-crush-locality')
+        # SHEC plugin config
+        bdm_c = config('ec-profile-durability-estimator')
+        # CLAY plugin config
+        bdm_d = config('ec-profile-helper-chunks')
+        scalar_mds = config('ec-profile-scalar-mds')
+        # Profile name
+        service = service_name()
+        profile_name = (
+            config('ec-profile-name') or "{}-profile".format(service)
+        )
+        rq.add_op_create_erasure_profile(
+            name=profile_name,
+            k=bdm_k, m=bdm_m,
+            lrc_locality=bdm_l,
+            lrc_crush_locality=crush_locality,
+            shec_durability_estimator=bdm_c,
+            clay_helper_chunks=bdm_d,
+            clay_scalar_mds=scalar_mds,
+            device_class=device_class,
+            erasure_type=plugin,
+            erasure_technique=technique
+        )
+
+        for pool in heavy:
+            pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
+            rq.add_op_create_erasure_pool(
+                name=pool,
+                erasure_profile=profile_name,
+                weight=bucket_weight,
+                group="objects",
+                app_name=CEPH_POOL_APP_NAME
+            )
+    else:
+        for pool in heavy:
+            pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
+            rq.add_op_create_pool(name=pool, replica_count=replicas,
+                                  weight=bucket_weight, group='objects',
+                                  app_name=CEPH_POOL_APP_NAME)
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
     # others since they are not expected to contain as much data
