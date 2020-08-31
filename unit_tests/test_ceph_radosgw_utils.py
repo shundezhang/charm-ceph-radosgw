@@ -56,7 +56,7 @@ class CephRadosGWUtilTests(CharmTestCase):
             self.application_version_set.assert_called_with('10.2.2')
 
     @patch.object(utils, 'get_optional_interfaces')
-    @patch.object(utils, 'check_optional_relations')
+    @patch.object(utils, 'check_optional_config_and_relations')
     @patch.object(utils, 'REQUIRED_INTERFACES')
     @patch.object(utils, 'services')
     @patch.object(utils, 'make_assess_status_func')

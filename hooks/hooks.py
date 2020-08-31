@@ -258,9 +258,19 @@ def mon_relation(rid=None, unit=None):
         if request_per_unit_key():
             relation_set(relation_id=rid,
                          key_name=key_name)
-        # NOTE: prefer zone name if in use over pool-prefix.
-        rq = ceph.get_create_rgw_pools_rq(
-            prefix=config('zone') or config('pool-prefix'))
+        try:
+            # NOTE: prefer zone name if in use over pool-prefix.
+            rq = ceph.get_create_rgw_pools_rq(
+                prefix=config('zone') or config('pool-prefix'))
+        except ValueError as e:
+            # The end user has most likely provided a invalid value for
+            # a configuration option. Just log the traceback here, the
+            # end user will be notified by assess_status() called at
+            # the end of the hook execution.
+            log('Caught ValueError, invalid value provided for '
+                'configuration?: "{}"'.format(str(e)),
+                level=DEBUG)
+            return
         if is_request_complete(rq, relation='mon'):
             log('Broker request complete', level=DEBUG)
             CONFIGS.write_all()

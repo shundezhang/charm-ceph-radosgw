@@ -181,7 +181,7 @@ def get_optional_interfaces():
     return optional_interfaces
 
 
-def check_optional_relations(configs):
+def check_optional_config_and_relations(configs):
     """Check that if we have a relation_id for high availability that we can
     get the hacluster config.  If we can't then we are blocked.  This function
     is called from assess_status/set_os_workload_status as the charm_func and
@@ -233,6 +233,14 @@ def check_optional_relations(configs):
             not all(master_configured)):
         return ('waiting',
                 'waiting for configuration of master zone')
+
+    # Check that provided Ceph BlueStoe configuration is valid.
+    try:
+        bluestore_compression = context.CephBlueStoreCompressionContext()
+        bluestore_compression.validate()
+    except ValueError as e:
+        return ('blocked', 'Invalid configuration: {}'.format(str(e)))
+
     # return 'unknown' as the lowest priority to not clobber an existing
     # status.
     return 'unknown', ''
@@ -291,7 +299,7 @@ def assess_status_func(configs):
     required_interfaces.update(get_optional_interfaces())
     return make_assess_status_func(
         configs, required_interfaces,
-        charm_func=check_optional_relations,
+        charm_func=check_optional_config_and_relations,
         services=services(), ports=None)
 
 

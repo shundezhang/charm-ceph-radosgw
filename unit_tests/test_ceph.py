@@ -51,95 +51,236 @@ class CephRadosGWCephTests(CharmTestCase):
                   '/etc/ceph/keyring.rados.gateway'])
         ])
 
+    @patch.object(utils.context, 'CephBlueStoreCompressionContext')
     @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
-           '.add_op_create_pool')
-    def test_create_rgw_pools_rq_with_prefix(self, mock_broker):
+           '.add_op_create_replicated_pool')
+    def test_create_rgw_pools_rq_with_prefix(
+            self,
+            mock_broker,
+            mock_bluestore_compression):
         self.test_config.set('rgw-lightweight-pool-pg-num', 10)
         self.test_config.set('ceph-osd-replication-count', 3)
         self.test_config.set('rgw-buckets-pool-weight', 19)
         ceph.get_create_rgw_pools_rq(prefix='us-east')
         mock_broker.assert_has_calls([
-            call(replica_count=3, weight=19, name='us-east.rgw.buckets.data',
+            call(name='us-east.rgw.buckets.data', replica_count=3, weight=19,
                  group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.control',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.data.root',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.gc',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.log',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.intent-log',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.meta',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.usage',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.users.keys',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.users.email',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.users.swift',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.users.uid',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.extra',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='us-east.rgw.buckets.index',
-                 group='objects', app_name='rgw'),
-            call(pg_num=10, replica_count=3, name='.rgw.root',
-                 group='objects', app_name='rgw')],
-        )
+            call('us-east.rgw.control', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.data.root', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.gc', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.log', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.intent-log', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.meta', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.usage', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.keys', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.email', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.swift', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.uid', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.buckets.extra', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.buckets.index', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('.rgw.root', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+        ])
 
+        # confirm operation with bluestore compression
+        mock_broker.reset_mock()
+        mock_bluestore_compression().get_kwargs.return_value = {
+            'compression_mode': 'fake',
+        }
+        ceph.get_create_rgw_pools_rq(prefix='us-east')
+        mock_broker.assert_has_calls([
+            call(name='us-east.rgw.buckets.data', replica_count=3, weight=19,
+                 group='objects', app_name='rgw', compression_mode='fake'),
+            call('us-east.rgw.control', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.data.root', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.gc', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.log', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.intent-log', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.meta', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.usage', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.keys', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.email', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.swift', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.users.uid', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.buckets.extra', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('us-east.rgw.buckets.index', replica_count=3, pg_num=10,
+                 weight=None, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('.rgw.root', replica_count=3, pg_num=10, weight=None,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+        ])
+
+    @patch.object(utils.context, 'CephBlueStoreCompressionContext')
     @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
            '.add_op_request_access_to_group')
     @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
-           '.add_op_create_pool')
-    def test_create_rgw_pools_rq_no_prefix_post_jewel(self, mock_broker,
-                                                      mock_request_access):
+           '.add_op_create_replicated_pool')
+    def test_create_rgw_pools_rq_no_prefix_post_jewel(
+            self,
+            mock_broker,
+            mock_request_access,
+            mock_bluestore_compression):
         self.test_config.set('rgw-lightweight-pool-pg-num', -1)
         self.test_config.set('ceph-osd-replication-count', 3)
         self.test_config.set('rgw-buckets-pool-weight', 19)
         self.test_config.set('restrict-ceph-pools', True)
         ceph.get_create_rgw_pools_rq(prefix=None)
         mock_broker.assert_has_calls([
-            call(replica_count=3, weight=19, name='default.rgw.buckets.data',
+            call(name='default.rgw.buckets.data', replica_count=3, weight=19,
                  group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.control',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.data.root',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.gc',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.log',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.intent-log',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.meta',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.usage',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.users.keys',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.users.email',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.users.swift',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='default.rgw.users.uid',
-                 group='objects', app_name='rgw'),
-            call(weight=1.00, replica_count=3,
-                 name='default.rgw.buckets.extra',
-                 group='objects', app_name='rgw'),
-            call(weight=3.00, replica_count=3,
-                 name='default.rgw.buckets.index',
-                 group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='.rgw.root',
-                 group='objects', app_name='rgw')],
-        )
+            call('default.rgw.control', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.data.root', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.gc', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.log', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.intent-log', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.meta', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.usage', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.keys', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.email', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.swift', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.uid', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.buckets.extra', replica_count=3, pg_num=None,
+                 weight=1.0, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.buckets.index', replica_count=3, pg_num=None,
+                 weight=3.0, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('.rgw.root', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+        ])
         mock_request_access.assert_called_with(key_name='radosgw.gateway',
                                                name='objects',
                                                permission='rwx')
 
+        # confirm operation with bluestore compression
+        mock_broker.reset_mock()
+        mock_bluestore_compression().get_kwargs.return_value = {
+            'compression_mode': 'fake',
+        }
+        ceph.get_create_rgw_pools_rq(prefix=None)
+        mock_broker.assert_has_calls([
+            call(name='default.rgw.buckets.data', replica_count=3, weight=19,
+                 group='objects', app_name='rgw', compression_mode='fake'),
+            call('default.rgw.control', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.data.root', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.gc', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.log', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.intent-log', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.meta', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.usage', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.keys', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.email', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.swift', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.users.uid', replica_count=3, pg_num=None,
+                 weight=0.1, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.buckets.extra', replica_count=3, pg_num=None,
+                 weight=1.0, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('default.rgw.buckets.index', replica_count=3, pg_num=None,
+                 weight=3.0, group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+            call('.rgw.root', replica_count=3, pg_num=None, weight=0.1,
+                 group='objects', namespace=None, app_name='rgw',
+                 max_bytes=None, max_objects=None),
+        ])
+
+    @patch.object(utils.context, 'CephBlueStoreCompressionContext')
     @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
            '.add_op_create_erasure_profile')
     @patch('charmhelpers.contrib.storage.linux.ceph.CephBrokerRq'
@@ -151,7 +292,8 @@ class CephRadosGWCephTests(CharmTestCase):
     def test_create_rgw_pools_rq_no_prefix_ec(self, mock_broker,
                                               mock_request_access,
                                               mock_request_create_ec_pool,
-                                              mock_request_create_ec_profile):
+                                              mock_request_create_ec_profile,
+                                              mock_bluestore_compression):
         self.test_config.set('rgw-lightweight-pool-pg-num', -1)
         self.test_config.set('ceph-osd-replication-count', 3)
         self.test_config.set('rgw-buckets-pool-weight', 19)
@@ -215,6 +357,20 @@ class CephRadosGWCephTests(CharmTestCase):
         mock_request_access.assert_called_with(key_name='radosgw.gateway',
                                                name='objects',
                                                permission='rwx')
+        # confirm operation with bluestore compression
+        mock_request_create_ec_pool.reset_mock()
+        mock_bluestore_compression().get_kwargs.return_value = {
+            'compression_mode': 'fake',
+        }
+        ceph.get_create_rgw_pools_rq(prefix=None)
+        mock_request_create_ec_pool.assert_has_calls([
+            call(name='default.rgw.buckets.data',
+                 erasure_profile='ceph-radosgw-profile',
+                 weight=19,
+                 group="objects",
+                 app_name='rgw',
+                 compression_mode='fake')
+        ])
 
     @patch.object(utils.apt_pkg, 'version_compare', lambda *args: -1)
     @patch.object(utils, 'lsb_release',

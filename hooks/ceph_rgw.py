@@ -16,6 +16,8 @@
 import os
 import subprocess
 
+import charmhelpers.contrib.openstack.context as ch_context
+
 from charmhelpers.core.hookenv import (
     config,
     service_name,
@@ -118,6 +120,7 @@ def get_create_rgw_pools_rq(prefix=None):
         '.rgw.buckets.data'
     ]
     bucket_weight = config('rgw-buckets-pool-weight')
+    bluestore_compression = ch_context.CephBlueStoreCompressionContext()
 
     if config('pool-type') == 'erasure-coded':
         # General EC plugin config
@@ -154,19 +157,35 @@ def get_create_rgw_pools_rq(prefix=None):
 
         for pool in heavy:
             pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
-            rq.add_op_create_erasure_pool(
-                name=pool,
-                erasure_profile=profile_name,
-                weight=bucket_weight,
-                group="objects",
-                app_name=CEPH_POOL_APP_NAME
-            )
+            # NOTE(fnordahl): once we deprecate Python 3.5 support we can do
+            # the unpacking of the BlueStore compression arguments as part of
+            # the function arguments. Until then we need to build the dict
+            # prior to the function call.
+            kwargs = {
+                'name': pool,
+                'erasure_profile': profile_name,
+                'weight': bucket_weight,
+                'group': "objects",
+                'app_name': CEPH_POOL_APP_NAME,
+            }
+            kwargs.update(bluestore_compression.get_kwargs())
+            rq.add_op_create_erasure_pool(**kwargs)
     else:
         for pool in heavy:
             pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
-            rq.add_op_create_pool(name=pool, replica_count=replicas,
-                                  weight=bucket_weight, group='objects',
-                                  app_name=CEPH_POOL_APP_NAME)
+            # NOTE(fnordahl): once we deprecate Python 3.5 support we can do
+            # the unpacking of the BlueStore compression arguments as part of
+            # the function arguments. Until then we need to build the dict
+            # prior to the function call.
+            kwargs = {
+                'name': pool,
+                'replica_count': replicas,
+                'weight': bucket_weight,
+                'group': 'objects',
+                'app_name': CEPH_POOL_APP_NAME,
+            }
+            kwargs.update(bluestore_compression.get_kwargs())
+            rq.add_op_create_replicated_pool(**kwargs)
 
     # NOTE: we want these pools to have a smaller pg_num/pgp_num than the
     # others since they are not expected to contain as much data
