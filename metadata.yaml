@@ -43,6 +43,8 @@ provides:
     interface: http
   master:
     interface: radosgw-multisite
+  object-store:
+    interface: swift-proxy
 peers:
   cluster:
     interface: swift-ha

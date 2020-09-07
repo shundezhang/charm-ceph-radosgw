@@ -250,6 +250,18 @@ class CephRadosGWTests(CharmTestCase):
         ceph_hooks.gateway_relation()
         self.relation_set.assert_called_with(hostname='10.0.0.1', port=80)
 
+    @patch.object(ceph_hooks, "canonical_url")
+    def test_object_store_relation(self, _canonical_url):
+        relation_data = {
+            "swift-url": "http://radosgw:80"
+        }
+        self.listen_port.return_value = 80
+        _canonical_url.return_value = "http://radosgw"
+        ceph_hooks.object_store_joined()
+        self.relation_set.assert_called_with(
+            relation_id=None,
+            relation_settings=relation_data)
+
     @patch.object(ceph_hooks, 'leader_get')
     @patch('charmhelpers.contrib.openstack.ip.service_name',
            lambda *args: 'ceph-radosgw')

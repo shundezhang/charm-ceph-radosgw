@@ -181,6 +181,15 @@ def install():
         leader_set(namespace_tenants=config('namespace-tenants'))
 
 
+@hooks.hook('object-store-relation-joined')
+def object_store_joined(relation_id=None):
+    relation_data = {
+        'swift-url':
+        "{}:{}".format(canonical_url(CONFIGS, INTERNAL), listen_port())
+    }
+    relation_set(relation_id=relation_id, relation_settings=relation_data)
+
+
 @hooks.hook('upgrade-charm.real')
 def upgrade_charm():
     if is_leader() and not leader_get('namespace_tenants') == 'True':
@@ -224,6 +233,10 @@ def config_changed():
         # Refire certificates relations for VIP changes
         for r_id in relation_ids('certificates'):
             certs_joined(r_id)
+
+        # Refire object-store relations for VIP/port changes
+        for r_id in relation_ids('object-store'):
+            object_store_joined(r_id)
 
         process_multisite_relations()
 
