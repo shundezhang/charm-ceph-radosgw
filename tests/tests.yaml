@@ -2,6 +2,7 @@ charm_name: ceph-radosgw
 gate_bundles:
   - vault: focal-victoria
   - vault: focal-victoria-namespaced
+  - vault: focal-ussuri-ec
   - vault: focal-ussuri
   - vault: focal-ussuri-namespaced
   - vault: bionic-ussuri
@@ -39,6 +40,7 @@ tests:
   - vault:
     - zaza.openstack.charm_tests.ceph.tests.CephRGWTest
     - zaza.openstack.charm_tests.swift.tests.S3APITest
+    - zaza.openstack.charm_tests.ceph.tests.CheckPoolTypes
 tests_options:
   force_deploy:
     - groovy-victoria
