@@ -68,6 +68,7 @@ TO_PATCH = [
     'filter_missing_packages',
     'ceph_utils',
     'multisite_deployment',
+    'multisite',
 ]
 
 
@@ -189,10 +190,15 @@ class CephRadosGWTests(CharmTestCase):
 
     @patch.object(ceph_hooks, 'is_request_complete',
                   lambda *args, **kwargs: True)
-    def test_mon_relation(self):
+    @patch.object(ceph_hooks, 'is_leader')
+    @patch('charmhelpers.contrib.openstack.ip.resolve_address')
+    @patch('charmhelpers.contrib.openstack.ip.config')
+    def test_mon_relation(self, _config, _resolve_address, is_leader):
         _ceph = self.patch('ceph')
         _ceph.import_radosgw_key.return_value = True
+        is_leader.return_value = True
         self.relation_get.return_value = 'seckey'
+        self.multisite.list_zones.return_value = []
         self.socket.gethostname.return_value = 'testinghostname'
         ceph_hooks.mon_relation()
         self.relation_set.assert_not_called()
@@ -203,9 +209,14 @@ class CephRadosGWTests(CharmTestCase):
 
     @patch.object(ceph_hooks, 'is_request_complete',
                   lambda *args, **kwargs: True)
-    def test_mon_relation_request_key(self):
+    @patch.object(ceph_hooks, 'is_leader')
+    @patch('charmhelpers.contrib.openstack.ip.resolve_address')
+    @patch('charmhelpers.contrib.openstack.ip.config')
+    def test_mon_relation_request_key(self, _config,
+                                      _resolve_address, is_leader):
         _ceph = self.patch('ceph')
         _ceph.import_radosgw_key.return_value = True
+        is_leader.return_value = True
         self.relation_get.return_value = 'seckey'
         self.socket.gethostname.return_value = 'testinghostname'
         self.request_per_unit_key.return_value = True
@@ -221,10 +232,15 @@ class CephRadosGWTests(CharmTestCase):
 
     @patch.object(ceph_hooks, 'is_request_complete',
                   lambda *args, **kwargs: True)
-    def test_mon_relation_nokey(self):
+    @patch.object(ceph_hooks, 'is_leader')
+    @patch('charmhelpers.contrib.openstack.ip.resolve_address')
+    @patch('charmhelpers.contrib.openstack.ip.config')
+    def test_mon_relation_nokey(self, _config,
+                                _resolve_address, is_leader):
         _ceph = self.patch('ceph')
         _ceph.import_radosgw_key.return_value = False
         self.relation_get.return_value = None
+        is_leader.return_value = True
         ceph_hooks.mon_relation()
         self.assertFalse(_ceph.import_radosgw_key.called)
         self.service_resume.assert_not_called()
@@ -493,6 +509,7 @@ class MiscMultisiteTests(CharmTestCase):
         'slave_relation_changed',
         'service_restart',
         'service_name',
+        'multisite'
     ]
 
     _relation_ids = {

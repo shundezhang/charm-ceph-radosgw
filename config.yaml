@@ -77,12 +77,13 @@ options:
     type: string
     default:
     description: |
-      The rados gateway stores objects in many different pools. If you would
-      like to have multiple rados gateways each pointing to a separate set of
-      pools set this prefix. The charm will then set up a new set of pools.
-      If your prefix has a dash in it that will be used to split the prefix
-      into region and zone. Please read the documentation on federated rados
-      gateways for more information on region and zone.
+      DEPRECATED, use zone instead - pool name can be inherited from the zone config
+      option. The rados gateway stores objects in many different pools. If you
+      would like to have multiple rados gateways each pointing to a separate
+      set of pools set this prefix. The charm will then set up a new set of pools.
+      If your prefix has a dash in it that will be used to split the prefix into
+      region and zone. Please read the documentation on federated rados gateways
+      for more information on region and zone.
   restrict-ceph-pools:
     type: boolean
     default: False
@@ -414,7 +415,7 @@ options:
       Name of RADOS Gateway Zone Group to create for multi-site replication.
   zone:
     type: string
-    default:
+    default: default
     description: |
       Name of RADOS Gateway Zone to create for multi-site replication. This
       option must be specific to the local site e.g. us-west or us-east.

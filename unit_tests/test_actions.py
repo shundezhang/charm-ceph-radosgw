@@ -103,6 +103,7 @@ class MultisiteActionsTestCase(CharmTestCase):
         self.multisite.update_period.assert_called_once_with()
 
     def test_promote_unconfigured(self):
+        self.test_config.set('zone', None)
         actions.promote([])
         self.action_fail.assert_called_once()
 
@@ -116,6 +117,7 @@ class MultisiteActionsTestCase(CharmTestCase):
         self.multisite.update_period.assert_called_once_with()
 
     def test_readonly_unconfigured(self):
+        self.test_config.set('zone', None)
         actions.readonly([])
         self.action_fail.assert_called_once()
 
@@ -129,6 +131,7 @@ class MultisiteActionsTestCase(CharmTestCase):
         self.multisite.update_period.assert_called_once_with()
 
     def test_readwrite_unconfigured(self):
+        self.test_config.set('zone', None)
         actions.readwrite([])
         self.action_fail.assert_called_once()
 
@@ -138,5 +141,6 @@ class MultisiteActionsTestCase(CharmTestCase):
         self.multisite.tidy_defaults.assert_called_once_with()
 
     def test_tidydefaults_unconfigured(self):
+        self.test_config.set('zone', None)
         actions.tidydefaults([])
         self.action_fail.assert_called_once()

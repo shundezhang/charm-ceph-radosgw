@@ -259,7 +259,6 @@ def mon_relation(rid=None, unit=None):
             relation_set(relation_id=rid,
                          key_name=key_name)
         try:
-            # NOTE: prefer zone name if in use over pool-prefix.
             rq = ceph.get_create_rgw_pools_rq(
                 prefix=config('zone') or config('pool-prefix'))
         except ValueError as e:
@@ -271,6 +270,7 @@ def mon_relation(rid=None, unit=None):
                 'configuration?: "{}"'.format(str(e)),
                 level=DEBUG)
             return
+
         if is_request_complete(rq, relation='mon'):
             log('Broker request complete', level=DEBUG)
             CONFIGS.write_all()
@@ -313,7 +313,24 @@ def mon_relation(rid=None, unit=None):
                         .format(service_name()), level=DEBUG)
                     service_resume(service_name())
 
-            process_multisite_relations()
+            if multisite_deployment():
+                process_multisite_relations()
+            elif is_leader():
+                # In a non multi-site deployment create the
+                # zone using the default zonegroup and restart the service
+                internal_url = '{}:{}'.format(
+                    canonical_url(CONFIGS, INTERNAL),
+                    listen_port(),
+                )
+                endpoints = [internal_url]
+                zonegroup = 'default'
+                zone = config('zone')
+                if zone not in multisite.list_zones():
+                    multisite.create_zone(zone,
+                                          endpoints=endpoints,
+                                          default=True, master=True,
+                                          zonegroup=zonegroup)
+                    service_restart(service_name())
         else:
             send_request_if_needed(rq, relation='mon')
     _mon_relation()

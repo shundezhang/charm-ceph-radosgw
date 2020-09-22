@@ -385,7 +385,7 @@ class MonContextTest(CharmTestCase):
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
-            'rgw_zone': None,
+            'rgw_zone': 'default',
             'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
@@ -433,7 +433,7 @@ class MonContextTest(CharmTestCase):
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
-            'rgw_zone': None,
+            'rgw_zone': 'default',
             'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
@@ -490,7 +490,7 @@ class MonContextTest(CharmTestCase):
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
-            'rgw_zone': None,
+            'rgw_zone': 'default',
             'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
@@ -529,7 +529,7 @@ class MonContextTest(CharmTestCase):
             'port': 70,
             'client_radosgw_gateway': {'rgw init timeout': 60},
             'ipv6': False,
-            'rgw_zone': None,
+            'rgw_zone': 'default',
             'fsid': 'testfsid',
         }
         self.assertEqual(expect, mon_ctxt())
