@@ -255,7 +255,9 @@ def mon_relation(rid=None, unit=None):
     @restart_on_change(restart_map())
     def _mon_relation():
         key_name = 'rgw.{}'.format(socket.gethostname())
+        legacy = True
         if request_per_unit_key():
+            legacy = False
             relation_set(relation_id=rid,
                          key_name=key_name)
         try:
@@ -315,7 +317,7 @@ def mon_relation(rid=None, unit=None):
 
             if multisite_deployment():
                 process_multisite_relations()
-            elif is_leader():
+            elif ready_for_service(legacy=legacy) and is_leader():
                 # In a non multi-site deployment create the
                 # zone using the default zonegroup and restart the service
                 internal_url = '{}:{}'.format(
@@ -325,7 +327,15 @@ def mon_relation(rid=None, unit=None):
                 endpoints = [internal_url]
                 zonegroup = 'default'
                 zone = config('zone')
-                if zone not in multisite.list_zones():
+                if zone == 'default':
+                    # If the requested zone is 'default' then the charm can
+                    # race with radosgw systemd process in creating it. So,
+                    # retry the zone list if it returns an empty list.
+                    existing_zones = multisite.list_zones(retry_on_empty=True)
+                else:
+                    existing_zones = multisite.list_zones()
+                log('Existing zones {}'.format(existing_zones), level=DEBUG)
+                if zone not in existing_zones:
                     multisite.create_zone(zone,
                                           endpoints=endpoints,
                                           default=True, master=True,

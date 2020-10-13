@@ -17,6 +17,7 @@ import json
 import functools
 import subprocess
 import socket
+import utils
 
 import charmhelpers.core.hookenv as hookenv
 import charmhelpers.core.decorators as decorators
@@ -48,7 +49,10 @@ def _call(cmd):
 
 def _key_name():
     """Determine the name of the cephx key for the local unit"""
-    return 'rgw.{}'.format(socket.gethostname())
+    if utils.request_per_unit_key():
+        return 'rgw.{}'.format(socket.gethostname())
+    else:
+        return 'radosgw.gateway'
 
 
 def _list(key):
@@ -66,6 +70,9 @@ def _list(key):
     ]
     try:
         result = json.loads(_check_output(cmd))
+        hookenv.log("Results: {}".format(
+            result),
+            level=hookenv.DEBUG)
         if isinstance(result, dict):
             return result['{}s'.format(key)]
         else:
@@ -74,9 +81,27 @@ def _list(key):
         return []
 
 
+@decorators.retry_on_exception(num_retries=5, base_delay=3,
+                               exc_type=ValueError)
+def list_zones(retry_on_empty=False):
+    """
+    List zones
+
+    :param retry_on_empty: Whether to retry if no zones are returned.
+    :type retry_on_empty: bool
+    :return: List of specified entities found
+    :rtype: list
+    :raises: ValueError
+    """
+    _zones = _list('zone')
+    if retry_on_empty and not _zones:
+        hookenv.log("No zones found", level=hookenv.DEBUG)
+        raise ValueError("No zones found")
+    return _zones
+
+
 list_realms = functools.partial(_list, 'realm')
 list_zonegroups = functools.partial(_list, 'zonegroup')
-list_zones = functools.partial(_list, 'zone')
 list_users = functools.partial(_list, 'user')
 
 

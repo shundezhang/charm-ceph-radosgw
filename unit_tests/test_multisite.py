@@ -31,16 +31,27 @@ class TestMultisiteHelpers(CharmTestCase):
         'subprocess',
         'socket',
         'hookenv',
+        'utils',
     ]
 
     def setUp(self):
         super(TestMultisiteHelpers, self).setUp(multisite, self.TO_PATCH)
         self.socket.gethostname.return_value = 'testhost'
+        self.utils.request_per_unit_key.return_value = True
 
     def _testdata(self, funcname):
         return os.path.join(os.path.dirname(__file__),
                             'testdata',
                             '{}.json'.format(funcname))
+
+    def test___key_name(self):
+        self.assertEqual(
+            multisite._key_name(),
+            'rgw.testhost')
+        self.utils.request_per_unit_key.return_value = False
+        self.assertEqual(
+            multisite._key_name(),
+            'radosgw.gateway')
 
     def test_create_realm(self):
         with open(self._testdata(whoami()), 'rb') as f:

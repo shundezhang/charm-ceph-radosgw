@@ -69,6 +69,7 @@ TO_PATCH = [
     'ceph_utils',
     'multisite_deployment',
     'multisite',
+    'ready_for_service',
 ]
 
 
