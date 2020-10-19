@@ -81,6 +81,19 @@ Erasure coded pools can be configured via options whose names begin with the
 See [Ceph Erasure Coding][cdg-ceph-erasure-coding] in the [OpenStack Charms
 Deployment Guide][cdg] for more information.
 
+## Ceph BlueStore compression
+
+This charm supports [BlueStore inline compression][ceph-bluestore-compression]
+for its associated Ceph storage pool(s). The feature is enabled by assigning a
+compression mode via the `bluestore-compression-mode` configuration option. The
+default behaviour is to disable compression.
+
+The efficiency of compression depends heavily on what type of data is stored
+in the pool and the charm provides a set of configuration options to fine tune
+the compression behaviour.
+
+> **Note**: BlueStore compression is supported starting with Ceph Mimic.
+
 ## Deployment
 
 To deploy a single RADOS gateway node within an existing Ceph cluster:
@@ -223,3 +236,4 @@ For general charm questions refer to the OpenStack [Charm Guide][cg].
 [lp-bugs-charm-ceph-radosgw]: https://bugs.launchpad.net/charm-ceph-radosgw/+filebug
 [juju-docs-spaces]: https://jaas.ai/docs/spaces
 [cdg-ceph-radosgw-multisite]: https://docs.openstack.org/project-deploy-guide/charm-deployment-guide/latest/app-rgw-multisite.html
+[ceph-bluestore-compression]: https://docs.ceph.com/en/latest/rados/configuration/bluestore-config-ref/#inline-compression
