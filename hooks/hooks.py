@@ -156,13 +156,20 @@ def install_packages():
     )
     if pkgs:
         status_set('maintenance', 'Installing radosgw packages')
+        if ('apache2' in pkgs):
+            # NOTE(lourot): Apache's default config makes it listen on port 80,
+            # which will prevent HAProxy from listening on that same port. We
+            # use Apache in this setup however for SSL (different port). We
+            # need to let Apache free port 80 before we can install HAProxy
+            # otherwise HAProxy will crash. See lp:1904411
+            log('Installing Apache')
+            apt_install(['apache2'], fatal=True)
+            disable_unused_apache_sites()
         apt_install(pkgs, fatal=True)
 
     pkgs = filter_missing_packages(APACHE_PACKAGES)
     if pkgs:
         apt_purge(pkgs)
-
-    disable_unused_apache_sites()
 
 
 @hooks.hook('install.real')

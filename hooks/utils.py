@@ -28,6 +28,7 @@ from charmhelpers.core.hookenv import (
     application_version_set,
     config,
     leader_get,
+    log,
 )
 from charmhelpers.contrib.openstack import (
     context,
@@ -47,6 +48,8 @@ from charmhelpers.core.host import (
     lsb_release,
     CompareHostReleases,
     init_is_systemd,
+    service,
+    service_running,
 )
 from charmhelpers.fetch import (
     apt_cache,
@@ -349,6 +352,7 @@ def disable_unused_apache_sites():
     """Ensure that unused apache configurations are disabled to prevent them
     from conflicting with the charm-provided version.
     """
+    log('Disabling unused Apache sites')
     for apache_site_file in UNUSED_APACHE_SITE_FILES:
         apache_site = apache_site_file.split('/')[-1].split('.')[0]
         if os.path.exists(apache_site_file):
@@ -361,6 +365,10 @@ def disable_unused_apache_sites():
 
     with open(APACHE_PORTS_FILE, 'w') as ports:
         ports.write("")
+
+    if service_running('apache2'):
+        log('Restarting Apache')
+        service('restart', 'apache2')
 
 
 def systemd_based_radosgw():

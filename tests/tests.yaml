@@ -1,5 +1,7 @@
 charm_name: ceph-radosgw
 gate_bundles:
+  - vault: groovy-victoria
+  - vault: groovy-victoria-namespaced
   - vault: focal-victoria
   - vault: focal-victoria-namespaced
   - vault: focal-ussuri-ec
@@ -24,8 +26,6 @@ gate_bundles:
 smoke_bundles:
   - vault: bionic-ussuri
 dev_bundles:
-  - vault: groovy-victoria
-  - vault: groovy-victoria-namespaced
   - bionic-queens-multisite
   - bionic-rocky-multisite
 target_deploy_status:
