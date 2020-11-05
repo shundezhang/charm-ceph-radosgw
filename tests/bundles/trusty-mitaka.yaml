@@ -22,7 +22,6 @@ applications:
     num_units: 3
     options:
       source: *source
-      auth-supported: 'none'
   percona-cluster:
     charm: cs:trusty/percona-cluster
     num_units: 1
