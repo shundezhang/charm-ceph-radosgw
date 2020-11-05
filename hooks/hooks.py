@@ -156,13 +156,20 @@ def install_packages():
     )
     if pkgs:
         status_set('maintenance', 'Installing radosgw packages')
+        if ('apache2' in pkgs):
+            # NOTE(lourot): Apache's default config makes it listen on port 80,
+            # which will prevent HAProxy from listening on that same port. We
+            # use Apache in this setup however for SSL (different port). We
+            # need to let Apache free port 80 before we can install HAProxy
+            # otherwise HAProxy will crash. See lp:1904411
+            log('Installing Apache')
+            apt_install(['apache2'], fatal=True)
+            disable_unused_apache_sites()
         apt_install(pkgs, fatal=True)
 
     pkgs = filter_missing_packages(APACHE_PACKAGES)
     if pkgs:
         apt_purge(pkgs)
-
-    disable_unused_apache_sites()
 
 
 @hooks.hook('install.real')
@@ -315,7 +322,7 @@ def mon_relation(rid=None, unit=None):
 
             if multisite_deployment():
                 process_multisite_relations()
-            elif is_leader():
+            elif is_leader() and 'mon' in CONFIGS.complete_contexts():
                 # In a non multi-site deployment create the
                 # zone using the default zonegroup and restart the service
                 internal_url = '{}:{}'.format(
@@ -325,11 +332,32 @@ def mon_relation(rid=None, unit=None):
                 endpoints = [internal_url]
                 zonegroup = 'default'
                 zone = config('zone')
-                if zone not in multisite.list_zones():
-                    multisite.create_zone(zone,
-                                          endpoints=endpoints,
-                                          default=True, master=True,
-                                          zonegroup=zonegroup)
+                existing_zones = multisite.list_zones()
+                log('Existing zones {}'.format(existing_zones), level=DEBUG)
+                if zone not in existing_zones:
+                    log("Zone '{}' doesn't exist, creating".format(zone))
+                    try:
+                        multisite.create_zone(zone,
+                                              endpoints=endpoints,
+                                              default=True, master=True,
+                                              zonegroup=zonegroup)
+                    except subprocess.CalledProcessError as e:
+                        if 'File exists' in e.stderr.decode('UTF-8'):
+                            # NOTE(lourot): may have been created in the
+                            # background by the Rados Gateway daemon, see
+                            # lp:1856106
+                            log("Zone '{}' existed already after all".format(
+                                zone))
+                        else:
+                            raise
+
+                    existing_zones = multisite.list_zones()
+                    log('Existing zones {}'.format(existing_zones),
+                        level=DEBUG)
+                    if zone not in existing_zones:
+                        raise RuntimeError("Could not create zone '{}'".format(
+                            zone))
+
                     service_restart(service_name())
         else:
             send_request_if_needed(rq, relation='mon')

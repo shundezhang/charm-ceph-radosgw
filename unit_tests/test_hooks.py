@@ -198,7 +198,10 @@ class CephRadosGWTests(CharmTestCase):
         _ceph.import_radosgw_key.return_value = True
         is_leader.return_value = True
         self.relation_get.return_value = 'seckey'
-        self.multisite.list_zones.return_value = []
+        self.multisite.list_zones.side_effect = [
+            [],           # at first the default zone doesn't exist, then...
+            ['default'],  # ... it got created
+        ]
         self.socket.gethostname.return_value = 'testinghostname'
         ceph_hooks.mon_relation()
         self.relation_set.assert_not_called()
@@ -218,6 +221,10 @@ class CephRadosGWTests(CharmTestCase):
         _ceph.import_radosgw_key.return_value = True
         is_leader.return_value = True
         self.relation_get.return_value = 'seckey'
+        self.multisite.list_zones.side_effect = [
+            [],           # at first the default zone doesn't exist, then...
+            ['default'],  # ... it got created
+        ]
         self.socket.gethostname.return_value = 'testinghostname'
         self.request_per_unit_key.return_value = True
         ceph_hooks.mon_relation()
@@ -241,6 +248,10 @@ class CephRadosGWTests(CharmTestCase):
         _ceph.import_radosgw_key.return_value = False
         self.relation_get.return_value = None
         is_leader.return_value = True
+        self.multisite.list_zones.side_effect = [
+            [],           # at first the default zone doesn't exist, then...
+            ['default'],  # ... it got created
+        ]
         ceph_hooks.mon_relation()
         self.assertFalse(_ceph.import_radosgw_key.called)
         self.service_resume.assert_not_called()
