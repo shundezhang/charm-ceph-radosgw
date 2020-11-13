@@ -410,7 +410,7 @@ class CephRadosGWTests(CharmTestCase):
                  swift_public_url='http://files.example.com:80/swift/v1',
                  swift_internal_url='http://myserv:80/swift/v1',
                  swift_admin_url='http://myserv:80/swift',
-                 requested_roles='Member,Admin',
+                 requested_roles='Member,member,Admin',
                  relation_id='rid'),
             call(s3_service='s3',
                  s3_region='RegionOne',

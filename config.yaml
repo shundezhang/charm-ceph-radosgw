@@ -223,7 +223,7 @@ options:
   # Keystone integration
   operator-roles:
     type: string
-    default: "Member"
+    default: "Member,member"
     description: |
       Comma-separated list of Swift operator roles; used when integrating with
       OpenStack Keystone.
