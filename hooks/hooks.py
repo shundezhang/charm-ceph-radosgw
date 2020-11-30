@@ -324,7 +324,8 @@ def mon_relation(rid=None, unit=None):
 
             if multisite_deployment():
                 process_multisite_relations()
-            elif ready_for_service(legacy=legacy) and is_leader():
+            elif (ready_for_service(legacy=legacy) and is_leader() and
+                  'mon' in CONFIGS.complete_contexts()):
                 # In a non multi-site deployment create the
                 # zone using the default zonegroup and restart the service
                 internal_url = '{}:{}'.format(
@@ -334,19 +335,32 @@ def mon_relation(rid=None, unit=None):
                 endpoints = [internal_url]
                 zonegroup = 'default'
                 zone = config('zone')
-                if zone == 'default':
-                    # If the requested zone is 'default' then the charm can
-                    # race with radosgw systemd process in creating it. So,
-                    # retry the zone list if it returns an empty list.
-                    existing_zones = multisite.list_zones(retry_on_empty=True)
-                else:
-                    existing_zones = multisite.list_zones()
+                existing_zones = multisite.list_zones()
                 log('Existing zones {}'.format(existing_zones), level=DEBUG)
                 if zone not in existing_zones:
-                    multisite.create_zone(zone,
-                                          endpoints=endpoints,
-                                          default=True, master=True,
-                                          zonegroup=zonegroup)
+                    log("Zone '{}' doesn't exist, creating".format(zone))
+                    try:
+                        multisite.create_zone(zone,
+                                              endpoints=endpoints,
+                                              default=True, master=True,
+                                              zonegroup=zonegroup)
+                    except subprocess.CalledProcessError as e:
+                        if 'File exists' in e.stderr.decode('UTF-8'):
+                            # NOTE(lourot): may have been created in the
+                            # background by the Rados Gateway daemon, see
+                            # lp:1856106
+                            log("Zone '{}' existed already after all".format(
+                                zone))
+                        else:
+                            raise
+
+                    existing_zones = multisite.list_zones(retry_on_empty=True)
+                    log('Existing zones {}'.format(existing_zones),
+                        level=DEBUG)
+                    if zone not in existing_zones:
+                        raise RuntimeError("Could not create zone '{}'".format(
+                            zone))
+
                     service_restart(service_name())
         else:
             send_request_if_needed(rq, relation='mon')

@@ -30,7 +30,7 @@ RGW_ADMIN = 'radosgw-admin'
 def _check_output(cmd):
     """Logging wrapper for subprocess.check_ouput"""
     hookenv.log("Executing: {}".format(' '.join(cmd)), level=hookenv.DEBUG)
-    return subprocess.check_output(cmd).decode('UTF-8')
+    return subprocess.check_output(cmd, stderr=subprocess.PIPE).decode('UTF-8')
 
 
 @decorators.retry_on_exception(num_retries=5, base_delay=3,

@@ -62,7 +62,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 'radosgw-admin', '--id=rgw.testhost',
                 'realm', 'create',
                 '--rgw-realm=beedata', '--default'
-            ])
+            ], stderr=mock.ANY)
 
     def test_list_realms(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -97,7 +97,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 '--rgw-realm=beedata',
                 '--default',
                 '--master'
-            ])
+            ], stderr=mock.ANY)
 
     def test_list_zonegroups(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -128,7 +128,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 '--access-key=mykey',
                 '--secret=mypassword',
                 '--read-only=0',
-            ])
+            ], stderr=mock.ANY)
 
     def test_modify_zone(self):
         multisite.modify_zone(
@@ -145,7 +145,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--endpoints=http://localhost:80,https://localhost:443',
             '--access-key=mykey', '--secret=secret',
             '--read-only=1',
-        ])
+        ], stderr=mock.ANY)
 
     def test_modify_zone_promote_master(self):
         multisite.modify_zone(
@@ -160,7 +160,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--master',
             '--default',
             '--read-only=0',
-        ])
+        ], stderr=mock.ANY)
 
     def test_modify_zone_partial_credentials(self):
         multisite.modify_zone(
@@ -174,7 +174,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--rgw-zone=brundall-east',
             '--endpoints=http://localhost:80,https://localhost:443',
             '--read-only=0',
-        ])
+        ], stderr=mock.ANY)
 
     def test_list_zones(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -234,7 +234,7 @@ class TestMultisiteHelpers(CharmTestCase):
             'realm', 'pull',
             '--url=http://master:80',
             '--access-key=testkey', '--secret=testsecret',
-        ])
+        ], stderr=mock.ANY)
 
     def test_pull_period(self):
         multisite.pull_period(url='http://master:80',
@@ -245,4 +245,4 @@ class TestMultisiteHelpers(CharmTestCase):
             'period', 'pull',
             '--url=http://master:80',
             '--access-key=testkey', '--secret=testsecret',
-        ])
+        ], stderr=mock.ANY)
