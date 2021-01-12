@@ -45,16 +45,13 @@ class HAProxyContextTests(CharmTestCase):
 
     @patch('charmhelpers.contrib.openstack.context.get_relation_ip')
     @patch('charmhelpers.contrib.openstack.context.mkdir')
-    @patch('charmhelpers.contrib.openstack.context.unit_get')
     @patch('charmhelpers.contrib.openstack.context.local_unit')
     @patch('charmhelpers.contrib.openstack.context.config')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch('charmhelpers.contrib.openstack.context.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     def test_ctxt(self, _harelation_ids, _ctxtrelation_ids, _haconfig,
-                  _ctxtconfig, _local_unit, _unit_get, _mkdir,
-                  _get_relation_ip):
-        _unit_get.return_value = '10.0.0.10'
+                  _ctxtconfig, _local_unit, _mkdir, _get_relation_ip):
         _get_relation_ip.return_value = '10.0.0.10'
         _ctxtconfig.side_effect = self.test_config.get
         _haconfig.side_effect = self.test_config.get
