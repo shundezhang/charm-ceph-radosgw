@@ -96,10 +96,16 @@ the compression behaviour.
 
 ## Deployment
 
-To deploy a single RADOS gateway node within an existing Ceph cluster:
+Ceph RADOS Gateway is often containerised. Here a single unit is deployed to a
+new container on machine '1' within an existing Ceph cluster:
 
-    juju deploy ceph-radosgw
+    juju deploy --to lxd:1 ceph-radosgw
     juju add-relation ceph-radosgw:mon ceph-mon:radosgw
+
+If the RADOS Gateway is being integrated into OpenStack then a relation to the
+keystone application is needed:
+
+    juju add-relation ceph-radosgw:identity-service keystone:identity-service
 
 Expose the service:
 
@@ -109,7 +115,7 @@ Expose the service:
   traffic by default. In general, MAAS is the only cloud type that does not
   employ firewalling.
 
-The gateway can be accessed over port 80 (as per `juju status ceph-radosgw`
+The Gateway can be accessed over port 80 (as per `juju status ceph-radosgw`
 output).
 
 ## Multi-site replication
@@ -210,17 +216,23 @@ display action descriptions run `juju actions ceph-radosgw`. If the charm is
 not deployed then see file `actions.yaml`.
 
 * `pause`
-* `resume`
 * `promote`
 * `readonly`
 * `readwrite`
+* `resume`
 * `tidydefaults`
+
+# Documentation
+
+The OpenStack Charms project maintains two documentation guides:
+
+* [OpenStack Charm Guide][cg]: for project information, including development
+  and support notes
+* [OpenStack Charms Deployment Guide][cdg]: for charm usage information
 
 # Bugs
 
 Please report bugs on [Launchpad][lp-bugs-charm-ceph-radosgw].
-
-For general charm questions refer to the OpenStack [Charm Guide][cg].
 
 <!-- LINKS -->
 
