@@ -13,21 +13,21 @@ gate_bundles:
   - vault: bionic-train-namespaced
   - vault: bionic-stein
   - vault: bionic-stein-namespaced
-  - vault: bionic-rocky
-  - vault: bionic-rocky-namespaced
   - vault: bionic-queens
   - vault: bionic-queens-namespaced
-  - vault: xenial-queens
-  - xenial-pike
-  - xenial-ocata
   - xenial-mitaka
   - xenial-mitaka-namespaced
-  - trusty-mitaka
 smoke_bundles:
   - vault: bionic-ussuri
 dev_bundles:
+  - trusty-mitaka
+  - xenial-ocata
+  - xenial-pike
+  - vault: xenial-queens
   - bionic-queens-multisite
   - bionic-rocky-multisite
+  - vault: bionic-rocky
+  - vault: bionic-rocky-namespaced
 target_deploy_status:
   vault:
     workload-status: blocked
