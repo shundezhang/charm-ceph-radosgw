@@ -52,7 +52,6 @@ from charmhelpers.fetch import (
 from charmhelpers.payload.execd import execd_preinstall
 from charmhelpers.core.host import (
     cmp_pkgrevno,
-    is_container,
     service,
     service_pause,
     service_reload,
@@ -111,7 +110,6 @@ CONFIGS = register_configs()
 
 PACKAGES = [
     'haproxy',
-    'ntp',
     'radosgw',
     'apache2'
 ]
@@ -144,9 +142,6 @@ def install_packages():
     if c.changed('source') or c.changed('key'):
         add_source(c.get('source'), c.get('key'))
         apt_update(fatal=True)
-
-    if is_container():
-        PACKAGES.remove('ntp')
 
     # NOTE: just use full package list if we're in an upgrade
     #       config-changed execution
