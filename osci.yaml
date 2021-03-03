@@ -3,8 +3,12 @@
       - charm-unit-jobs
     check:
       jobs:
+        - vault-hirsute-wallaby_rgw
+        - vault-hirsute-wallaby-namespaced
         - vault-groovy-victoria_rgw
         - vault-groovy-victoria-namespaced
+        - vault-focal-wallaby_rgw
+        - vault-focal-wallaby-namespaced
         - vault-focal-victoria_rgw
         - vault-focal-victoria-namespaced
         - vault-focal-ussuri-ec
@@ -33,10 +37,22 @@
     vars:
       tox_extra_args: vault:bionic-ussuri
 - job:
-    name: vault-groovy-victoria_rgw
+    name: vault-hirsute-wallaby_rgw
     parent: func-target
     dependencies: &smoke-jobs
       - vault-bionic-ussuri
+    vars:
+      tox_extra_args: vault:hirsute-wallaby
+- job:
+    name: vault-hirsute-wallaby-namespaced
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: vault:hirsute-wallaby-namespaced
+- job:
+    name: vault-groovy-victoria_rgw
+    parent: func-target
+    dependencies: *smoke-jobs
     vars:
       tox_extra_args: vault:groovy-victoria
 - job:
@@ -45,6 +61,18 @@
     dependencies: *smoke-jobs
     vars:
       tox_extra_args: vault:groovy-victoria-namespaced
+- job:
+    name: vault-focal-wallaby_rgw
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: vault:focal-wallaby
+- job:
+    name: vault-focal-wallaby-namespaced
+    parent: func-target
+    dependencies: *smoke-jobs
+    vars:
+      tox_extra_args: vault:focal-wallaby-namespaced
 - job:
     name: vault-focal-victoria_rgw
     parent: func-target
