@@ -40,6 +40,7 @@ TO_PATCH = [
     'listen_port',
     'log',
     'open_port',
+    'opened_ports',
     'os',
     'relation_ids',
     'relation_set',

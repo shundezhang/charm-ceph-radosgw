@@ -32,6 +32,8 @@ from charmhelpers.core.hookenv import (
     related_units,
     config,
     open_port,
+    opened_ports,
+    close_port,
     relation_set,
     log,
     DEBUG,
@@ -247,7 +249,14 @@ def config_changed():
 
         update_nrpe_config()
 
-        open_port(port=listen_port())
+        port = listen_port()
+        open_port(port)
+        for opened_port in opened_ports():
+            opened_port_number = opened_port.split('/')[0]
+            if opened_port_number != port:
+                close_port(opened_port_number)
+                log('Closed port %s in favor of port %s' %
+                    (opened_port_number, port))
     _config_changed()
 
 
