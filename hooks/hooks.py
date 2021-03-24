@@ -399,6 +399,14 @@ def identity_joined(relid=None):
     requested_roles = ''
     if roles:
         requested_roles = ','.join(roles) if len(roles) > 1 else roles[0]
+    # remove stale settings without service prefix left by old charms,
+    # which cause the keystone charm to ignore new settings w/ prefix.
+    relation_set(service='',
+                 region='',
+                 public_url='',
+                 internal_url='',
+                 admin_url='',
+                 relation_id=relid)
     relation_set(swift_service='swift',
                  swift_region=config('region'),
                  swift_public_url=public_url,
