@@ -253,7 +253,7 @@ def config_changed():
         open_port(port)
         for opened_port in opened_ports():
             opened_port_number = opened_port.split('/')[0]
-            if opened_port_number != port:
+            if str(opened_port_number) != str(port):
                 close_port(opened_port_number)
                 log('Closed port %s in favor of port %s' %
                     (opened_port_number, port))
