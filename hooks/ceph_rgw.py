@@ -196,6 +196,7 @@ def get_create_rgw_pools_rq(prefix=None):
         '.rgw.log',
         '.rgw.intent-log',
         '.rgw.meta',
+        '.rgw.otp',
         '.rgw.usage',
         '.rgw.users.keys',
         '.rgw.users.email',
