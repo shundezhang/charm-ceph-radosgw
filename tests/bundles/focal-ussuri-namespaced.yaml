@@ -25,10 +25,10 @@ machines:
 applications:
 
   keystone-mysql-router:
-    charm: cs:~openstack-charmers-next/mysql-router
+    charm: cs:~openstack-charmers/mysql-router
 
   mysql-innodb-cluster:
-    charm: cs:~openstack-charmers-next/mysql-innodb-cluster
+    charm: cs:~openstack-charmers/mysql-innodb-cluster
     num_units: 3
     options:
       source: *source
@@ -47,7 +47,7 @@ applications:
       - '3'
 
   ceph-osd:
-    charm: cs:~openstack-charmers-next/ceph-osd
+    charm: cs:~openstack-charmers/ceph-osd
     num_units: 3
     constraints: "mem=2048"
     storage:
@@ -61,7 +61,7 @@ applications:
       - '6'
 
   ceph-mon:
-    charm: cs:~openstack-charmers-next/ceph-mon
+    charm: cs:~openstack-charmers/ceph-mon
     num_units: 3
     options:
       source: *source
@@ -72,7 +72,7 @@ applications:
 
   keystone:
     expose: True
-    charm: cs:~openstack-charmers-next/keystone
+    charm: cs:~openstack-charmers/keystone
     num_units: 1
     options:
       openstack-origin: *source
@@ -80,10 +80,10 @@ applications:
       - '10'
 
   vault-mysql-router:
-    charm: cs:~openstack-charmers-next/mysql-router
+    charm: cs:~openstack-charmers/mysql-router
 
   vault:
-    charm: cs:~openstack-charmers-next/vault
+    charm: cs:~openstack-charmers/vault
     num_units: 1
     to:
       - '11'
