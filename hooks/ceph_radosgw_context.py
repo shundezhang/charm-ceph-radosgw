@@ -23,10 +23,14 @@ from charmhelpers.contrib.hahelpers.cluster import (
     determine_api_port,
     determine_apache_port,
 )
-from charmhelpers.core.host import cmp_pkgrevno
+from charmhelpers.core.host import (
+    cmp_pkgrevno,
+    arch,
+)
 from charmhelpers.core.hookenv import (
     DEBUG,
     WARNING,
+    ERROR,
     config,
     log,
     related_units,
@@ -42,6 +46,12 @@ from charmhelpers.contrib.network.ip import (
 from charmhelpers.contrib.storage.linux.ceph import CephConfContext
 
 import utils
+
+
+BEAST_FRONTEND = 'beast'
+CIVETWEB_FRONTEND = 'civetweb'
+SUPPORTED_FRONTENDS = (BEAST_FRONTEND, CIVETWEB_FRONTEND)
+UNSUPPORTED_BEAST_ARCHS = ('s390x', 'riscv64')
 
 
 class ApacheSSLContext(context.ApacheSSLContext):
@@ -142,6 +152,55 @@ def ensure_host_resolvable_v6(hostname):
         shutil.rmtree(dtmp)
 
 
+def resolve_http_frontend():
+    """Automatically determine the HTTP frontend configuration
+
+    Determines the best HTTP frontend configuration based
+    on the Ceph release in use and the architecture of the
+    machine being used.
+
+    :returns http frontend configuration to use.
+    :rtype: str
+    """
+    octopus_or_later = cmp_pkgrevno('radosgw', '15.2.0') >= 0
+    pacific_or_later = cmp_pkgrevno('radosgw', '16.2.0') >= 0
+    if octopus_or_later:
+        # Pacific or later supports beast on all architectures
+        # but octopus does not support s390x or riscv64
+        if not pacific_or_later and arch() in UNSUPPORTED_BEAST_ARCHS:
+            return CIVETWEB_FRONTEND
+        else:
+            return BEAST_FRONTEND
+    return CIVETWEB_FRONTEND
+
+
+def validate_http_frontend(frontend_config):
+    """Validate HTTP frontend configuration
+
+    :param frontend_config: user provided config value
+    :type: str
+    :raises: ValueError if the provided config is not valid
+    """
+    mimic_or_later = cmp_pkgrevno('radosgw', '13.2.0') >= 0
+    pacific_or_later = cmp_pkgrevno('radosgw', '16.2.0') >= 0
+    if frontend_config not in SUPPORTED_FRONTENDS:
+        e = ('Please provide either civetweb or beast for '
+             'http-frontend configuration')
+        log(e, level=ERROR)
+        raise ValueError(e)
+    if frontend_config == BEAST_FRONTEND:
+        if not mimic_or_later:
+            e = ('Use of the beast HTTP frontend requires Ceph '
+                 'mimic or later.')
+            log(e, level=ERROR)
+            raise ValueError(e)
+        if not pacific_or_later and arch() in UNSUPPORTED_BEAST_ARCHS:
+            e = ('Use of the beast HTTP frontend on {} requires Ceph '
+                 'pacific or later.'.format(arch()))
+            log(e, level=ERROR)
+            raise ValueError(e)
+
+
 class MonContext(context.CephContext):
     interfaces = ['mon']
 
@@ -191,6 +250,12 @@ class MonContext(context.CephContext):
         if config('prefer-ipv6'):
             port = "[::]:%s" % (port)
 
+        http_frontend = config('http-frontend')
+        if not http_frontend:
+            http_frontend = resolve_http_frontend()
+        else:
+            validate_http_frontend(http_frontend)
+
         mon_hosts.sort()
         ctxt = {
             'auth_supported': auth,
@@ -210,6 +275,7 @@ class MonContext(context.CephContext):
             'unit_public_ip': unit_public_ip(),
             'fsid': fsid,
             'rgw_swift_versioning': config('rgw-swift-versioning-enabled'),
+            'frontend': http_frontend,
         }
 
         # NOTE(dosaboy): these sections must correspond to what is supported in

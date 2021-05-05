@@ -509,3 +509,10 @@ options:
       NOTE: X-Versions-Location is the only versioning-related header that
       radosgw interprets. X-History-Location, supported by native OpenStack
       Swift, is currently not supported by radosgw.
+  http-frontend:
+    type: string
+    default:
+    description: |
+      Frontend HTTP engine to use for the Ceph RADOS Gateway; For Octopus and
+      later this defaults to 'beast' and for older releases (and on architectures
+      where beast is not supported) 'civetweb'.

@@ -42,6 +42,7 @@ from charmhelpers.core.hookenv import (
     is_leader,
     leader_set,
     leader_get,
+    WORKLOAD_STATES,
 )
 from charmhelpers.fetch import (
     apt_update,
@@ -747,4 +748,8 @@ if __name__ == '__main__':
         hooks.execute(sys.argv)
     except UnregisteredHookError as e:
         log('Unknown hook {} - skipping.'.format(e))
-    assess_status(CONFIGS)
+    except ValueError as e:
+        # Handle any invalid configuration values
+        status_set(WORKLOAD_STATES.BLOCKED, str(e))
+    else:
+        assess_status(CONFIGS)

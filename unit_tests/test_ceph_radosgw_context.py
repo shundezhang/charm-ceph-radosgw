@@ -17,6 +17,7 @@ from mock import patch
 import ceph_radosgw_context as context
 import charmhelpers
 import charmhelpers.contrib.storage.linux.ceph as ceph
+import charmhelpers.fetch as fetch
 
 from test_utils import CharmTestCase
 
@@ -27,6 +28,7 @@ TO_PATCH = [
     'relation_ids',
     'related_units',
     'cmp_pkgrevno',
+    'arch',
     'socket',
     'unit_public_ip',
     'determine_api_port',
@@ -42,6 +44,7 @@ class HAProxyContextTests(CharmTestCase):
         self.relation_get.side_effect = self.test_relation.get
         self.config.side_effect = self.test_config.get
         self.cmp_pkgrevno.return_value = 1
+        self.arch.return_value = 'amd64'
 
     @patch('charmhelpers.contrib.openstack.context.get_relation_ip')
     @patch('charmhelpers.contrib.openstack.context.mkdir')
@@ -356,7 +359,8 @@ class MonContextTest(CharmTestCase):
         super(MonContextTest, self).setUp(context, TO_PATCH)
         self.config.side_effect = self.test_config.get
         self.unit_public_ip.return_value = '10.255.255.255'
-        self.cmp_pkgrevno.return_value = 1
+        self.cmp_pkgrevno.side_effect = lambda *args: 1
+        self.arch.return_value = 'amd64'
 
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
@@ -395,6 +399,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zone': 'default',
             'fsid': 'testfsid',
             'rgw_swift_versioning': False,
+            'frontend': 'beast',
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -444,6 +449,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zone': 'default',
             'fsid': 'testfsid',
             'rgw_swift_versioning': False,
+            'frontend': 'beast',
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -502,6 +508,7 @@ class MonContextTest(CharmTestCase):
             'rgw_zone': 'default',
             'fsid': 'testfsid',
             'rgw_swift_versioning': False,
+            'frontend': 'beast',
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -542,8 +549,67 @@ class MonContextTest(CharmTestCase):
             'rgw_zone': 'default',
             'fsid': 'testfsid',
             'rgw_swift_versioning': False,
+            'frontend': 'beast',
         }
         self.assertEqual(expect, mon_ctxt())
+
+    def test_resolve_http_frontend(self):
+        _test_version = '12.2.0'
+
+        def _compare_version(package, version):
+            return fetch.apt_pkg.version_compare(
+                _test_version, version
+            )
+
+        # Older releases, default and invalid configuration
+        self.cmp_pkgrevno.side_effect = _compare_version
+        self.assertEqual('civetweb', context.resolve_http_frontend())
+
+        # Default for Octopus but not Pacific
+        _test_version = '15.2.0'
+        self.assertEqual('beast', context.resolve_http_frontend())
+
+        self.arch.return_value = 's390x'
+        self.assertEqual('civetweb', context.resolve_http_frontend())
+
+        # Default for Pacific and later
+        _test_version = '16.2.0'
+        self.assertEqual('beast', context.resolve_http_frontend())
+        self.arch.return_value = 'amd64'
+        self.assertEqual('beast', context.resolve_http_frontend())
+
+    def test_validate_http_frontend(self):
+        _test_version = '12.2.0'
+
+        def _compare_version(package, version):
+            return fetch.apt_pkg.version_compare(
+                _test_version, version
+            )
+
+        self.cmp_pkgrevno.side_effect = _compare_version
+
+        # Invalid configuration option
+        with self.assertRaises(ValueError):
+            context.validate_http_frontend('foobar')
+
+        # beast config but ceph pre mimic
+        with self.assertRaises(ValueError):
+            context.validate_http_frontend('beast')
+
+        # Mimic with valid configuration
+        _test_version = '13.2.0'
+        context.validate_http_frontend('beast')
+        context.validate_http_frontend('civetweb')
+
+        # beast config on unsupported s390x/octopus
+        _test_version = '15.2.0'
+        self.arch.return_value = 's390x'
+        with self.assertRaises(ValueError):
+            context.validate_http_frontend('beast')
+
+        # beast config on s390x/pacific
+        _test_version = '16.2.0'
+        context.validate_http_frontend('beast')
 
 
 class ApacheContextTest(CharmTestCase):
