@@ -500,3 +500,12 @@ options:
     description: |
       Value of bluestore compression max blob size for solid state media on
       pools requested by this charm.
+  rgw-swift-versioning-enabled:
+    type: boolean
+    default: False
+    description: |
+      If True, swift object versioning will be enabled for radosgw.
+
+      NOTE: X-Versions-Location is the only versioning-related header that
+      radosgw interprets. X-History-Location, supported by native OpenStack
+      Swift, is currently not supported by radosgw.

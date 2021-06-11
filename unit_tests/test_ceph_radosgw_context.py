@@ -384,6 +384,7 @@ class MonContextTest(CharmTestCase):
             'ipv6': False,
             'rgw_zone': 'default',
             'fsid': 'testfsid',
+            'rgw_swift_versioning': False,
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -432,6 +433,7 @@ class MonContextTest(CharmTestCase):
             'ipv6': False,
             'rgw_zone': 'default',
             'fsid': 'testfsid',
+            'rgw_swift_versioning': False,
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -489,6 +491,7 @@ class MonContextTest(CharmTestCase):
             'ipv6': False,
             'rgw_zone': 'default',
             'fsid': 'testfsid',
+            'rgw_swift_versioning': False,
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -528,6 +531,7 @@ class MonContextTest(CharmTestCase):
             'ipv6': False,
             'rgw_zone': 'default',
             'fsid': 'testfsid',
+            'rgw_swift_versioning': False,
         }
         self.assertEqual(expect, mon_ctxt())
 

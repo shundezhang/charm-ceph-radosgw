@@ -207,6 +207,7 @@ class MonContext(context.CephContext):
             # not available externally). ~tribaal
             'unit_public_ip': unit_public_ip(),
             'fsid': fsid,
+            'rgw_swift_versioning': config('rgw-swift-versioning-enabled'),
         }
 
         # NOTE(dosaboy): these sections must correspond to what is supported in
