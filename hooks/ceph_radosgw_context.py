@@ -92,6 +92,8 @@ class IdentityServiceContext(context.IdentityServiceContext):
             ctxt.pop('admin_domain_id')
 
         ctxt['auth_type'] = 'keystone'
+        if cmp_pkgrevno('radosgw', '15.0.0') < 0:
+            ctxt['keystone_revocation_parameter_supported'] = True
         if cmp_pkgrevno('radosgw', "11.0.0") >= 0:
             ctxt['user_roles'] = config('operator-roles')
             ctxt['admin_roles'] = config('admin-roles')
