@@ -141,6 +141,15 @@ def upgrade_available():
 
 
 def install_packages():
+    """Installs necessary packages for the ceph-radosgw service.
+
+    Calling this method when the source config value has changed
+    will cause an upgrade of ceph packages to be performed.
+
+    :returns: whether packages were installed or not
+    :rtype: boolean
+    """
+    pkgs_installed = False
     c = config()
     if c.changed('source') or c.changed('key'):
         add_source(c.get('source'), c.get('key'))
@@ -164,10 +173,13 @@ def install_packages():
             apt_install(['apache2'], fatal=True)
             disable_unused_apache_sites()
         apt_install(pkgs, fatal=True)
+        pkgs_installed = True
 
     pkgs = filter_missing_packages(APACHE_PACKAGES)
     if pkgs:
         apt_purge(pkgs)
+
+    return pkgs_installed
 
 
 @hooks.hook('install.real')
@@ -212,7 +224,12 @@ def config_changed():
             log("Unit is pause or upgrading. Skipping config_changed", "WARN")
             return
 
-        install_packages()
+        # NOTE(wolsen) if an upgrade has been applied, then the radosgw
+        # service needs to be restarted as the package doesn't do it by
+        # itself. See LP#1906707
+        if install_packages():
+            log("Packages have been installed/upgraded... restarting", "INFO")
+            service_restart(service_name())
 
         if config('prefer-ipv6'):
             status_set('maintenance', 'configuring ipv6')
