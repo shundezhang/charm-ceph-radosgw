@@ -611,6 +611,47 @@ class MonContextTest(CharmTestCase):
         _test_version = '16.2.0'
         context.validate_http_frontend('beast')
 
+    @patch.object(ceph, 'config', lambda *args:
+                  '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
+    def test_ctxt_inconsistent_fsids(self):
+        self.socket.gethostname.return_value = 'testhost'
+        mon_ctxt = context.MonContext()
+        addresses = ['10.5.4.1', '10.5.4.2', '10.5.4.3']
+        fsids = ['testfsid', 'testfsid', None]
+
+        def _relation_get(attr, unit, rid):
+            if attr == 'ceph-public-address':
+                return addresses.pop()
+            elif attr == 'auth':
+                return 'cephx'
+            elif attr == 'rgw.testhost_key':
+                return 'testkey'
+            elif attr == 'fsid':
+                return fsids.pop()
+
+        self.relation_get.side_effect = _relation_get
+        self.relation_ids.return_value = ['mon:6']
+        self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.determine_api_port.return_value = 70
+        expect = {
+            'auth_supported': 'cephx',
+            'hostname': 'testhost',
+            'mon_hosts': '10.5.4.1 10.5.4.2 10.5.4.3',
+            'old_auth': False,
+            'systemd_rgw': True,
+            'unit_public_ip': '10.255.255.255',
+            'use_syslog': 'false',
+            'loglevel': 1,
+            'port': 70,
+            'client_radosgw_gateway': {'rgw init timeout': 60},
+            'ipv6': False,
+            'rgw_zone': 'default',
+            'fsid': 'testfsid',
+            'rgw_swift_versioning': False,
+            'frontend': 'beast',
+        }
+        self.assertEqual(expect, mon_ctxt())
+
 
 class ApacheContextTest(CharmTestCase):
 

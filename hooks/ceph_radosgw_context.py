@@ -217,7 +217,8 @@ class MonContext(context.CephContext):
 
         for rid in relation_ids(self.interfaces[0]):
             for unit in related_units(rid):
-                fsid = relation_get('fsid', rid=rid, unit=unit)
+                if fsid is None:
+                    fsid = relation_get('fsid', rid=rid, unit=unit)
                 _auth = relation_get('auth', rid=rid, unit=unit)
                 if _auth:
                     auths.append(_auth)
