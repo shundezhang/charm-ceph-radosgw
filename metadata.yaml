@@ -45,6 +45,8 @@ provides:
     interface: radosgw-multisite
   object-store:
     interface: swift-proxy
+  radosgw-user:
+    interface: radosgw-user
 peers:
   cluster:
     interface: swift-ha

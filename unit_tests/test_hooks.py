@@ -46,6 +46,7 @@ TO_PATCH = [
     'relation_set',
     'relation_get',
     'related_units',
+    'remote_service_name',
     'status_set',
     'subprocess',
     'sys',
@@ -508,6 +509,56 @@ class CephRadosGWTests(CharmTestCase):
             'vault/0'
         )
         mock_configure_https.assert_called_once_with()
+
+    @patch.object(ceph_hooks, 'canonical_url')
+    @patch.object(ceph_hooks, 'is_leader')
+    def test_radosgw_user_changed(self, is_leader, canonical_url):
+        relation_data = {
+            'radosgw-user:3': {'system-role': 'false'},
+            'radosgw-user:5': {'system-role': 'true'}}
+        user = {
+            'juju-radosgw-user-3': ('access1', 'key1'),
+            'juju-radosgw-user-5-system': ('access2', 'key2')}
+        self.ready_for_service.return_value = True
+        is_leader.return_value = True
+        self.remote_service_name.return_value = 'ceph-dashboard'
+        canonical_url.return_value = 'http://radosgw'
+        self.listen_port.return_value = 80
+        self.socket.gethostname.return_value = 'testinghostname'
+        self.relation_ids.return_value = relation_data.keys()
+        self.relation_get.side_effect = lambda rid, app: relation_data[rid]
+        self.multisite.list_users.return_value = ['juju-radosgw-user-3']
+        self.multisite.get_user_creds.side_effect = lambda u: user[u]
+        self.multisite.create_user.side_effect = lambda u, system_user: user[u]
+        ceph_hooks.radosgw_user_changed()
+        expected = [
+            call(
+                app='ceph-dashboard',
+                relation_id='radosgw-user:3',
+                relation_settings={
+                    'uid': 'juju-radosgw-user-3',
+                    'access-key': 'access1',
+                    'secret-key': 'key1'}),
+            call(
+                app='ceph-dashboard',
+                relation_id='radosgw-user:5',
+                relation_settings={
+                    'uid': 'juju-radosgw-user-5-system',
+                    'access-key': 'access2',
+                    'secret-key': 'key2'}),
+            call(
+                relation_id='radosgw-user:3',
+                relation_settings={
+                    'internal-url': 'http://radosgw:80',
+                    'daemon-id': 'testinghostname'}),
+            call(
+                relation_id='radosgw-user:5',
+                relation_settings={
+                    'internal-url': 'http://radosgw:80',
+                    'daemon-id': 'testinghostname'})]
+        self.relation_set.assert_has_calls(
+            expected,
+            any_order=True)
 
 
 class MiscMultisiteTests(CharmTestCase):

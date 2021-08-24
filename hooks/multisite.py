@@ -316,12 +316,48 @@ def tidy_defaults():
         update_period()
 
 
-def create_system_user(username):
+def get_user_creds(username):
+    cmd = [
+        RGW_ADMIN, '--id={}'.format(_key_name()),
+        'user', 'info',
+        '--uid={}'.format(username)
+    ]
+    result = json.loads(_check_output(cmd))
+    return (result['keys'][0]['access_key'],
+            result['keys'][0]['secret_key'])
+
+
+def suspend_user(username):
     """
-    Create a RADOS Gateway system use for sync usage
+    Suspend a RADOS Gateway user
 
     :param username: username of user to create
     :type username: str
+    """
+    if username not in list_users():
+        hookenv.log(
+            "Cannot suspended user {}. User not found.".format(username),
+            level=hookenv.DEBUG)
+        return
+    cmd = [
+        RGW_ADMIN, '--id={}'.format(_key_name()),
+        'user', 'suspend',
+        '--uid={}'.format(username)
+    ]
+    _check_output(cmd)
+    hookenv.log(
+        "Suspended user {}".format(username),
+        level=hookenv.DEBUG)
+
+
+def create_user(username, system_user=False):
+    """
+    Create a RADOS Gateway user
+
+    :param username: username of user to create
+    :type username: str
+    :param system_user: Whether to grant system user role
+    :type system_user: bool
     :return: access key and secret
     :rtype: (str, str)
     """
@@ -329,15 +365,28 @@ def create_system_user(username):
         RGW_ADMIN, '--id={}'.format(_key_name()),
         'user', 'create',
         '--uid={}'.format(username),
-        '--display-name=Synchronization User',
-        '--system',
+        '--display-name=Synchronization User'
     ]
+    if system_user:
+        cmd.append('--system')
     try:
         result = json.loads(_check_output(cmd))
         return (result['keys'][0]['access_key'],
                 result['keys'][0]['secret_key'])
     except TypeError:
         return (None, None)
+
+
+def create_system_user(username):
+    """
+    Create a RADOS Gateway system user
+
+    :param username: username of user to create
+    :type username: str
+    :return: access key and secret
+    :rtype: (str, str)
+    """
+    create_user(username, system_user=True)
 
 
 def pull_realm(url, access_key, secret):

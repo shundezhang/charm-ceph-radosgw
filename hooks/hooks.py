@@ -28,6 +28,7 @@ import multisite
 
 from charmhelpers.core.hookenv import (
     relation_get,
+    relation_id as ch_relation_id,
     relation_ids,
     related_units,
     config,
@@ -42,8 +43,10 @@ from charmhelpers.core.hookenv import (
     is_leader,
     leader_set,
     leader_get,
+    remote_service_name,
     WORKLOAD_STATES,
 )
+from charmhelpers.core.strutils import bool_from_string
 from charmhelpers.fetch import (
     apt_update,
     apt_install,
@@ -243,6 +246,9 @@ def config_changed():
         for r_id in relation_ids('object-store'):
             object_store_joined(r_id)
 
+        for r_id in relation_ids('radosgw-user'):
+            radosgw_user_changed(r_id)
+
         process_multisite_relations()
 
         CONFIGS.write_all()
@@ -367,6 +373,10 @@ def mon_relation(rid=None, unit=None):
                             zone))
 
                     service_restart(service_name())
+
+            for r_id in relation_ids('radosgw-user'):
+                radosgw_user_changed(r_id)
+
         else:
             send_request_if_needed(rq, relation='mon')
     _mon_relation()
@@ -575,6 +585,91 @@ def certs_changed(relation_id=None, unit=None):
     _certs_changed()
 
 
+def get_radosgw_username(r_id):
+    """Generate a username based on a relation id"""
+    gw_user = 'juju-' + r_id.replace(":", "-")
+    return gw_user
+
+
+def get_radosgw_system_username(r_id):
+    """Generate a username for a system user based on a relation id"""
+    gw_user = get_radosgw_username(r_id)
+    # There is no way to switch a user from being a system user to a
+    # non-system user, so add the '-system' suffix to ensure there is
+    # no clash if the user request is updated in the future.
+    gw_user = gw_user + "-system"
+    return gw_user
+
+
+@hooks.hook('radosgw-user-relation-departed')
+def radosgw_user_departed():
+    # If there are no related units then the last unit
+    # is currently departing.
+    if not related_units():
+        r_id = ch_relation_id()
+        for user in [get_radosgw_system_username(r_id),
+                     get_radosgw_username(r_id)]:
+            multisite.suspend_user(user)
+
+
+@hooks.hook('radosgw-user-relation-changed')
+def radosgw_user_changed(relation_id=None):
+    if not ready_for_service(legacy=False):
+        log('unit not ready, deferring radosgw_user configuration')
+        return
+    if relation_id:
+        r_ids = [relation_id]
+    else:
+        r_ids = relation_ids('radosgw-user')
+    # The leader manages the users and sets the credentials using the
+    # the application relation data bag.
+    if is_leader():
+        for r_id in r_ids:
+            remote_app = remote_service_name(r_id)
+            relation_data = relation_get(
+                rid=r_id,
+                app=remote_app)
+            if 'system-role' not in relation_data:
+                log('system-role not in relation data, cannot create user',
+                    level=DEBUG)
+                return
+            system_user = bool_from_string(
+                relation_data.get('system-role', 'false'))
+            if system_user:
+                gw_user = get_radosgw_system_username(r_id)
+                # If there is a pre-existing non-system user then ensure it is
+                # suspended
+                multisite.suspend_user(get_radosgw_username(r_id))
+            else:
+                gw_user = get_radosgw_username(r_id)
+                # If there is a pre-existing system user then ensure it is
+                # suspended
+                multisite.suspend_user(get_radosgw_system_username(r_id))
+            if gw_user in multisite.list_users():
+                (access_key, secret_key) = multisite.get_user_creds(gw_user)
+            else:
+                (access_key, secret_key) = multisite.create_user(
+                    gw_user,
+                    system_user=system_user)
+            relation_set(
+                app=remote_app,
+                relation_id=r_id,
+                relation_settings={
+                    'uid': gw_user,
+                    'access-key': access_key,
+                    'secret-key': secret_key})
+    # Each unit publishes its own endpoint data and daemon id using the
+    # unit relation data bag.
+    for r_id in r_ids:
+        relation_set(
+            relation_id=r_id,
+            relation_settings={
+                'internal-url': "{}:{}".format(
+                    canonical_url(CONFIGS, INTERNAL),
+                    listen_port()),
+                'daemon-id': socket.gethostname()})
+
+
 @hooks.hook('master-relation-joined')
 def master_relation_joined(relation_id=None):
     if not ready_for_service(legacy=False):
@@ -732,6 +827,8 @@ def leader_settings_changed():
     if not is_leader():
         for r_id in relation_ids('master'):
             master_relation_joined(r_id)
+        for r_id in relation_ids('radosgw-user'):
+            radosgw_user_changed(r_id)
 
 
 def process_multisite_relations():
