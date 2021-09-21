@@ -1,8 +1,8 @@
 charm_name: ceph-radosgw
 
 gate_bundles:
-  - vault: groovy-victoria
-  - vault: groovy-victoria-namespaced
+  - vault: focal-xena
+  - vault: focal-xena-namespaced
   - vault: focal-wallaby
   - vault: focal-wallaby-namespaced
   - vault: focal-victoria
@@ -33,8 +33,12 @@ dev_bundles:
   - bionic-rocky-multisite
   - vault: bionic-rocky
   - vault: bionic-rocky-namespaced
+  - vault: groovy-victoria
+  - vault: groovy-victoria-namespaced
   - vault: hirsute-wallaby
   - vault: hirsute-wallaby-namespaced
+  - vault: impish-xena
+  - vault: impish-xena-namespaced
 
 target_deploy_status:
   vault:
@@ -57,3 +61,7 @@ tests_options:
   force_deploy:
     - hirsute-wallaby
     - hirsute-wallaby-namespaced
+    - groovy-victoria
+    - groovy-victoria-namespaced
+    - impish-xena
+    - impish-xena-namespaced
