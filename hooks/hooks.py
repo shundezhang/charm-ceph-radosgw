@@ -583,6 +583,8 @@ def certs_changed(relation_id=None, unit=None):
         process_certificates('ceph-radosgw', relation_id, unit)
         configure_https()
     _certs_changed()
+    for r_id in relation_ids('identity-service'):
+        identity_joined(relid=r_id)
 
 
 def get_radosgw_username(r_id):
