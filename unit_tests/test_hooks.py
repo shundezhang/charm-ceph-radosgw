@@ -191,6 +191,27 @@ class CephRadosGWTests(CharmTestCase):
         update_nrpe_config.assert_called_with()
         mock_certs_joined.assert_called_once_with('certificates:1')
 
+    @patch.object(ceph_hooks, 'service_name')
+    @patch.object(ceph_hooks, 'service_restart')
+    @patch.object(ceph_hooks, 'certs_joined')
+    @patch.object(ceph_hooks, 'update_nrpe_config')
+    def test_config_changed_upgrade(self, update_nrpe_config,
+                                    mock_certs_joined, mock_service_restart,
+                                    mock_service_name):
+        _install_packages = self.patch('install_packages')
+        _install_packages.return_value = True
+        mock_service_name.return_value = 'radosgw@localhost'
+        _relations = {
+            'certificates': ['certificates:1']
+        }
+        self.relation_ids.side_effect = lambda name: _relations.get(name, [])
+        ceph_hooks.config_changed()
+        self.assertTrue(_install_packages.called)
+        self.CONFIGS.write_all.assert_called_with()
+        update_nrpe_config.assert_called_with()
+        mock_certs_joined.assert_called_once_with('certificates:1')
+        mock_service_restart.assert_called_once_with('radosgw@localhost')
+
     @patch.object(ceph_hooks, 'is_request_complete',
                   lambda *args, **kwargs: True)
     @patch.object(ceph_hooks, 'is_leader')
