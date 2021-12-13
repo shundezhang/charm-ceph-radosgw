@@ -386,7 +386,7 @@ def create_system_user(username):
     :return: access key and secret
     :rtype: (str, str)
     """
-    create_user(username, system_user=True)
+    return create_user(username, system_user=True)
 
 
 def pull_realm(url, access_key, secret):

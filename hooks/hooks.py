@@ -707,6 +707,10 @@ def master_relation_joined(relation_id=None):
     secret = leader_get('secret')
 
     if not all((realm, zonegroup, zone)):
+        log('Cannot setup multisite configuration, required config is '
+            'missing. realm, zonegroup and zone charm config options must all '
+            'be set',
+            'WARN')
         return
 
     relation_set(relation_id=relation_id,
@@ -717,9 +721,12 @@ def master_relation_joined(relation_id=None):
                  secret=secret)
 
     if not is_leader():
+        log('Cannot setup multisite configuration, this unit is not the '
+            'leader')
         return
 
     if not leader_get('restart_nonce'):
+        log('No restart_nonce found')
         # NOTE(jamespage):
         # This is an ugly kludge to force creation of the required data
         # items in the .rgw.root pool prior to the radosgw process being
@@ -730,10 +737,12 @@ def master_relation_joined(relation_id=None):
     mutation = False
 
     if realm not in multisite.list_realms():
+        log('Realm {} not found, creating now'.format(realm))
         multisite.create_realm(realm, default=True)
         mutation = True
 
     if zonegroup not in multisite.list_zonegroups():
+        log('Zonegroup {} not found, creating now'.format(zonegroup))
         multisite.create_zonegroup(zonegroup,
                                    endpoints=endpoints,
                                    default=True, master=True,
@@ -741,6 +750,7 @@ def master_relation_joined(relation_id=None):
         mutation = True
 
     if zone not in multisite.list_zones():
+        log('Zone {} not found, creating now'.format(zone))
         multisite.create_zone(zone,
                               endpoints=endpoints,
                               default=True, master=True,
@@ -748,6 +758,7 @@ def master_relation_joined(relation_id=None):
         mutation = True
 
     if MULTISITE_SYSTEM_USER not in multisite.list_users():
+        log('User {} not found, creating now'.format(MULTISITE_SYSTEM_USER))
         access_key, secret = multisite.create_system_user(
             MULTISITE_SYSTEM_USER
         )
@@ -759,9 +770,14 @@ def master_relation_joined(relation_id=None):
         mutation = True
 
     if mutation:
+        log(
+            'Mutation detected. Restarting {}.'.format(service_name()),
+            'INFO')
         multisite.update_period()
         service_restart(service_name())
         leader_set(restart_nonce=str(uuid.uuid4()))
+    else:
+        log('No mutation detected.', 'INFO')
 
     relation_set(relation_id=relation_id,
                  access_key=access_key,
@@ -771,6 +787,8 @@ def master_relation_joined(relation_id=None):
 @hooks.hook('slave-relation-changed')
 def slave_relation_changed(relation_id=None, unit=None):
     if not is_leader():
+        log('Cannot setup multisite configuration, this unit is not the '
+            'leader')
         return
     if not ready_for_service(legacy=False):
         log('unit not ready, deferring multisite configuration')
@@ -801,6 +819,7 @@ def slave_relation_changed(relation_id=None, unit=None):
         return
 
     if not leader_get('restart_nonce'):
+        log('No restart_nonce found')
         # NOTE(jamespage):
         # This is an ugly kludge to force creation of the required data
         # items in the .rgw.root pool prior to the radosgw process being
@@ -811,6 +830,7 @@ def slave_relation_changed(relation_id=None, unit=None):
     mutation = False
 
     if realm not in multisite.list_realms():
+        log('Realm {} not found, pulling now'.format(realm))
         multisite.pull_realm(url=master_data['url'],
                              access_key=master_data['access_key'],
                              secret=master_data['secret'])
@@ -821,6 +841,7 @@ def slave_relation_changed(relation_id=None, unit=None):
         mutation = True
 
     if zone not in multisite.list_zones():
+        log('Zone {} not found, creating now'.format(zone))
         multisite.create_zone(zone,
                               endpoints=endpoints,
                               default=False, master=False,
@@ -830,9 +851,14 @@ def slave_relation_changed(relation_id=None, unit=None):
         mutation = True
 
     if mutation:
+        log(
+            'Mutation detected. Restarting {}.'.format(service_name()),
+            'INFO')
         multisite.update_period()
         service_restart(service_name())
         leader_set(restart_nonce=str(uuid.uuid4()))
+    else:
+        log('No mutation detected.', 'INFO')
 
 
 @hooks.hook('leader-settings-changed')

@@ -78,6 +78,45 @@ class TestMultisiteHelpers(CharmTestCase):
             '--rgw-realm=newrealm'
         ])
 
+    def test_create_user(self):
+        with open(self._testdata(whoami()), 'rb') as f:
+            self.subprocess.check_output.return_value = f.read()
+            access_key, secret = multisite.create_user(
+                'mrbees',
+            )
+            self.assertEqual(
+                access_key,
+                '41JJQK1HN2NAE5DEZUF9')
+            self.assertEqual(
+                secret,
+                '1qhCgxmUDAJI9saFAVdvUTG5MzMjlpMxr5agaaa4')
+            self.subprocess.check_output.assert_called_with([
+                'radosgw-admin', '--id=rgw.testhost',
+                'user', 'create',
+                '--uid=mrbees',
+                '--display-name=Synchronization User',
+            ], stderr=mock.ANY)
+
+    def test_create_system_user(self):
+        with open(self._testdata(whoami()), 'rb') as f:
+            self.subprocess.check_output.return_value = f.read()
+            access_key, secret = multisite.create_system_user(
+                'mrbees',
+            )
+            self.assertEqual(
+                access_key,
+                '41JJQK1HN2NAE5DEZUF9')
+            self.assertEqual(
+                secret,
+                '1qhCgxmUDAJI9saFAVdvUTG5MzMjlpMxr5agaaa4')
+            self.subprocess.check_output.assert_called_with([
+                'radosgw-admin', '--id=rgw.testhost',
+                'user', 'create',
+                '--uid=mrbees',
+                '--display-name=Synchronization User',
+                '--system'
+            ], stderr=mock.ANY)
+
     def test_create_zonegroup(self):
         with open(self._testdata(whoami()), 'rb') as f:
             self.subprocess.check_output.return_value = f.read()

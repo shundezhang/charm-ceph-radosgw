@@ -73,5 +73,5 @@ relations:
   - west-ceph-mon:radosgw
 - - slave-ceph-radosgw:identity-service
   - keystone:identity-service
-- - slave-ceph-radosgw:master
-  - ceph-radosgw:slave
+- - slave-ceph-radosgw:slave
+  - ceph-radosgw:master
