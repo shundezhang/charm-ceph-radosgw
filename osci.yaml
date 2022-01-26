@@ -1,29 +1,15 @@
 - project:
     templates:
-      - charm-yoga-unit-jobs
+      - charm-unit-jobs-py38
+      - charm-unit-jobs-py39
     check:
       jobs:
-        - vault-bionic-queens
-        - vault-bionic-queens-namespaced
-        - vault-bionic-stein
-        - vault-bionic-stein-namespaced
-        - vault-bionic-ussuri
-        - vault-bionic-ussuri-namespaced
-        - vault-focal-ussuri-ec
-        - vault-focal-ussuri_rgw
-        - vault-focal-ussuri-namespaced
-        - vault-focal-victoria_rgw
-        - vault-focal-victoria-namespaced
-        - vault-focal-wallaby_rgw
-        - vault-focal-wallaby-namespaced
         - vault-focal-xena_rgw
         - vault-focal-xena-namespaced
         - vault-focal-yoga_rgw:
             voting: false
         - vault-focal-yoga-namespaced:
             voting: false
-        - vault-hirsute-wallaby_rgw
-        - vault-hirsute-wallaby-namespaced
         - vault-impish-xena_rgw:
             voting: false
         - vault-impish-xena-namespaced:
@@ -34,145 +20,60 @@
             voting: false
 
 - job:
-    name: vault-bionic-ussuri
+    name: vault-jammy-yoga_rgw
     parent: func-target
     dependencies:
       - osci-lint
-      - tox-py36
       - tox-py38
       - tox-py39
-    vars:
-      tox_extra_args: vault:bionic-ussuri
-- job:
-    name: vault-jammy-yoga_rgw
-    parent: func-target
-    dependencies: &smoke-jobs
-      - vault-bionic-ussuri
     vars:
       tox_extra_args: vault:jammy-yoga
 - job:
     name: vault-jammy-yoga-namespaced
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - vault-jammy-yoga_rgw
     vars:
       tox_extra_args: vault:jammy-yoga-namespaced
 - job:
     name: vault-impish-xena_rgw
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - vault-jammy-yoga_rgw
     vars:
       tox_extra_args: vault:impish-xena
 - job:
     name: vault-impish-xena-namespaced
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - vault-jammy-yoga_rgw
     vars:
       tox_extra_args: vault:impish-xena-namespaced
 - job:
-    name: vault-hirsute-wallaby_rgw
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:hirsute-wallaby
-- job:
-    name: vault-hirsute-wallaby-namespaced
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:hirsute-wallaby-namespaced
-- job:
     name: vault-focal-yoga_rgw
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - vault-jammy-yoga_rgw
     vars:
       tox_extra_args: vault:focal-yoga
 - job:
     name: vault-focal-yoga-namespaced
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - vault-jammy-yoga_rgw
     vars:
       tox_extra_args: vault:focal-yoga-namespaced
 - job:
     name: vault-focal-xena_rgw
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - vault-jammy-yoga_rgw
     vars:
       tox_extra_args: vault:focal-xena
 - job:
     name: vault-focal-xena-namespaced
     parent: func-target
-    dependencies: *smoke-jobs
+    dependencies:
+      - vault-jammy-yoga_rgw
     vars:
       tox_extra_args: vault:focal-xena-namespaced
-- job:
-    name: vault-focal-wallaby_rgw
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:focal-wallaby
-- job:
-    name: vault-focal-wallaby-namespaced
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:focal-wallaby-namespaced
-- job:
-    name: vault-focal-victoria_rgw
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:focal-victoria
-- job:
-    name: vault-focal-victoria-namespaced
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:focal-victoria-namespaced
-- job:
-    name: vault-focal-ussuri-ec
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:focal-ussuri-ec
-- job:
-    name: vault-focal-ussuri_rgw
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:focal-ussuri
-- job:
-    name: vault-focal-ussuri-namespaced
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:focal-ussuri-namespaced
-- job:
-    name: vault-bionic-ussuri-namespaced
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:bionic-ussuri-namespaced
-- job:
-    name: vault-bionic-stein
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:bionic-stein
-- job:
-    name: vault-bionic-stein-namespaced
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:bionic-stein-namespaced
-- job:
-    name: vault-bionic-queens
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:bionic-queens
-- job:
-    name: vault-bionic-queens-namespaced
-    parent: func-target
-    dependencies: *smoke-jobs
-    vars:
-      tox_extra_args: vault:bionic-queens-namespaced

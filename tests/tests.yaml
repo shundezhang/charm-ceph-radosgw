@@ -1,36 +1,15 @@
 charm_name: ceph-radosgw
 
 gate_bundles:
-  - vault: bionic-queens
-  - vault: bionic-queens-namespaced
-  - vault: bionic-stein
-  - vault: bionic-stein-namespaced
-  - vault: bionic-ussuri
-  - vault: bionic-ussuri-namespaced
-  - vault: focal-ussuri
-  - vault: focal-ussuri-ec
-  - vault: focal-ussuri-namespaced
-  - vault: focal-victoria
-  - vault: focal-victoria-namespaced
-  - vault: focal-wallaby
-  - vault: focal-wallaby-namespaced
   - vault: focal-xena
   - vault: focal-xena-namespaced
-  - vault: hirsute-wallaby
-  - vault: hirsute-wallaby-namespaced
   - vault: impish-xena
   - vault: impish-xena-namespaced
 
 smoke_bundles:
-  - vault: focal-ussuri
+  - vault: focal-xena
 
 dev_bundles:
-  - bionic-queens-multisite
-  - bionic-rocky-multisite
-  - vault: bionic-rocky
-  - vault: bionic-rocky-namespaced
-  - vault: bionic-train
-  - vault: bionic-train-namespaced
   - vault: focal-yoga
   - vault: focal-yoga-namespaced
   - vault: jammy-yoga
@@ -55,8 +34,6 @@ tests:
 
 tests_options:
   force_deploy:
-    - hirsute-wallaby
-    - hirsute-wallaby-namespaced
     - impish-xena
     - impish-xena-namespaced
     - jammy-yoga
