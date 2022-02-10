@@ -695,11 +695,11 @@ def master_relation_joined(relation_id=None):
         log('unit not ready, deferring multisite configuration')
         return
 
-    internal_url = '{}:{}'.format(
-        canonical_url(CONFIGS, INTERNAL),
+    public_url = '{}:{}'.format(
+        canonical_url(CONFIGS, PUBLIC),
         listen_port(),
     )
-    endpoints = [internal_url]
+    endpoints = [public_url]
     realm = config('realm')
     zonegroup = config('zonegroup')
     zone = config('zone')
@@ -803,11 +803,11 @@ def slave_relation_changed(relation_id=None, unit=None):
         log("Defer processing until master RGW has provided required data")
         return
 
-    internal_url = '{}:{}'.format(
-        canonical_url(CONFIGS, INTERNAL),
+    public_url = '{}:{}'.format(
+        canonical_url(CONFIGS, PUBLIC),
         listen_port(),
     )
-    endpoints = [internal_url]
+    endpoints = [public_url]
 
     realm = config('realm')
     zonegroup = config('zonegroup')
