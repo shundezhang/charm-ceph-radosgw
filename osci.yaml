@@ -18,11 +18,16 @@
             voting: false
         - vault-jammy-yoga-namespaced:
             voting: false
+    vars:
+      needs_charm_build: true
+      charm_build_name: ceph-radosgw
+      build_type: charmcraft
 - job:
     name: vault-focal-xena_rgw
     parent: func-target
     dependencies:
       - osci-lint
+      - charm-build
       - tox-py38
       - tox-py39
     vars:
