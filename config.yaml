@@ -515,4 +515,5 @@ options:
     description: |
       Frontend HTTP engine to use for the Ceph RADOS Gateway; For Octopus and
       later this defaults to 'beast' and for older releases (and on architectures
-      where beast is not supported) 'civetweb'.
+      where beast is not supported) 'civetweb'. Civetweb support is removed at
+      Ceph Quincy.

@@ -194,6 +194,7 @@ def validate_http_frontend(frontend_config):
     """
     mimic_or_later = cmp_pkgrevno('radosgw', '13.2.0') >= 0
     pacific_or_later = cmp_pkgrevno('radosgw', '16.2.0') >= 0
+    quincy_or_later = cmp_pkgrevno('radosgw', '17.0.0') >= 0
     if frontend_config not in SUPPORTED_FRONTENDS:
         e = ('Please provide either civetweb or beast for '
              'http-frontend configuration')
@@ -210,6 +211,10 @@ def validate_http_frontend(frontend_config):
                  'pacific or later.'.format(arch()))
             log(e, level=ERROR)
             raise ValueError(e)
+    if frontend_config == CIVETWEB_FRONTEND and quincy_or_later:
+        e = 'Civetweb frontend is not supported after Ceph Pacific.'
+        log(e, level=ERROR)
+        raise ValueError(e)
 
 
 class MonContext(context.CephContext):
