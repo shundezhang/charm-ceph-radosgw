@@ -10,10 +10,6 @@
             voting: false
         - vault-focal-yoga-namespaced:
             voting: false
-        - vault-impish-xena_rgw:
-            voting: false
-        - vault-impish-xena-namespaced:
-            voting: false
         - vault-jammy-yoga_rgw:
             voting: false
         - vault-jammy-yoga-namespaced:
@@ -58,22 +54,6 @@
       - vault-focal-xena-namespaced
     vars:
       tox_extra_args: vault:jammy-yoga-namespaced
-- job:
-    name: vault-impish-xena_rgw
-    parent: func-target
-    dependencies:
-      - vault-focal-xena_rgw
-      - vault-focal-xena-namespaced
-    vars:
-      tox_extra_args: vault:impish-xena
-- job:
-    name: vault-impish-xena-namespaced
-    parent: func-target
-    dependencies:
-      - vault-focal-xena_rgw
-      - vault-focal-xena-namespaced
-    vars:
-      tox_extra_args: vault:impish-xena-namespaced
 - job:
     name: vault-focal-yoga_rgw
     parent: func-target
