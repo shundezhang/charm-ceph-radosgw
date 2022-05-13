@@ -122,6 +122,16 @@ options:
       that once a pool has been created, changes to this setting will be
       ignored. Setting this value to -1, enables the number of placement
       groups to be calculated based on the Ceph placement group calculator.
+  relaxed-s3-bucket-names:
+    type: boolean
+    default: false
+    description: |
+      Enables relaxed S3 bucket names rules for US region buckets. This
+      allows for bucket names with any combination of  letters, numbers,
+      periods, dashes and underscores up to 255 characters long, as long
+      as bucket names are unique and not formatted as IP addresses.
+
+      https://docs.ceph.com/en/latest/radosgw/s3/bucketops/
   pool-type:
     type: string
     default: replicated

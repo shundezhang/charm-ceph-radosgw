@@ -292,6 +292,7 @@ class MonContext(context.CephContext):
             'unit_public_ip': unit_public_ip(),
             'fsid': fsid,
             'rgw_swift_versioning': config('rgw-swift-versioning-enabled'),
+            'relaxed_s3_bucket_names': config('relaxed-s3-bucket-names'),
             'frontend': http_frontend,
         }
 
