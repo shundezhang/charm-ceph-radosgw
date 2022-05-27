@@ -308,6 +308,8 @@ class MonContext(context.CephContext):
             # Multi-site Zone configuration is optional,
             # so add after assessment
             ctxt['rgw_zone'] = config('zone')
+            ctxt['rgw_zonegroup'] = config('zonegroup')
+            ctxt['rgw_realm'] = config('realm')
             return ctxt
 
         return {}

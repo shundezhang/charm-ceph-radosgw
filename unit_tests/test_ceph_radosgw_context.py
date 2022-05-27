@@ -80,6 +80,8 @@ class MonContextTest(CharmTestCase):
         self.unit_public_ip.return_value = '10.255.255.255'
         self.cmp_pkgrevno.side_effect = lambda *args: 1
         self.arch.return_value = 'amd64'
+        self.test_config.set('zonegroup', 'zonegroup1')
+        self.test_config.set('realm', 'realmX')
 
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
@@ -119,7 +121,9 @@ class MonContextTest(CharmTestCase):
             'fsid': 'testfsid',
             'rgw_swift_versioning': False,
             'frontend': 'beast',
-            'relaxed_s3_bucket_names': False
+            'relaxed_s3_bucket_names': False,
+            'rgw_zonegroup': 'zonegroup1',
+            'rgw_realm': 'realmX'
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -171,6 +175,8 @@ class MonContextTest(CharmTestCase):
             'rgw_swift_versioning': False,
             'frontend': 'beast',
             'relaxed_s3_bucket_names': False,
+            'rgw_zonegroup': 'zonegroup1',
+            'rgw_realm': 'realmX'
         }
         self.assertEqual(expect, mon_ctxt())
         self.assertFalse(mock_ensure_rsv_v6.called)
@@ -231,6 +237,8 @@ class MonContextTest(CharmTestCase):
             'rgw_swift_versioning': False,
             'frontend': 'beast',
             'relaxed_s3_bucket_names': False,
+            'rgw_zonegroup': 'zonegroup1',
+            'rgw_realm': 'realmX'
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -273,6 +281,8 @@ class MonContextTest(CharmTestCase):
             'rgw_swift_versioning': False,
             'frontend': 'beast',
             'relaxed_s3_bucket_names': False,
+            'rgw_zonegroup': 'zonegroup1',
+            'rgw_realm': 'realmX'
         }
         self.assertEqual(expect, mon_ctxt())
 
@@ -373,6 +383,8 @@ class MonContextTest(CharmTestCase):
             'rgw_swift_versioning': False,
             'frontend': 'beast',
             'relaxed_s3_bucket_names': False,
+            'rgw_zonegroup': 'zonegroup1',
+            'rgw_realm': 'realmX'
         }
         self.assertEqual(expect, mon_ctxt())
 
