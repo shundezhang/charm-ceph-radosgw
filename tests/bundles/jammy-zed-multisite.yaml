@@ -1,7 +1,7 @@
 options:
-  source: &source cloud:focal-xena
+  source: &source cloud:jammy-zed
 
-series: focal
+series: jammy
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'
@@ -96,3 +96,4 @@ relations:
 
   - - 'secondary-ceph-radosgw:mon'
     - 'secondary-ceph-mon:radosgw'
+
