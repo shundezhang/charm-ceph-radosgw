@@ -20,6 +20,7 @@ from collections import OrderedDict
 from copy import deepcopy
 
 import ceph_radosgw_context
+import multisite
 
 from charmhelpers.core.hookenv import (
     relation_get,
@@ -184,6 +185,14 @@ def get_optional_interfaces():
     return optional_interfaces
 
 
+def get_zones_zonegroups():
+    """Get a tuple with lists of zones and zonegroups existing on site
+
+    :rtype: tuple
+    """
+    return multisite.list_zones(), multisite.list_zonegroups()
+
+
 def check_optional_config_and_relations(configs):
     """Check that if we have a relation_id for high availability that we can
     get the hacluster config.  If we can't then we are blocked.  This function
@@ -201,41 +210,72 @@ def check_optional_config_and_relations(configs):
             return ('blocked',
                     'hacluster missing configuration: '
                     'vip, vip_iface, vip_cidr')
-    # NOTE: misc multi-site relation and config checks
+
     multisite_config = (config('realm'),
                         config('zonegroup'),
                         config('zone'))
-    if relation_ids('master') or relation_ids('slave'):
+    master_configured = (leader_get('access_key'),
+                         leader_get('secret'),
+                         leader_get('restart_nonce'))
+
+    # Any realm or zonegroup config is present, multisite checks can be done.
+    if (config('realm') or config('zonegroup')):
+        # All of Realm, zonegroup, and zone must be configured.
         if not all(multisite_config):
             return ('blocked',
                     'multi-site configuration incomplete '
                     '(realm={realm}, zonegroup={zonegroup}'
                     ', zone={zone})'.format(**config()))
-    if (all(multisite_config) and not
-            (relation_ids('master') or relation_ids('slave'))):
-        return ('blocked',
-                'multi-site configuration but master/slave '
-                'relation missing')
-    if (all(multisite_config) and relation_ids('slave')):
-        multisite_ready = False
-        for rid in relation_ids('slave'):
-            for unit in related_units(rid):
-                if relation_get('url', unit=unit, rid=rid):
-                    multisite_ready = True
-                    continue
-        if not multisite_ready:
-            return ('waiting',
-                    'multi-site master relation incomplete')
-    master_configured = (
-        leader_get('access_key'),
-        leader_get('secret'),
-        leader_get('restart_nonce'),
-    )
-    if (all(multisite_config) and
-            relation_ids('master') and
-            not all(master_configured)):
-        return ('waiting',
-                'waiting for configuration of master zone')
+
+        # Master/Slave Relation should be configured.
+        if not (relation_ids('master') or relation_ids('slave')):
+            return ('blocked',
+                    'multi-site configuration but master/slave '
+                    'relation missing')
+
+        # Primary site status check
+        if relation_ids('master'):
+            # Migration: The system is not multisite already.
+            if not multisite.is_multisite_configured(config('zone'),
+                                                     config('zonegroup')):
+                if multisite.check_cluster_has_buckets():
+                    zones, zonegroups = get_zones_zonegroups()
+                    status_msg = "Multiple zone or zonegroup configured, " \
+                                 "use action 'config-multisite-values' to " \
+                                 "resolve."
+                    if (len(zonegroups) > 1 and
+                            config('zonegroup') not in zonegroups):
+                        return('blocked', status_msg)
+
+                    if len(zones) > 1 and config('zone') not in zones:
+                        return('blocked', status_msg)
+
+                    if not all(master_configured):
+                        return ('blocked', "Failure in Multisite migration, "
+                                           "Refer to Logs.")
+            # Non-Migration scenario.
+            if not all(master_configured):
+                return ('waiting',
+                        'waiting for configuration of master zone')
+
+        # Secondary site status check
+        if relation_ids('slave'):
+            # Migration: The system is not multisite already.
+            if not multisite.is_multisite_configured(config('zone'),
+                                                     config('zonegroup')):
+                if multisite.check_cluster_has_buckets():
+                    return ('blocked',
+                            "Non-Pristine RGW site can't be used as secondary")
+
+            multisite_ready = False
+            for rid in relation_ids('slave'):
+                for unit in related_units(rid):
+                    if relation_get('url', unit=unit, rid=rid):
+                        multisite_ready = True
+                        continue
+            if not multisite_ready:
+                return ('waiting',
+                        'multi-site master relation incomplete')
 
     # Check that provided Ceph BlueStoe configuration is valid.
     try:

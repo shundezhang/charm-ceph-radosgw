@@ -1,13 +1,17 @@
 charm_name: ceph-radosgw
 
 gate_bundles:
+  - focal-xena-multisite
   - vault: focal-xena
   - vault: focal-xena-namespaced
 
 smoke_bundles:
+  - focal-xena-multisite
   - vault: focal-xena
 
 dev_bundles:
+  - focal-yoga-multisite
+  - jammy-yoga-multisite
   - vault: focal-yoga
   - vault: focal-yoga-namespaced
   - vault: jammy-yoga
@@ -16,7 +20,7 @@ dev_bundles:
 target_deploy_status:
   vault:
     workload-status: blocked
-    workload-status-message: Vault needs to be initialized
+    workload-status-message-prefix: Vault needs to be initialized
 
 configure:
   - vault:

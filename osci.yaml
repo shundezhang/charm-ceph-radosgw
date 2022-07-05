@@ -4,11 +4,16 @@
       - charm-unit-jobs-py39
     check:
       jobs:
+        - focal-xena-multisite
         - vault-focal-xena_rgw
         - vault-focal-xena-namespaced
+        - focal-yoga-multisite:
+            voting: false
         - vault-focal-yoga_rgw:
             voting: false
         - vault-focal-yoga-namespaced:
+            voting: false
+        - jammy-yoga-multisite:
             voting: false
         - vault-jammy-yoga_rgw:
             voting: false
@@ -18,6 +23,16 @@
       needs_charm_build: true
       charm_build_name: ceph-radosgw
       build_type: charmcraft
+- job:
+    name: focal-xena-multisite
+    parent: func-target
+    dependencies:
+      - osci-lint
+      - charm-build
+      - tox-py38
+      - tox-py39
+    vars:
+      tox_extra_args: focal-xena-multisite
 - job:
     name: vault-focal-xena_rgw
     parent: func-target
@@ -39,6 +54,13 @@
       tox_extra_args: vault:focal-xena-namespaced
 
 - job:
+    name: jammy-yoga-multisite
+    parent: func-target
+    dependencies:
+      - focal-xena-multisite
+    vars:
+      tox_extra_args: jammy-yoga-multisite
+- job:
     name: vault-jammy-yoga_rgw
     parent: func-target
     dependencies:
@@ -54,6 +76,13 @@
       - vault-focal-xena-namespaced
     vars:
       tox_extra_args: vault:jammy-yoga-namespaced
+- job:
+    name: focal-yoga-multisite
+    parent: func-target
+    dependencies:
+      - focal-xena-multisite
+    vars:
+      tox_extra_args: focal-yoga-multisite
 - job:
     name: vault-focal-yoga_rgw
     parent: func-target

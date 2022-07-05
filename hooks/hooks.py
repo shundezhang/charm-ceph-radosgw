@@ -27,6 +27,7 @@ import charms_ceph.utils as ceph_utils
 import multisite
 
 from charmhelpers.core.hookenv import (
+    ERROR,
     relation_get,
     relation_id as ch_relation_id,
     relation_ids,
@@ -366,7 +367,7 @@ def mon_relation(rid=None, unit=None):
                 existing_zones = multisite.list_zones()
                 log('Existing zones {}'.format(existing_zones), level=DEBUG)
                 if zone not in existing_zones:
-                    log("Zone '{}' doesn't exist, creating".format(zone))
+                    log("zone '{}' doesn't exist, creating".format(zone))
                     try:
                         multisite.create_zone(zone,
                                               endpoints=endpoints,
@@ -377,7 +378,7 @@ def mon_relation(rid=None, unit=None):
                             # NOTE(lourot): may have been created in the
                             # background by the Rados Gateway daemon, see
                             # lp:1856106
-                            log("Zone '{}' existed already after all".format(
+                            log("zone '{}' existed already after all".format(
                                 zone))
                         else:
                             raise
@@ -741,8 +742,43 @@ def master_relation_joined(relation_id=None):
         multisite.create_realm(realm, default=True)
         mutation = True
 
+    # Migration if master site has buckets configured.
+    # Migration involves renaming existing zone/zongroups such that existing
+    # buckets and their objects can be preserved on the master site.
+    if multisite.check_cluster_has_buckets() is True:
+        log('Migrating to multisite with zone ({}) and zonegroup ({})'
+            .format(zone, zonegroup), level=DEBUG)
+        zones = multisite.list_zones()
+        zonegroups = multisite.list_zonegroups()
+
+        if (len(zonegroups) > 1) and (zonegroup not in zonegroups):
+            log('Multiple zonegroups found {}, aborting.'
+                .format(zonegroups), level=ERROR)
+            return
+
+        if (len(zones) > 1) and (zone not in zones):
+            log('Multiple zones found {}, aborting.'
+                .format(zones), level=ERROR)
+            return
+
+        rename_result = multisite.rename_multisite_config(
+            zonegroups, zonegroup,
+            zones, zone
+        )
+        if rename_result is None:
+            return
+
+        modify_result = multisite.modify_multisite_config(
+            zone, zonegroup,
+            endpoints=endpoints,
+            realm=realm
+        )
+        if modify_result is None:
+            return
+        mutation = True
+
     if zonegroup not in multisite.list_zonegroups():
-        log('Zonegroup {} not found, creating now'.format(zonegroup))
+        log('zonegroup {} not found, creating now'.format(zonegroup))
         multisite.create_zonegroup(zonegroup,
                                    endpoints=endpoints,
                                    default=True, master=True,
@@ -750,7 +786,7 @@ def master_relation_joined(relation_id=None):
         mutation = True
 
     if zone not in multisite.list_zones():
-        log('Zone {} not found, creating now'.format(zone))
+        log('zone {} not found, creating now'.format(zone))
         multisite.create_zone(zone,
                               endpoints=endpoints,
                               default=True, master=True,
@@ -773,7 +809,7 @@ def master_relation_joined(relation_id=None):
         log(
             'Mutation detected. Restarting {}.'.format(service_name()),
             'INFO')
-        multisite.update_period()
+        multisite.update_period(zonegroup=zonegroup, zone=zone)
         service_restart(service_name())
         leader_set(restart_nonce=str(uuid.uuid4()))
     else:
@@ -829,6 +865,13 @@ def slave_relation_changed(relation_id=None, unit=None):
 
     mutation = False
 
+    # NOTE(utkarshbhatthere):
+    # A site with existing data can create inconsistencies when added as a
+    # secondary site for RGW. Hence it must be pristine.
+    if multisite.check_cluster_has_buckets():
+        log("Non-Pristine site can't be used as secondary", level=ERROR)
+        return
+
     if realm not in multisite.list_realms():
         log('Realm {} not found, pulling now'.format(realm))
         multisite.pull_realm(url=master_data['url'],
@@ -841,7 +884,7 @@ def slave_relation_changed(relation_id=None, unit=None):
         mutation = True
 
     if zone not in multisite.list_zones():
-        log('Zone {} not found, creating now'.format(zone))
+        log('zone {} not found, creating now'.format(zone))
         multisite.create_zone(zone,
                               endpoints=endpoints,
                               default=False, master=False,
@@ -854,7 +897,7 @@ def slave_relation_changed(relation_id=None, unit=None):
         log(
             'Mutation detected. Restarting {}.'.format(service_name()),
             'INFO')
-        multisite.update_period()
+        multisite.update_period(zonegroup=zonegroup, zone=zone)
         service_restart(service_name())
         leader_set(restart_nonce=str(uuid.uuid4()))
     else:

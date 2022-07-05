@@ -10,3 +10,12 @@ readwrite:
   description: Mark the zone associated with the local units as read/write (multi-site).
 tidydefaults:
   description: Delete default zone and zonegroup configuration (multi-site).
+force-enable-multisite:
+  description: Reconfigure provided Zone and Zonegroup for migration to multisite.
+  params:
+    zone:
+      type: string
+      description: Existing Zone to be reconfigured as the 'zone' config value.
+    zonegroup:
+      type: string
+      description: Existing Zonegroup to be reconfigured as the 'zonegroup' config value.

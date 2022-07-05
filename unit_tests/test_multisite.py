@@ -25,6 +25,19 @@ def whoami():
     return inspect.stack()[1][3]
 
 
+def get_zonegroup_stub():
+    # populate dummy zone info
+    zone = {}
+    zone['id'] = "test_zone_id"
+    zone['name'] = "test_zone"
+
+    # populate dummy zonegroup info
+    zonegroup = {}
+    zonegroup['name'] = "test_zonegroup"
+    zonegroup['zones'] = [zone]
+    return zonegroup
+
+
 class TestMultisiteHelpers(CharmTestCase):
 
     TO_PATCH = [
@@ -285,3 +298,159 @@ class TestMultisiteHelpers(CharmTestCase):
             '--url=http://master:80',
             '--access-key=testkey', '--secret=testsecret',
         ], stderr=mock.ANY)
+
+    def test_list_buckets(self):
+        self.subprocess.CalledProcessError = BaseException
+        multisite.list_buckets('default', 'default')
+        self.subprocess.check_output.assert_called_once_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'bucket', 'list', '--rgw-zone=default',
+            '--rgw-zonegroup=default'
+        ], stderr=mock.ANY)
+
+    def test_rename_zonegroup(self):
+        multisite.rename_zonegroup('default', 'test_zone_group')
+        self.subprocess.call.assert_called_once_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zonegroup', 'rename', '--rgw-zonegroup=default',
+            '--zonegroup-new-name=test_zone_group'
+        ])
+
+    def test_rename_zone(self):
+        multisite.rename_zone('default', 'test_zone', 'test_zone_group')
+        self.subprocess.call.assert_called_once_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zone', 'rename', '--rgw-zone=default',
+            '--zone-new-name=test_zone',
+            '--rgw-zonegroup=test_zone_group'
+        ])
+
+    def test_get_zonegroup(self):
+        multisite.get_zonegroup_info('test_zone')
+        self.subprocess.check_output.assert_called_once_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zonegroup', 'get', '--rgw-zonegroup=test_zone'
+        ], stderr=mock.ANY)
+
+    def test_modify_zonegroup_migrate(self):
+        multisite.modify_zonegroup('test_zonegroup',
+                                   endpoints=['http://localhost:80'],
+                                   default=True, master=True,
+                                   realm='test_realm')
+        self.subprocess.check_output.assert_called_once_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zonegroup', 'modify',
+            '--rgw-zonegroup=test_zonegroup', '--rgw-realm=test_realm',
+            '--endpoints=http://localhost:80', '--default', '--master',
+        ], stderr=mock.ANY)
+
+    def test_modify_zone_migrate(self):
+        multisite.modify_zone('test_zone', default=True, master=True,
+                              endpoints=['http://localhost:80'],
+                              zonegroup='test_zonegroup', realm='test_realm')
+        self.subprocess.check_output.assert_called_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zone', 'modify',
+            '--rgw-zone=test_zone', '--rgw-realm=test_realm',
+            '--rgw-zonegroup=test_zonegroup',
+            '--endpoints=http://localhost:80',
+            '--master', '--default', '--read-only=0',
+        ], stderr=mock.ANY)
+
+    @mock.patch.object(multisite, 'list_zones')
+    @mock.patch.object(multisite, 'get_zonegroup_info')
+    def test_get_local_zone(self, mock_get_zonegroup_info, mock_list_zones):
+        mock_get_zonegroup_info.return_value = get_zonegroup_stub()
+        mock_list_zones.return_value = ['test_zone']
+        zone, _zonegroup = multisite.get_local_zone('test_zonegroup')
+        self.assertEqual(
+            zone,
+            'test_zone'
+        )
+
+    def test_rename_multisite_config_zonegroup_fail(self):
+        self.assertEqual(
+            multisite.rename_multisite_config(
+                ['default'], 'test_zonegroup',
+                ['default'], 'test_zone'
+            ),
+            None
+        )
+
+        self.subprocess.call.assert_called_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zonegroup', 'rename', '--rgw-zonegroup=default',
+            '--zonegroup-new-name=test_zonegroup'
+        ])
+
+    def test_modify_multisite_config_zonegroup_fail(self):
+        self.assertEqual(
+            multisite.modify_multisite_config(
+                'test_zone', 'test_zonegroup',
+                endpoints=['http://localhost:80'],
+                realm='test_realm'
+            ),
+            None
+        )
+
+        self.subprocess.check_output.assert_called_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zonegroup', 'modify', '--rgw-zonegroup=test_zonegroup',
+            '--rgw-realm=test_realm',
+            '--endpoints=http://localhost:80', '--default',
+            '--master',
+        ], stderr=mock.ANY)
+
+    @mock.patch.object(multisite, 'modify_zonegroup')
+    def test_modify_multisite_config_zone_fail(self, mock_modify_zonegroup):
+        mock_modify_zonegroup.return_value = True
+        self.assertEqual(
+            multisite.modify_multisite_config(
+                'test_zone', 'test_zonegroup',
+                endpoints=['http://localhost:80'],
+                realm='test_realm'
+            ),
+            None
+        )
+
+        self.subprocess.check_output.assert_called_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zone', 'modify',
+            '--rgw-zone=test_zone',
+            '--rgw-realm=test_realm',
+            '--rgw-zonegroup=test_zonegroup',
+            '--endpoints=http://localhost:80',
+            '--master', '--default', '--read-only=0',
+        ], stderr=mock.ANY)
+
+    @mock.patch.object(multisite, 'rename_zonegroup')
+    def test_rename_multisite_config_zone_fail(self, mock_rename_zonegroup):
+        mock_rename_zonegroup.return_value = True
+        self.assertEqual(
+            multisite.rename_multisite_config(
+                ['default'], 'test_zonegroup',
+                ['default'], 'test_zone'
+            ),
+            None
+        )
+
+        self.subprocess.call.assert_called_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zone', 'rename', '--rgw-zone=default',
+            '--zone-new-name=test_zone',
+            '--rgw-zonegroup=test_zonegroup',
+        ])
+
+    @mock.patch.object(multisite, 'list_zonegroups')
+    @mock.patch.object(multisite, 'get_local_zone')
+    @mock.patch.object(multisite, 'list_buckets')
+    def test_check_zone_has_buckets(self, mock_list_zonegroups,
+                                    mock_get_local_zone,
+                                    mock_list_buckets):
+        mock_list_zonegroups.return_value = ['test_zonegroup']
+        mock_get_local_zone.return_value = 'test_zone', 'test_zonegroup'
+        mock_list_buckets.return_value = ['test_bucket_1', 'test_bucket_2']
+        self.assertEqual(
+            multisite.check_cluster_has_buckets(),
+            True
+        )

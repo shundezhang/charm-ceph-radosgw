@@ -85,6 +85,9 @@ class MultisiteActionsTestCase(CharmTestCase):
         'action_set',
         'multisite',
         'config',
+        'is_leader',
+        'leader_set',
+        'service_name',
     ]
 
     def setUp(self):
@@ -93,17 +96,23 @@ class MultisiteActionsTestCase(CharmTestCase):
         self.config.side_effect = self.test_config.get
 
     def test_promote(self):
+        self.is_leader.return_value = True
         self.test_config.set('zone', 'testzone')
+        self.test_config.set('zonegroup', 'testzonegroup')
         actions.promote([])
         self.multisite.modify_zone.assert_called_once_with(
             'testzone',
             default=True,
             master=True,
         )
-        self.multisite.update_period.assert_called_once_with()
+        self.multisite.update_period.assert_called_once_with(
+            zonegroup='testzonegroup', zone='testzone'
+        )
 
     def test_promote_unconfigured(self):
+        self.is_leader.return_value = True
         self.test_config.set('zone', None)
+        self.test_config.set('zonegroup', None)
         actions.promote([])
         self.action_fail.assert_called_once()
 

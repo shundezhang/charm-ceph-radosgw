@@ -740,7 +740,7 @@ class MasterMultisiteTests(CephRadosMultisiteTests):
         )
         self.multisite.update_period.assert_has_calls([
             call(fatal=False),
-            call(),
+            call(zonegroup='testzonegroup', zone='testzone'),
         ])
         self.service_restart.assert_called_once_with('rgw@hostname')
         self.leader_set.assert_has_calls([
@@ -827,6 +827,7 @@ class SlaveMultisiteTests(CephRadosMultisiteTests):
         self.relation_get.return_value = self._test_relation
         self.multisite.list_realms.return_value = []
         self.multisite.list_zones.return_value = []
+        self.multisite.check_cluster_has_buckets.return_value = False
         ceph_hooks.slave_relation_changed('slave:1', 'rgw/0')
         self.config.assert_has_calls([
             call('realm'),
@@ -857,7 +858,7 @@ class SlaveMultisiteTests(CephRadosMultisiteTests):
         )
         self.multisite.update_period.assert_has_calls([
             call(fatal=False),
-            call(),
+            call(zonegroup='testzonegroup', zone='testzone2'),
         ])
         self.service_restart.assert_called_once()
         self.leader_set.assert_called_once_with(restart_nonce=ANY)
