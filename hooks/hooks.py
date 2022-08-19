@@ -810,6 +810,7 @@ def master_relation_joined(relation_id=None):
             'Mutation detected. Restarting {}.'.format(service_name()),
             'INFO')
         multisite.update_period(zonegroup=zonegroup, zone=zone)
+        CONFIGS.write_all()
         service_restart(service_name())
         leader_set(restart_nonce=str(uuid.uuid4()))
     else:
@@ -898,6 +899,7 @@ def slave_relation_changed(relation_id=None, unit=None):
             'Mutation detected. Restarting {}.'.format(service_name()),
             'INFO')
         multisite.update_period(zonegroup=zonegroup, zone=zone)
+        CONFIGS.write_all()
         service_restart(service_name())
         leader_set(restart_nonce=str(uuid.uuid4()))
     else:

@@ -18,6 +18,7 @@ import socket
 import tempfile
 import shutil
 
+import multisite
 from charmhelpers.contrib.openstack import context
 from charmhelpers.contrib.hahelpers.cluster import (
     determine_api_port,
@@ -307,9 +308,17 @@ class MonContext(context.CephContext):
         if self.context_complete(ctxt):
             # Multi-site zone configuration is optional,
             # so add after assessment
-            ctxt['rgw_zone'] = config('zone')
-            ctxt['rgw_zonegroup'] = config('zonegroup')
-            ctxt['rgw_realm'] = config('realm')
+            zone = config('zone')
+            zonegroup = config('zonegroup')
+            realm = config('realm')
+            log("config: zone {} zonegroup {} realm {}"
+                .format(zone, zonegroup, realm), level=DEBUG)
+            if zone in multisite.plain_list('zone'):
+                ctxt['rgw_zone'] = zone
+            if zonegroup in multisite.plain_list('zonegroup'):
+                ctxt['rgw_zonegroup'] = zonegroup
+            if realm in multisite.plain_list('realm'):
+                ctxt['rgw_realm'] = realm
             return ctxt
 
         return {}

@@ -33,6 +33,7 @@ TO_PATCH = [
     'determine_api_port',
     'cmp_pkgrevno',
     'leader_get',
+    'multisite',
     'utils',
 ]
 
@@ -83,6 +84,17 @@ class MonContextTest(CharmTestCase):
         self.test_config.set('zonegroup', 'zonegroup1')
         self.test_config.set('realm', 'realmX')
 
+    @staticmethod
+    def plain_list_stub(key):
+        if key == "zone":
+            return ["default"]
+        if key == "zonegroup":
+            return ["zonegroup1"]
+        if key == "realm":
+            return ["realmX"]
+        else:
+            return []
+
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
     @patch.object(context, 'ensure_host_resolvable_v6')
@@ -104,6 +116,7 @@ class MonContextTest(CharmTestCase):
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.multisite.plain_list = self.plain_list_stub
         self.determine_api_port.return_value = 70
         expect = {
             'auth_supported': 'cephx',
@@ -156,6 +169,7 @@ class MonContextTest(CharmTestCase):
 
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
+        self.multisite.plain_list = self.plain_list_stub
         self.related_units.return_value = ['ceph-proxy/0']
         self.determine_api_port.return_value = 70
         expect = {
@@ -219,6 +233,7 @@ class MonContextTest(CharmTestCase):
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.multisite.plain_list = self.plain_list_stub
         self.determine_api_port.return_value = 70
         expect = {
             'auth_supported': 'none',
@@ -264,6 +279,7 @@ class MonContextTest(CharmTestCase):
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
         self.determine_api_port.return_value = 70
+        self.multisite.plain_list = self.plain_list_stub
         expect = {
             'auth_supported': 'cephx',
             'hostname': 'testhost',
@@ -365,6 +381,7 @@ class MonContextTest(CharmTestCase):
         self.relation_get.side_effect = _relation_get
         self.relation_ids.return_value = ['mon:6']
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
+        self.multisite.plain_list = self.plain_list_stub
         self.determine_api_port.return_value = 70
         expect = {
             'auth_supported': 'cephx',

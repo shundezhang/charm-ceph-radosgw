@@ -81,6 +81,35 @@ def _list(key):
         return []
 
 
+def plain_list(key):
+    """Simple Implementation for list_*, where execution may fail expectedly.
+
+    On failure, retries are not attempted and empty list is returned.
+
+    :param key: string for required resource (zone, zonegroup, realm, user)
+    :type key: str
+    :return: list of specified entities found
+    :rtype: list
+    """
+    cmd = [
+        RGW_ADMIN, '--id={}'.format(_key_name()),
+        key, 'list'
+    ]
+    try:
+        result = json.loads(subprocess.check_output(
+            cmd, stderr=subprocess.PIPE
+        ).decode('UTF-8'))
+        hookenv.log("Results: {}".format(result), level=hookenv.DEBUG)
+        if isinstance(result, dict):
+            return result['{}s'.format(key)]
+        else:
+            return result
+    except subprocess.CalledProcessError:
+        return []
+    except TypeError:
+        return []
+
+
 @decorators.retry_on_exception(num_retries=5, base_delay=3,
                                exc_type=ValueError)
 def list_zones(retry_on_empty=False):
@@ -646,7 +675,7 @@ def get_local_zone(zonegroup):
     if zonegroup_info is None:
         hookenv.log("Failed to fetch zonegroup ({}) info".format(zonegroup),
                     level=hookenv.ERROR)
-        return None
+        return None, None
 
     # zonegroup info always contains self name and zones list so fetching
     # directly is safe.
@@ -660,7 +689,7 @@ def get_local_zone(zonegroup):
         "No local zone configured for zonegroup ({})".format(zonegroup),
         level=hookenv.ERROR
     )
-    return None
+    return None, None
 
 
 def rename_multisite_config(zonegroups, new_zonegroup_name,
