@@ -1,7 +1,7 @@
 options:
-  source: &source cloud:focal-yoga
+  source: &source distro
 
-series: focal
+series: kinetic
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'
