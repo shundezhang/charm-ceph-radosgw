@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
+import json
 from unittest.mock import (
     patch, call, MagicMock, ANY
 )
@@ -73,6 +73,25 @@ TO_PATCH = [
     'multisite',
     'ready_for_service',
 ]
+
+
+# Stub Methods
+def get_zonegroup_stub():
+    # populate dummy zones info
+    zone_one = {}
+    zone_one['id'] = "test_zone_id_one"
+    zone_one['name'] = "testzone"
+
+    zone_two = {}
+    zone_two['id'] = "test_zone_id_two"
+    zone_two['name'] = "testzone_two"
+
+    # populate dummy zonegroup info
+    zonegroup = {}
+    zonegroup['name'] = "testzonegroup"
+    zonegroup['master_zone'] = "test_zone_id_one"
+    zonegroup['zones'] = [zone_one, zone_two]
+    return zonegroup
 
 
 class CephRadosGWTests(CharmTestCase):
@@ -792,6 +811,26 @@ class MasterMultisiteTests(CephRadosMultisiteTests):
             secret='mysecret',
         )
         self.multisite.list_realms.assert_not_called()
+
+    @patch.object(json, 'loads')
+    def test_multisite_relation_departed(self, json_loads):
+        for k, v in self._complete_config.items():
+            self.test_config.set(k, v)
+        self.is_leader.return_value = True
+        # Multisite is configured at first but then disabled.
+        self.multisite.is_multisite_configured.side_effect = [True, False]
+        self.multisite.get_zonegroup_info.return_value = get_zonegroup_stub()
+        # json.loads() raises TypeError for mock objects.
+        json_loads.returnvalue = []
+        ceph_hooks.multisite_relation_departed()
+
+        self.multisite.modify_zone.assert_called_once_with(
+            'testzone', default=True, master=True, zonegroup='testzonegroup'
+        )
+        self.multisite.update_period.assert_called_once_with(
+            fatal=True, zonegroup='testzonegroup',
+            zone='testzone', realm='testrealm'
+        )
 
 
 class SlaveMultisiteTests(CephRadosMultisiteTests):
