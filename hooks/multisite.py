@@ -370,7 +370,60 @@ def modify_zone(name, endpoints=None, default=False, master=False,
         return None
 
 
-def update_period(fatal=True, zonegroup=None, zone=None):
+def remove_zone_from_zonegroup(zone, zonegroup):
+    """Remove RADOS Gateway zone from provided parent zonegroup
+
+    Removal is different from deletion, this operation removes zone/zonegroup
+    affiliation but does not delete the actual zone.
+
+    :param zonegroup: parent zonegroup name
+    :type zonegroup: str
+    :param zone: zone name
+    :type zone: str
+    :return: modified zonegroup config
+    :rtype: dict
+    """
+    cmd = [
+        RGW_ADMIN, '--id={}'.format(_key_name()),
+        'zonegroup', 'remove',
+        '--rgw-zonegroup={}'.format(zonegroup),
+        '--rgw-zone={}'.format(zone),
+    ]
+    try:
+        result = _check_output(cmd)
+        return json.loads(result)
+    except (TypeError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "Error removing zone {} from zonegroup {}. Result: {}"
+            .format(zone, zonegroup, result)) from exc
+
+
+def add_zone_to_zonegroup(zone, zonegroup):
+    """Add RADOS Gateway zone to provided zonegroup
+
+    :param zonegroup: parent zonegroup name
+    :type zonegroup: str
+    :param zone: zone name
+    :type zone: str
+    :return: modified zonegroup config
+    :rtype: dict
+    """
+    cmd = [
+        RGW_ADMIN, '--id={}'.format(_key_name()),
+        'zonegroup', 'add',
+        '--rgw-zonegroup={}'.format(zonegroup),
+        '--rgw-zone={}'.format(zone),
+    ]
+    try:
+        result = _check_output(cmd)
+        return json.loads(result)
+    except (TypeError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError(
+            "Error adding zone {} from zonegroup {}. Result: {}"
+            .format(zone, zonegroup, result)) from exc
+
+
+def update_period(fatal=True, zonegroup=None, zone=None, realm=None):
     """Update RADOS Gateway configuration period
 
     :param fatal: In failure case, whether CalledProcessError is to be raised.
@@ -379,6 +432,8 @@ def update_period(fatal=True, zonegroup=None, zone=None):
     :type zonegroup: str
     :param zone: zone name
     :type zone: str
+    :param realm: realm name
+    :type realm: str
     """
     cmd = [
         RGW_ADMIN, '--id={}'.format(_key_name()),
@@ -388,6 +443,8 @@ def update_period(fatal=True, zonegroup=None, zone=None):
         cmd.append('--rgw-zonegroup={}'.format(zonegroup))
     if zone is not None:
         cmd.append('--rgw-zone={}'.format(zone))
+    if realm is not None:
+        cmd.append('--rgw-realm={}'.format(realm))
     if fatal:
         _check_call(cmd)
     else:
@@ -641,17 +698,21 @@ def is_multisite_configured(zone, zonegroup):
 
     :rtype: Boolean
     """
-    if zone not in list_zones():
-        hookenv.log("No local zone found with name ({})".format(zonegroup),
-                    level=hookenv.ERROR)
+    local_zones = list_zones()
+    if zone not in local_zones:
+        hookenv.log("zone {} not found in local zones {}"
+                    .format(zone, local_zones), level=hookenv.ERROR)
         return False
 
-    if zonegroup not in list_zonegroups():
-        hookenv.log("No zonegroup found with name ({})".format(zonegroup),
-                    level=hookenv.ERROR)
+    local_zonegroups = list_zonegroups()
+    if zonegroup not in local_zonegroups:
+        hookenv.log("zonegroup {} not found in local zonegroups {}"
+                    .format(zonegroup, local_zonegroups), level=hookenv.ERROR)
         return False
 
     sync_status = get_sync_status()
+    hookenv.log("Multisite sync status {}".format(sync_status),
+                level=hookenv.DEBUG)
     if sync_status is not None:
         return ('data sync source:' in sync_status)
 

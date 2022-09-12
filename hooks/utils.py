@@ -219,7 +219,9 @@ def check_optional_config_and_relations(configs):
                          leader_get('restart_nonce'))
 
     # Any realm or zonegroup config is present, multisite checks can be done.
-    if (config('realm') or config('zonegroup')):
+    # zone config can't be used because it's used by default.
+    if config('realm') or config('zonegroup') or relation_ids('master') \
+            or relation_ids('slave'):
         # All of Realm, zonegroup, and zone must be configured.
         if not all(multisite_config):
             return ('blocked',

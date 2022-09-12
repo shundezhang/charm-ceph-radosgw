@@ -821,6 +821,53 @@ def master_relation_joined(relation_id=None):
                  secret=secret)
 
 
+@hooks.hook('master-relation-departed')
+@hooks.hook('slave-relation-departed')
+def multisite_relation_departed():
+    if not is_leader():
+        log('Cannot remove multisite relation, this unit is not the leader')
+        return
+
+    if not ready_for_service(legacy=False):
+        raise RuntimeError("Leader unit not ready for service.")
+
+    zone = config('zone')
+    zonegroup = config('zonegroup')
+    realm = config('realm')
+
+    # If config zone/zonegroup not present on site,
+    # remove-relation is called prematurely
+    if not multisite.is_multisite_configured(zone=zone,
+                                             zonegroup=zonegroup):
+        log('Multisite is not configured, skipping scaledown.')
+        return
+
+    zonegroup_info = multisite.get_zonegroup_info(zonegroup)
+    # remove other zones from zonegroup
+    for zone_info in zonegroup_info['zones']:
+        if zone_info['name'] is not zone:
+            multisite.remove_zone_from_zonegroup(
+                zone_info['name'], zonegroup
+            )
+
+    # modify self as master zone.
+    multisite.modify_zone(zone, default=True, master=True,
+                          zonegroup=zonegroup)
+
+    # Update period.
+    multisite.update_period(
+        fatal=True, zonegroup=zonegroup,
+        zone=zone, realm=realm
+    )
+
+    # Verify multisite is not configured.
+    if multisite.is_multisite_configured(zone=zone,
+                                         zonegroup=zonegroup):
+        status_set(WORKLOAD_STATES.BLOCKED,
+                   "Failed to do a clean scaledown.")
+        raise RuntimeError("Residual multisite config at local site.")
+
+
 @hooks.hook('slave-relation-changed')
 def slave_relation_changed(relation_id=None, unit=None):
     if not is_leader():

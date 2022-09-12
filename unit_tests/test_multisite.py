@@ -14,6 +14,7 @@
 
 import inspect
 import os
+import json
 from unittest import mock
 
 import multisite
@@ -34,6 +35,7 @@ def get_zonegroup_stub():
     # populate dummy zonegroup info
     zonegroup = {}
     zonegroup['name'] = "test_zonegroup"
+    zonegroup['master_zone'] = "test_zone_id"
     zonegroup['zones'] = [zone]
     return zonegroup
 
@@ -440,6 +442,34 @@ class TestMultisiteHelpers(CharmTestCase):
             '--zone-new-name=test_zone',
             '--rgw-zonegroup=test_zonegroup',
         ])
+
+    @mock.patch.object(json, 'loads')
+    def test_remove_zone_from_zonegroup(self, json_loads):
+        # json.loads() raises TypeError for mock objects.
+        json_loads.returnvalue = []
+        multisite.remove_zone_from_zonegroup(
+            'test_zone', 'test_zonegroup',
+        )
+
+        self.subprocess.check_output.assert_called_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zonegroup', 'remove', '--rgw-zonegroup=test_zonegroup',
+            '--rgw-zone=test_zone',
+        ], stderr=mock.ANY)
+
+    @mock.patch.object(json, 'loads')
+    def test_add_zone_from_zonegroup(self, json_loads):
+        # json.loads() raises TypeError for mock objects.
+        json_loads.returnvalue = []
+        multisite.add_zone_to_zonegroup(
+            'test_zone', 'test_zonegroup',
+        )
+
+        self.subprocess.check_output.assert_called_with([
+            'radosgw-admin', '--id=rgw.testhost',
+            'zonegroup', 'add', '--rgw-zonegroup=test_zonegroup',
+            '--rgw-zone=test_zone',
+        ], stderr=mock.ANY)
 
     @mock.patch.object(multisite, 'list_zonegroups')
     @mock.patch.object(multisite, 'get_local_zone')
