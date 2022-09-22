@@ -218,10 +218,14 @@ def check_optional_config_and_relations(configs):
                          leader_get('secret'),
                          leader_get('restart_nonce'))
 
+    # An operator may have deployed both relations
+    primary_rids = relation_ids('master') + relation_ids('primary')
+    secondary_rids = relation_ids('slave') + relation_ids('secondary')
+    multisite_rids = primary_rids + secondary_rids
+
     # Any realm or zonegroup config is present, multisite checks can be done.
     # zone config can't be used because it's used by default.
-    if config('realm') or config('zonegroup') or relation_ids('master') \
-            or relation_ids('slave'):
+    if config('realm') or config('zonegroup') or multisite_rids:
         # All of Realm, zonegroup, and zone must be configured.
         if not all(multisite_config):
             return ('blocked',
@@ -229,14 +233,14 @@ def check_optional_config_and_relations(configs):
                     '(realm={realm}, zonegroup={zonegroup}'
                     ', zone={zone})'.format(**config()))
 
-        # Master/Slave Relation should be configured.
-        if not (relation_ids('master') or relation_ids('slave')):
+        # Primary/Secondary Relation should be configured.
+        if not multisite_rids:
             return ('blocked',
-                    'multi-site configuration but master/slave '
+                    'multi-site configuration but primary/secondary '
                     'relation missing')
 
         # Primary site status check
-        if relation_ids('master'):
+        if primary_rids:
             # Migration: The system is not multisite already.
             if not multisite.is_multisite_configured(config('zone'),
                                                      config('zonegroup')):
@@ -261,7 +265,7 @@ def check_optional_config_and_relations(configs):
                         'waiting for configuration of master zone')
 
         # Secondary site status check
-        if relation_ids('slave'):
+        if secondary_rids:
             # Migration: The system is not multisite already.
             if not multisite.is_multisite_configured(config('zone'),
                                                      config('zonegroup')):
@@ -270,7 +274,7 @@ def check_optional_config_and_relations(configs):
                             "Non-Pristine RGW site can't be used as secondary")
 
             multisite_ready = False
-            for rid in relation_ids('slave'):
+            for rid in secondary_rids:
                 for unit in related_units(rid):
                     if relation_get('url', unit=unit, rid=rid):
                         multisite_ready = True

@@ -340,7 +340,7 @@ def mon_relation(rid=None, unit=None):
 
                 # NOTE(jamespage):
                 # Multi-site deployments need to defer restart as the
-                # zone is not created until the master relation is
+                # zone is not created until the primary relation is
                 # joined; restarting here will cause a restart burst
                 # in systemd and stop the process restarting once
                 # zone configuration is complete.
@@ -690,8 +690,8 @@ def radosgw_user_changed(relation_id=None):
                 'daemon-id': socket.gethostname()})
 
 
-@hooks.hook('master-relation-joined')
-def master_relation_joined(relation_id=None):
+@hooks.hook('primary-relation-joined')
+def primary_relation_joined(relation_id=None):
     if not ready_for_service(legacy=False):
         log('unit not ready, deferring multisite configuration')
         return
@@ -742,9 +742,9 @@ def master_relation_joined(relation_id=None):
         multisite.create_realm(realm, default=True)
         mutation = True
 
-    # Migration if master site has buckets configured.
+    # Migration if primary site has buckets configured.
     # Migration involves renaming existing zone/zongroups such that existing
-    # buckets and their objects can be preserved on the master site.
+    # buckets and their objects can be preserved on the primary site.
     if multisite.check_cluster_has_buckets() is True:
         log('Migrating to multisite with zone ({}) and zonegroup ({})'
             .format(zone, zonegroup), level=DEBUG)
@@ -821,8 +821,8 @@ def master_relation_joined(relation_id=None):
                  secret=secret)
 
 
-@hooks.hook('master-relation-departed')
-@hooks.hook('slave-relation-departed')
+@hooks.hook('primary-relation-departed')
+@hooks.hook('secondary-relation-departed')
 def multisite_relation_departed():
     if not is_leader():
         log('Cannot remove multisite relation, this unit is not the leader')
@@ -868,8 +868,8 @@ def multisite_relation_departed():
         raise RuntimeError("Residual multisite config at local site.")
 
 
-@hooks.hook('slave-relation-changed')
-def slave_relation_changed(relation_id=None, unit=None):
+@hooks.hook('secondary-relation-changed')
+def secondary_relation_changed(relation_id=None, unit=None):
     if not is_leader():
         log('Cannot setup multisite configuration, this unit is not the '
             'leader')
@@ -884,7 +884,7 @@ def slave_relation_changed(relation_id=None, unit=None):
                 master_data.get('access_key'),
                 master_data.get('secret'),
                 master_data.get('url'))):
-        log("Defer processing until master RGW has provided required data")
+        log("Defer processing until primary RGW has provided required data")
         return
 
     public_url = '{}:{}'.format(
@@ -933,6 +933,9 @@ def slave_relation_changed(relation_id=None, unit=None):
 
     if zone not in multisite.list_zones():
         log('zone {} not found, creating now'.format(zone))
+        multisite.pull_period(url=master_data['url'],
+                              access_key=master_data['access_key'],
+                              secret=master_data['secret'])
         multisite.create_zone(zone,
                               endpoints=endpoints,
                               default=False, master=False,
@@ -953,6 +956,27 @@ def slave_relation_changed(relation_id=None, unit=None):
         log('No mutation detected.', 'INFO')
 
 
+@hooks.hook('master-relation-departed')
+@hooks.hook('slave-relation-departed')
+def master_slave_relation_departed():
+    log("departed relation is deprecated", "WARN")
+    multisite_relation_departed()
+
+
+@hooks.hook('master-relation-joined')
+def master_relation_joined(relation_id=None):
+    log("This relation is deprecated, use primary-secondary relation instead",
+        "WARN")
+    primary_relation_joined(relation_id)
+
+
+@hooks.hook('slave-relation-changed')
+def slave_relation_changed(relation_id=None, unit=None):
+    log("This relation is deprecated, use primary-secondary relation instead",
+        "WARN")
+    secondary_relation_changed(relation_id, unit)
+
+
 @hooks.hook('leader-settings-changed')
 def leader_settings_changed():
     # NOTE: leader unit will only ever set leader storage
@@ -962,19 +986,30 @@ def leader_settings_changed():
     if restart_nonce_changed(leader_get('restart_nonce')):
         service_restart(service_name())
     if not is_leader():
+        # Deprecated Master/Slave relation
         for r_id in relation_ids('master'):
             master_relation_joined(r_id)
+        # Primary/Secondary relation
+        for r_id in relation_ids('primary'):
+            primary_relation_joined(r_id)
         for r_id in relation_ids('radosgw-user'):
             radosgw_user_changed(r_id)
 
 
 def process_multisite_relations():
-    """Re-trigger any pending master/slave relations"""
+    """Re-trigger any pending multisite relations"""
+    # Deprecated Master/Slave relation
     for r_id in relation_ids('master'):
         master_relation_joined(r_id)
     for r_id in relation_ids('slave'):
         for unit in related_units(r_id):
             slave_relation_changed(r_id, unit)
+    # Primary/Secondary relation
+    for r_id in relation_ids('primary'):
+        primary_relation_joined(r_id)
+    for r_id in relation_ids('secondary'):
+        for unit in related_units(r_id):
+            secondary_relation_changed(r_id, unit)
 
 
 if __name__ == '__main__':

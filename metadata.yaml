@@ -30,6 +30,8 @@ requires:
     interface: tls-certificates
   slave:
     interface: radosgw-multisite
+  secondary:
+    interface: radosgw-multisite
 provides:
   nrpe-external-master:
     interface: nrpe-external-master
@@ -37,6 +39,8 @@ provides:
   gateway:
     interface: http
   master:
+    interface: radosgw-multisite
+  primary:
     interface: radosgw-multisite
   object-store:
     interface: swift-proxy
