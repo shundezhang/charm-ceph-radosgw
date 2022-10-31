@@ -4,6 +4,9 @@ gate_bundles:
   - jammy-yoga-multisite
   - vault: jammy-yoga
   - vault: jammy-yoga-namespaced
+  - focal-yoga-multisite
+  - vault: focal-yoga
+  - vault: focal-yoga-namespaced
 
 smoke_bundles:
   - jammy-yoga-multisite
