@@ -15,6 +15,7 @@ tags:
 series:
 - focal
 - jammy
+- kinetic
 extra-bindings:
   public:
   admin:
