@@ -88,6 +88,7 @@ class MultisiteActionsTestCase(CharmTestCase):
         'is_leader',
         'leader_set',
         'service_name',
+        'service_restart',
     ]
 
     def setUp(self):
