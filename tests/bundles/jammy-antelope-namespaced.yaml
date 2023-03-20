@@ -1,5 +1,5 @@
 options:
-  source: &source distro
+  source: &source cloud:jammy-antelope
 
 series: jammy
 
@@ -26,7 +26,7 @@ applications:
 
   keystone-mysql-router:
     charm: ch:mysql-router
-    channel: 8.0.19/edge
+    channel: latest/edge
 
   mysql-innodb-cluster:
     charm: ch:mysql-innodb-cluster
@@ -37,7 +37,7 @@ applications:
       - '0'
       - '1'
       - '2'
-    channel: 8.0.19/edge
+    channel: latest/edge
 
   ceph-radosgw:
     charm: ../../ceph-radosgw.charm
@@ -61,7 +61,7 @@ applications:
       - '4'
       - '5'
       - '6'
-    channel: latest/edge
+    channel: quincy/edge
 
   ceph-mon:
     charm: ch:ceph-mon
@@ -72,7 +72,7 @@ applications:
       - '7'
       - '8'
       - '9'
-    channel: latest/edge
+    channel: quincy/edge
 
   keystone:
     expose: True
@@ -82,11 +82,11 @@ applications:
       openstack-origin: *source
     to:
       - '10'
-    channel: latest/edge
+    channel: 2023.1/edge
 
   vault-mysql-router:
     charm: ch:mysql-router
-    channel: 8.0.19/edge
+    channel: latest/edge
 
   vault:
     charm: ch:vault
