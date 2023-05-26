@@ -77,7 +77,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 'radosgw-admin', '--id=rgw.testhost',
                 'realm', 'create',
                 '--rgw-realm=beedata', '--default'
-            ], stderr=mock.ANY)
+            ])
 
     def test_list_realms(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -110,7 +110,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 'user', 'create',
                 '--uid=mrbees',
                 '--display-name=Synchronization User',
-            ], stderr=mock.ANY)
+            ])
 
     def test_create_system_user(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -130,7 +130,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 '--uid=mrbees',
                 '--display-name=Synchronization User',
                 '--system'
-            ], stderr=mock.ANY)
+            ])
 
     def test_create_zonegroup(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -151,7 +151,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 '--rgw-realm=beedata',
                 '--default',
                 '--master'
-            ], stderr=mock.ANY)
+            ])
 
     def test_list_zonegroups(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -182,7 +182,7 @@ class TestMultisiteHelpers(CharmTestCase):
                 '--access-key=mykey',
                 '--secret=mypassword',
                 '--read-only=0',
-            ], stderr=mock.ANY)
+            ])
 
     def test_modify_zone(self):
         multisite.modify_zone(
@@ -199,7 +199,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--endpoints=http://localhost:80,https://localhost:443',
             '--access-key=mykey', '--secret=secret',
             '--read-only=1',
-        ], stderr=mock.ANY)
+        ])
 
     def test_modify_zone_promote_master(self):
         multisite.modify_zone(
@@ -214,7 +214,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--master',
             '--default',
             '--read-only=0',
-        ], stderr=mock.ANY)
+        ])
 
     def test_modify_zone_partial_credentials(self):
         multisite.modify_zone(
@@ -228,7 +228,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--rgw-zone=brundall-east',
             '--endpoints=http://localhost:80,https://localhost:443',
             '--read-only=0',
-        ], stderr=mock.ANY)
+        ])
 
     def test_list_zones(self):
         with open(self._testdata(whoami()), 'rb') as f:
@@ -288,7 +288,7 @@ class TestMultisiteHelpers(CharmTestCase):
             'realm', 'pull',
             '--url=http://master:80',
             '--access-key=testkey', '--secret=testsecret',
-        ], stderr=mock.ANY)
+        ])
 
     def test_pull_period(self):
         multisite.pull_period(url='http://master:80',
@@ -299,7 +299,7 @@ class TestMultisiteHelpers(CharmTestCase):
             'period', 'pull',
             '--url=http://master:80',
             '--access-key=testkey', '--secret=testsecret',
-        ], stderr=mock.ANY)
+        ])
 
     def test_list_buckets(self):
         self.subprocess.CalledProcessError = BaseException
@@ -308,7 +308,7 @@ class TestMultisiteHelpers(CharmTestCase):
             'radosgw-admin', '--id=rgw.testhost',
             'bucket', 'list', '--rgw-zone=default',
             '--rgw-zonegroup=default'
-        ], stderr=mock.ANY)
+        ])
 
     def test_rename_zonegroup(self):
         multisite.rename_zonegroup('default', 'test_zone_group')
@@ -332,7 +332,7 @@ class TestMultisiteHelpers(CharmTestCase):
         self.subprocess.check_output.assert_called_once_with([
             'radosgw-admin', '--id=rgw.testhost',
             'zonegroup', 'get', '--rgw-zonegroup=test_zone'
-        ], stderr=mock.ANY)
+        ])
 
     def test_modify_zonegroup_migrate(self):
         multisite.modify_zonegroup('test_zonegroup',
@@ -344,7 +344,7 @@ class TestMultisiteHelpers(CharmTestCase):
             'zonegroup', 'modify',
             '--rgw-zonegroup=test_zonegroup', '--rgw-realm=test_realm',
             '--endpoints=http://localhost:80', '--default', '--master',
-        ], stderr=mock.ANY)
+        ])
 
     def test_modify_zone_migrate(self):
         multisite.modify_zone('test_zone', default=True, master=True,
@@ -357,7 +357,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--rgw-zonegroup=test_zonegroup',
             '--endpoints=http://localhost:80',
             '--master', '--default', '--read-only=0',
-        ], stderr=mock.ANY)
+        ])
 
     @mock.patch.object(multisite, 'list_zones')
     @mock.patch.object(multisite, 'get_zonegroup_info')
@@ -401,7 +401,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--rgw-realm=test_realm',
             '--endpoints=http://localhost:80', '--default',
             '--master',
-        ], stderr=mock.ANY)
+        ])
 
     @mock.patch.object(multisite, 'modify_zonegroup')
     def test_modify_multisite_config_zone_fail(self, mock_modify_zonegroup):
@@ -423,7 +423,7 @@ class TestMultisiteHelpers(CharmTestCase):
             '--rgw-zonegroup=test_zonegroup',
             '--endpoints=http://localhost:80',
             '--master', '--default', '--read-only=0',
-        ], stderr=mock.ANY)
+        ])
 
     @mock.patch.object(multisite, 'rename_zonegroup')
     def test_rename_multisite_config_zone_fail(self, mock_rename_zonegroup):
@@ -455,7 +455,7 @@ class TestMultisiteHelpers(CharmTestCase):
             'radosgw-admin', '--id=rgw.testhost',
             'zonegroup', 'remove', '--rgw-zonegroup=test_zonegroup',
             '--rgw-zone=test_zone',
-        ], stderr=mock.ANY)
+        ])
 
     @mock.patch.object(json, 'loads')
     def test_add_zone_from_zonegroup(self, json_loads):
@@ -469,7 +469,7 @@ class TestMultisiteHelpers(CharmTestCase):
             'radosgw-admin', '--id=rgw.testhost',
             'zonegroup', 'add', '--rgw-zonegroup=test_zonegroup',
             '--rgw-zone=test_zone',
-        ], stderr=mock.ANY)
+        ])
 
     @mock.patch.object(multisite, 'list_zonegroups')
     @mock.patch.object(multisite, 'get_local_zone')

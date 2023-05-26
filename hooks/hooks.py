@@ -373,13 +373,10 @@ def mon_relation(rid=None, unit=None):
                                               endpoints=endpoints,
                                               default=True, master=True,
                                               zonegroup=zonegroup)
-                    except subprocess.CalledProcessError as e:
-                        if 'File exists' in e.stderr.decode('UTF-8'):
-                            # NOTE(lourot): may have been created in the
-                            # background by the Rados Gateway daemon, see
-                            # lp:1856106
-                            log("zone '{}' existed already after all".format(
-                                zone))
+                    except subprocess.CalledProcessError:
+                        if zone in multisite.list_zones(retry_on_empty=True):
+                            log("zone '{}' existed already after all"
+                                .format(zone))
                         else:
                             raise
 
