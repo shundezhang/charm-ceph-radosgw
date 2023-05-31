@@ -295,6 +295,7 @@ class MonContext(context.CephContext):
             'rgw_swift_versioning': config('rgw-swift-versioning-enabled'),
             'relaxed_s3_bucket_names': config('relaxed-s3-bucket-names'),
             'frontend': http_frontend,
+            'behind_https_proxy': https(),
         }
 
         # NOTE(dosaboy): these sections must correspond to what is supported in
