@@ -1,7 +1,6 @@
 - project:
     templates:
       - charm-unit-jobs-py38
-      - charm-unit-jobs-py39
       - charm-unit-jobs-py310
     check:
       jobs:
@@ -12,7 +11,6 @@
         - jammy-zed-multisite
         - jammy-antelope-multisite:
             voting: false
-        - kinetic-zed-multisite
         - lunar-antelope-multisite:
             voting: false
         - vault-jammy-yoga_rgw
@@ -23,8 +21,6 @@
             voting: false
         - vault-jammy-antelope-namespaced:
             voting: false
-        - vault-kinetic-zed_rgw
-        - vault-kinetic-zed-namespaced
         - vault-lunar-antelope_rgw:
             voting: false
         - vault-lunar-antelope-namespaced:
@@ -41,7 +37,6 @@
       - osci-lint
       - charm-build
       - tox-py38
-      - tox-py39
       - name: tox-py310
         soft: true
     vars:
@@ -70,13 +65,6 @@
       - jammy-yoga-multisite
     vars:
       tox_extra_args: jammy-antelope-multisite
-- job:
-    name: kinetic-zed-multisite
-    parent: func-target
-    dependencies:
-      - jammy-yoga-multisite
-    vars:
-      tox_extra_args: kinetic-zed-multisite
 - job:
     name: lunar-antelope-multisite
     parent: func-target
@@ -142,22 +130,6 @@
       - vault-jammy-yoga-namespaced
     vars:
       tox_extra_args: vault:jammy-zed-namespaced
-- job:
-    name: vault-kinetic-zed_rgw
-    parent: func-target
-    dependencies:
-      - vault-jammy-yoga_rgw
-      - vault-jammy-yoga-namespaced
-    vars:
-      tox_extra_args: vault:kinetic-zed
-- job:
-    name: vault-kinetic-zed-namespaced
-    parent: func-target
-    dependencies:
-      - vault-jammy-yoga_rgw
-      - vault-jammy-yoga-namespaced
-    vars:
-      tox_extra_args: vault:kinetic-zed-namespaced
 - job:
     name: vault-jammy-antelope_rgw
     parent: func-target

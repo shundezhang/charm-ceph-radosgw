@@ -7,6 +7,7 @@ description: |
   .
   This charm provides the RADOS HTTP gateway supporting S3 and Swift protocols
   for object storage.
+docs: https://discourse.charmhub.io/t/ceph-radosgw-docs-index/11005
 tags:
 - openstack
 - storage
