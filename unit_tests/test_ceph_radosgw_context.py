@@ -46,6 +46,7 @@ class HAProxyContextTests(CharmTestCase):
         self.cmp_pkgrevno.return_value = 1
         self.arch.return_value = 'amd64'
 
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.openstack.context.get_relation_ip')
     @patch('charmhelpers.contrib.openstack.context.mkdir')
     @patch('charmhelpers.contrib.openstack.context.local_unit')
@@ -54,7 +55,9 @@ class HAProxyContextTests(CharmTestCase):
     @patch('charmhelpers.contrib.openstack.context.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     def test_ctxt(self, _harelation_ids, _ctxtrelation_ids, _haconfig,
-                  _ctxtconfig, _local_unit, _mkdir, _get_relation_ip):
+                  _ctxtconfig, _local_unit, _mkdir, _get_relation_ip,
+                  _mock_https):
+        _mock_https.return_value = False
         _get_relation_ip.return_value = '10.0.0.10'
         _ctxtconfig.side_effect = self.test_config.get
         _haconfig.side_effect = self.test_config.get
@@ -96,14 +99,17 @@ class MonContextTest(CharmTestCase):
         else:
             return []
 
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
     @patch.object(context, 'ensure_host_resolvable_v6')
     def test_ctxt(
-        self, mock_ensure_rsv_v6, mock_config_get, mock_relation_ids
+        self, mock_ensure_rsv_v6, mock_config_get, mock_relation_ids,
+        mock_https,
     ):
+        mock_https.return_value = False
         mock_relation_ids.return_value = []
         mock_config_get.side_effect = self.test_config.get
         self.socket.gethostname.return_value = 'testhost'
@@ -212,14 +218,17 @@ class MonContextTest(CharmTestCase):
         self.assertEqual(expect, mon_ctxt())
         self.assertTrue(mock_ensure_rsv_v6.called)
 
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
     @patch.object(context, 'ensure_host_resolvable_v6')
     def test_list_of_addresses_from_ceph_proxy(
-        self, mock_ensure_rsv_v6, mock_config_get, mock_relation_ids
+        self, mock_ensure_rsv_v6, mock_config_get, mock_relation_ids,
+        mock_https,
     ):
+        mock_https.return_value = False
         mock_relation_ids.return_value = []
         mock_config_get.side_effect = self.test_config.get
         self.socket.gethostname.return_value = 'testhost'
@@ -273,11 +282,14 @@ class MonContextTest(CharmTestCase):
         self.assertEqual(expect, mon_ctxt())
         self.assertTrue(mock_ensure_rsv_v6.called)
 
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
-    def test_ctxt_missing_data(self, mock_config_get, mock_relation_ids):
+    def test_ctxt_missing_data(self, mock_config_get, mock_relation_ids,
+                               mock_https):
+        mock_https.return_value = False
         mock_relation_ids.return_value = []
         mock_config_get.side_effect = self.test_config.get
         self.socket.gethostname.return_value = 'testhost'
@@ -287,11 +299,14 @@ class MonContextTest(CharmTestCase):
         self.related_units.return_value = ['ceph/0', 'ceph/1', 'ceph/2']
         self.assertEqual({}, mon_ctxt())
 
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
-    def test_ctxt_inconsistent_auths(self, mock_config_get, mock_relation_ids):
+    def test_ctxt_inconsistent_auths(self, mock_config_get, mock_relation_ids,
+                                     mock_https):
+        mock_https.return_value = False
         mock_relation_ids.return_value = []
         mock_config_get.side_effect = self.test_config.get
         self.socket.gethostname.return_value = 'testhost'
@@ -337,11 +352,14 @@ class MonContextTest(CharmTestCase):
         }
         self.assertEqual(expect, mon_ctxt())
 
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
-    def test_ctxt_consistent_auths(self, mock_config_get, mock_relation_ids):
+    def test_ctxt_consistent_auths(self, mock_config_get, mock_relation_ids,
+                                   mock_https):
+        mock_https.return_value = False
         mock_relation_ids.return_value = []
         mock_config_get.side_effect = self.test_config.get
         self.socket.gethostname.return_value = 'testhost'
@@ -445,11 +463,14 @@ class MonContextTest(CharmTestCase):
         _test_version = '16.2.0'
         context.validate_http_frontend('beast')
 
+    @patch('ceph_radosgw_context.https')
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     @patch('charmhelpers.contrib.hahelpers.cluster.config_get')
     @patch.object(ceph, 'config', lambda *args:
                   '{"client.radosgw.gateway": {"rgw init timeout": 60}}')
-    def test_ctxt_inconsistent_fsids(self, mock_config_get, mock_relation_ids):
+    def test_ctxt_inconsistent_fsids(self, mock_config_get, mock_relation_ids,
+                                     mock_https):
+        mock_https.return_value = False
         mock_relation_ids.return_value = []
         mock_config_get.side_effect = self.test_config.get
         self.socket.gethostname.return_value = 'testhost'
