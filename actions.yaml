@@ -1,7 +1,7 @@
 pause:
   description: Pause the ceph-radosgw unit.
 resume:
-  descrpition: Resume the ceph-radosgw unit.
+  description: Resume the ceph-radosgw unit.
 promote:
   description: Promote the zone associated with the local units to master/default (multi-site).
 readonly:

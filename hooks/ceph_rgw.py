@@ -79,6 +79,10 @@ def import_radosgw_key(key, name=None):
     return False
 
 
+def normalize_pool_name(pool):
+    return pool[1:] if pool.startswith('.') else pool
+
+
 def get_create_rgw_pools_rq(prefix=None):
     """Pre-create RGW pools so that they have the correct settings.
 
@@ -101,6 +105,8 @@ def get_create_rgw_pools_rq(prefix=None):
         w = weights.get(pool, 0.10)
         if prefix:
             pool = "{prefix}{pool}".format(prefix=prefix, pool=pool)
+
+        pool = normalize_pool_name(pool)
         if pg_num > 0:
             rq.add_op_create_pool(name=pool, replica_count=replicas,
                                   pg_num=pg_num, group='objects',
@@ -162,7 +168,7 @@ def get_create_rgw_pools_rq(prefix=None):
             # the function arguments. Until then we need to build the dict
             # prior to the function call.
             kwargs = {
-                'name': pool,
+                'name': normalize_pool_name(pool),
                 'erasure_profile': profile_name,
                 'weight': bucket_weight,
                 'group': "objects",
@@ -178,7 +184,7 @@ def get_create_rgw_pools_rq(prefix=None):
             # the function arguments. Until then we need to build the dict
             # prior to the function call.
             kwargs = {
-                'name': pool,
+                'name': normalize_pool_name(pool),
                 'replica_count': replicas,
                 'weight': bucket_weight,
                 'group': 'objects',
@@ -209,7 +215,8 @@ def get_create_rgw_pools_rq(prefix=None):
     for pool in light:
         _add_light_pool(rq, pool, pg_num, prefix)
 
-    _add_light_pool(rq, '.rgw.root', pg_num)
+    # RadosGW creates this pool automatically from Quincy on.
+    # _add_light_pool(rq, '.rgw.root', pg_num)
 
     if config('restrict-ceph-pools'):
         rq.add_op_request_access_to_group(name="objects",
