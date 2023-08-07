@@ -9,37 +9,37 @@
         - vault-focal-yoga-namespaced
         - focal-yoga-multisite
         - jammy-yoga-multisite
-        - jammy-zed-multisite:
-            voting: false
         - jammy-antelope-multisite:
             voting: false
-        - kinetic-zed-multisite:
+        - jammy-bobcat-multisite:
             voting: false
         - lunar-antelope-multisite:
             voting: false
+        - mantic-bobcat-multisite:
+            voting: false
         - vault-jammy-yoga_rgw
         - vault-jammy-yoga-namespaced
-        - vault-jammy-zed_rgw:
-            voting: false
-        - vault-jammy-zed-namespaced:
-            voting: false
         - vault-jammy-antelope_rgw:
             voting: false
         - vault-jammy-antelope-namespaced:
             voting: false
-        - vault-kinetic-zed_rgw:
+        - vault-jammy-bobcat_rgw:
             voting: false
-        - vault-kinetic-zed-namespaced:
+        - vault-jammy-bobcat-namespaced:
             voting: false
         - vault-lunar-antelope_rgw:
             voting: false
         - vault-lunar-antelope-namespaced:
             voting: false
+        - vault-mantic-bobcat_rgw:
+            voting: false
+        - vault-mantic-bobcat-namespaced:
+            voting: false
     vars:
       needs_charm_build: true
       charm_build_name: ceph-radosgw
       build_type: charmcraft
-      charmcraft_channel: 2.1/stable
+      charmcraft_channel: 2.x/stable
 - job:
     name: focal-yoga-multisite
     parent: func-target
@@ -63,13 +63,6 @@
     vars:
       tox_extra_args: '-- jammy-yoga-multisite'
 - job:
-    name: jammy-zed-multisite
-    parent: func-target
-    dependencies:
-      - jammy-yoga-multisite
-    vars:
-      tox_extra_args: '-- jammy-zed-multisite'
-- job:
     name: jammy-antelope-multisite
     parent: func-target
     dependencies:
@@ -77,12 +70,12 @@
     vars:
       tox_extra_args: '-- jammy-antelope-multisite'
 - job:
-    name: kinetic-zed-multisite
+    name: jammy-bobcat-multisite
     parent: func-target
     dependencies:
       - jammy-yoga-multisite
     vars:
-      tox_extra_args: '-- kinetic-zed-multisite'
+      tox_extra_args: '-- jammy-bobcat-multisite'
 - job:
     name: lunar-antelope-multisite
     parent: func-target
@@ -90,6 +83,13 @@
       - jammy-yoga-multisite
     vars:
       tox_extra_args: '-- lunar-antelope-multisite'
+- job:
+    name: mantic-bobcat-multisite
+    parent: func-target
+    dependencies:
+      - jammy-yoga-multisite
+    vars:
+      tox_extra_args: '-- mantic-bobcat-multisite'
 - job:
     name: vault-focal-yoga_rgw
     parent: func-target
@@ -119,13 +119,6 @@
     vars:
       tox_extra_args: '-- vault:jammy-yoga-namespaced'
 - job:
-    name: vault-jammy-zed-namespaced
-    parent: func-target
-    dependencies:
-      - jammy-yoga-multisite
-    vars:
-      tox_extra_args: '-- vault:jammy-zed-namespaced'
-- job:
     name: vault-jammy-antelope-namespaced
     parent: func-target
     dependencies:
@@ -133,37 +126,12 @@
     vars:
       tox_extra_args: '-- vault:jammy-antelope-namespaced'
 - job:
-    name: vault-jammy-zed_rgw
+    name: vault-jammy-bobcat-namespaced
     parent: func-target
     dependencies:
-      - vault-jammy-yoga_rgw
-      - vault-jammy-yoga-namespaced
+      - jammy-yoga-multisite
     vars:
-      tox_extra_args: '-- vault:jammy-zed'
-- job:
-    name: vault-jammy-zed-namespaced
-    parent: func-target
-    dependencies:
-      - vault-jammy-yoga_rgw
-      - vault-jammy-yoga-namespaced
-    vars:
-      tox_extra_args: '-- vault:jammy-zed-namespaced'
-- job:
-    name: vault-kinetic-zed_rgw
-    parent: func-target
-    dependencies:
-      - vault-jammy-yoga_rgw
-      - vault-jammy-yoga-namespaced
-    vars:
-      tox_extra_args: '-- vault:kinetic-zed'
-- job:
-    name: vault-kinetic-zed-namespaced
-    parent: func-target
-    dependencies:
-      - vault-jammy-yoga_rgw
-      - vault-jammy-yoga-namespaced
-    vars:
-      tox_extra_args: '-- vault:kinetic-zed-namespaced'
+      tox_extra_args: '-- vault:jammy-bobcat-namespaced'
 - job:
     name: vault-jammy-antelope_rgw
     parent: func-target
@@ -173,13 +141,13 @@
     vars:
       tox_extra_args: '-- vault:jammy-antelope'
 - job:
-    name: vault-lunar-antelope_rgw
+    name: vault-jammy-bobcat_rgw
     parent: func-target
     dependencies:
       - vault-jammy-yoga_rgw
       - vault-jammy-yoga-namespaced
     vars:
-      tox_extra_args: '-- vault:lunar-antelope'
+      tox_extra_args: '-- vault:jammy-bobcat'
 - job:
     name: vault-lunar-antelope-namespaced
     parent: func-target
@@ -188,3 +156,27 @@
       - vault-jammy-yoga-namespaced
     vars:
       tox_extra_args: '-- vault:lunar-antelope-namespaced'
+- job:
+    name: vault-mantic-bobcat-namespaced
+    parent: func-target
+    dependencies:
+      - vault-jammy-yoga_rgw
+      - vault-jammy-yoga-namespaced
+    vars:
+      tox_extra_args: '-- vault:mantic-bobcat-namespaced'
+- job:
+    name: vault-lunar-antelope_rgw
+    parent: func-target
+    dependencies:
+      - vault-jammy-yoga_rgw
+      - vault-jammy-yoga-namespaced
+    vars:
+      tox_extra_args: '-- vault:lunar-antelope'
+- job:
+    name: vault-mantic-bobcat_rgw
+    parent: func-target
+    dependencies:
+      - vault-jammy-yoga_rgw
+      - vault-jammy-yoga-namespaced
+    vars:
+      tox_extra_args: '-- vault:mantic-bobcat'

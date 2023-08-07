@@ -1,7 +1,7 @@
 options:
-  source: &source distro
+  source: &source cloud:mantic-bobcat
 
-series: kinetic
+series: mantic
 
 comment:
 - 'machines section to decide order of deployment. database sooner = faster'
@@ -44,7 +44,6 @@ applications:
     num_units: 1
     options:
       source: *source
-      namespace-tenants: True
     to:
       - '3'
 

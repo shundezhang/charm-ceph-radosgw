@@ -14,20 +14,20 @@ smoke_bundles:
 
 dev_bundles:
   - jammy-yoga-multisite
-  - jammy-zed-multisite
   - lunar-antelope-multisite
-  - kinetic-zed-multisite
+  - mantic-bobcat-multisite
   - jammy-antelope-multisite
+  - jammy-bobcat-multisite
   - vault: jammy-yoga
   - vault: jammy-yoga-namespaced
-  - vault: jammy-zed
   - vault: lunar-antelope
-  - vault: jammy-zed-namespaced
+  - vault: mantic-bobcat
   - vault: lunar-antelope-namespaced
-  - vault: kinetic-zed
+  - vault: mantic-bobcat-namespaced
   - vault: jammy-antelope
-  - vault: kinetic-zed-namespaced
+  - vault: jammy-bobcat
   - vault: jammy-antelope-namespaced
+  - vault: jammy-bobcat-namespaced
 
 target_deploy_status:
   vault:
@@ -48,7 +48,7 @@ tests:
 
 tests_options:
   force_deploy:
-    - kinetic-zed
     - jammy-antelope
-    - kinetic-zed-namespaced
+    - jammy-bobcat
     - jammy-antelope-namespaced
+    - jammy-bobcat-namespaced
