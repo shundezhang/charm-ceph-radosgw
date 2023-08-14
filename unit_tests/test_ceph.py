@@ -107,9 +107,6 @@ class CephRadosGWCephTests(CharmTestCase):
             call('us-east.rgw.buckets.index', replica_count=3, pg_num=10,
                  weight=None, group='objects', namespace=None, app_name='rgw',
                  max_bytes=None, max_objects=None),
-            call('.rgw.root', replica_count=3, pg_num=10, weight=None,
-                 group='objects', namespace=None, app_name='rgw',
-                 max_bytes=None, max_objects=None),
         ])
 
         # confirm operation with bluestore compression
@@ -162,9 +159,6 @@ class CephRadosGWCephTests(CharmTestCase):
                  max_bytes=None, max_objects=None),
             call('us-east.rgw.buckets.index', replica_count=3, pg_num=10,
                  weight=None, group='objects', namespace=None, app_name='rgw',
-                 max_bytes=None, max_objects=None),
-            call('.rgw.root', replica_count=3, pg_num=10, weight=None,
-                 group='objects', namespace=None, app_name='rgw',
                  max_bytes=None, max_objects=None),
         ])
 
@@ -228,9 +222,6 @@ class CephRadosGWCephTests(CharmTestCase):
             call('default.rgw.buckets.index', replica_count=3, pg_num=None,
                  weight=3.0, group='objects', namespace=None, app_name='rgw',
                  max_bytes=None, max_objects=None),
-            call('.rgw.root', replica_count=3, pg_num=None, weight=0.1,
-                 group='objects', namespace=None, app_name='rgw',
-                 max_bytes=None, max_objects=None),
         ])
         mock_request_access.assert_called_with(key_name='radosgw.gateway',
                                                name='objects',
@@ -286,9 +277,6 @@ class CephRadosGWCephTests(CharmTestCase):
                  max_bytes=None, max_objects=None),
             call('default.rgw.buckets.index', replica_count=3, pg_num=None,
                  weight=3.0, group='objects', namespace=None, app_name='rgw',
-                 max_bytes=None, max_objects=None),
-            call('.rgw.root', replica_count=3, pg_num=None, weight=0.1,
-                 group='objects', namespace=None, app_name='rgw',
                  max_bytes=None, max_objects=None),
         ])
 
@@ -365,9 +353,7 @@ class CephRadosGWCephTests(CharmTestCase):
             call(weight=3.00, replica_count=3,
                  name='default.rgw.buckets.index',
                  group='objects', app_name='rgw'),
-            call(weight=0.10, replica_count=3, name='.rgw.root',
-                 group='objects', app_name='rgw')],
-        )
+        ],)
         mock_request_access.assert_called_with(key_name='radosgw.gateway',
                                                name='objects',
                                                permission='rwx')
