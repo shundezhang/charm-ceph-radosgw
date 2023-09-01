@@ -28,3 +28,4 @@ git+https://opendev.org/openstack/tempest.git#egg=tempest
 
 pyopenssl<=22.0.0
 croniter            # needed for charm-rabbitmq-server unit tests
+jsonschema<4.18.0   # jsonschema 4.18.0 depends on Rust (via rpds-py)
