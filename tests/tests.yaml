@@ -1,25 +1,19 @@
 charm_name: ceph-radosgw
 
 gate_bundles:
-  - jammy-yoga-multisite
-  - vault: jammy-yoga
-  - vault: jammy-yoga-namespaced
   - focal-yoga-multisite
   - vault: focal-yoga
   - vault: focal-yoga-namespaced
 
 smoke_bundles:
-  - jammy-yoga-multisite
-  - vault: jammy-yoga
+  - jammy-antelope-multisite
+  - vault: jammy-antelope
 
 dev_bundles:
-  - jammy-yoga-multisite
   - lunar-antelope-multisite
   - mantic-bobcat-multisite
   - jammy-antelope-multisite
   - jammy-bobcat-multisite
-  - vault: jammy-yoga
-  - vault: jammy-yoga-namespaced
   - vault: lunar-antelope
   - vault: mantic-bobcat
   - vault: lunar-antelope-namespaced
