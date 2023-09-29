@@ -39,6 +39,12 @@ tests:
     - zaza.openstack.charm_tests.swift.tests.S3APITest
     - zaza.openstack.charm_tests.ceph.tests.CheckPoolTypes
     - zaza.openstack.charm_tests.ceph.tests.BlueStoreCompressionCharmOperation
+    # Charm upgrade, then re-run tests
+    - zaza.charm_tests.lifecycle.tests.UpgradeCharmsToPath;ceph-radosgw
+    - zaza.openstack.charm_tests.ceph.tests.CephRGWTest
+    - zaza.openstack.charm_tests.swift.tests.S3APITest
+    - zaza.openstack.charm_tests.ceph.tests.CheckPoolTypes
+    - zaza.openstack.charm_tests.ceph.tests.BlueStoreCompressionCharmOperation
 
 tests_options:
   force_deploy:
