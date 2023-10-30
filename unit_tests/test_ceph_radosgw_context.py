@@ -47,6 +47,7 @@ class HAProxyContextTests(CharmTestCase):
         self.arch.return_value = 'amd64'
 
     @patch('ceph_radosgw_context.https')
+    @patch('charmhelpers.contrib.openstack.context.is_ipv6_disabled')
     @patch('charmhelpers.contrib.openstack.context.get_relation_ip')
     @patch('charmhelpers.contrib.openstack.context.mkdir')
     @patch('charmhelpers.contrib.openstack.context.local_unit')
@@ -56,7 +57,7 @@ class HAProxyContextTests(CharmTestCase):
     @patch('charmhelpers.contrib.hahelpers.cluster.relation_ids')
     def test_ctxt(self, _harelation_ids, _ctxtrelation_ids, _haconfig,
                   _ctxtconfig, _local_unit, _mkdir, _get_relation_ip,
-                  _mock_https):
+                  _is_ipv6_disabled, _mock_https):
         _mock_https.return_value = False
         _get_relation_ip.return_value = '10.0.0.10'
         _ctxtconfig.side_effect = self.test_config.get
@@ -74,6 +75,7 @@ class HAProxyContextTests(CharmTestCase):
             'https': False
         }
         self.assertEqual(expect, haproxy_context())
+        _is_ipv6_disabled.assert_called_once_with()
 
 
 class MonContextTest(CharmTestCase):
