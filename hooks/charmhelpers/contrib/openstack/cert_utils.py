@@ -159,6 +159,8 @@ def get_certificate_request(json_encode=True, bindings=None):
             vip = get_vip_in_network(resolve_network_cidr(ip))
             if vip:
                 addresses.append(vip)
+            if config('virtual-hosted-bucket-enabled') and hostname_override:
+                addresses.append("*."+hostname_override)
 
             # Clear any Nones or duplicates
             addresses = list(set([i for i in addresses if i]))
